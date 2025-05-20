@@ -1,0 +1,200 @@
+"use client"
+
+import { useState } from "react"
+import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom"
+import { Footer } from "./MainComponents/Footer/Footer"
+import Dashboard from "./MainPages/Dashboard/MainDashboard"
+import AppHeader from "./MainComponents/NavBar/Navbar"
+import LandingHeader from "./MainComponents/NavBar/LandingNavbar"
+import Sidebar from "./MainComponents/Sidebar/Sidebar"
+import "./App.css"
+import VesselsPage from "./MainPages/Vessels/VesselsPage"
+import DocumentHub from "./MainPages/DocumentHub/DocumentHub"
+import ProtectedRoute from "./Auth/ProtectedRoute"
+
+import PortPreparation from "./MainPages/PortPrep/PortPrep"
+import DocumentSharing from "./MainPages/DocumentSharing/DocumentSharing"
+import PricingPage from "./MainPages/Pricing/PricingPage"
+import SettingsPage from "./MainPages/Settings/SettingsPage"
+import NotificationsPage from "./MainPages/Notifications/Notifications"
+import OnboardingPage from "./Auth/Onboarding/OnboardingPage"
+import LandingPage from "./MainPages/LandingPage/LandingPage"
+import DocumentSharingRecipientView from "./MainPages/SharePage/DocumentSharingRecipientView"
+import SignupPage from "./Auth/Signup/SignupPage"
+import LoginPage from "./Auth/Login/LoginPage"
+import EmailVerificationPage from "./Auth/Signup/ConfirmEmail"
+import EmailConfirmationPage from "./Auth/Signup/EmailConfirmed"
+
+// Define a simple user type for demonstration
+interface UserType {
+  id?: string
+  name?: string
+  email?: string
+  profileImage?: string
+}
+
+// Create a wrapper component to handle conditional header rendering
+function AppContent() {
+  // State for the navbar props
+  const [activeTab, setActiveTab] = useState("aiChat")
+  const [showSidePanel, setShowSidePanel] = useState(true)
+  const [showRightPanel, setShowRightPanel] = useState(false)
+
+  // Use location to determine which header to show
+  const location = useLocation()
+  const isLandingPage = location.pathname === "/"
+  const isAuthPage =
+    location.pathname === "/login" ||
+    location.pathname === "/signup" ||
+    location.pathname === "/onboarding" ||
+    location.pathname === "/confirm-email" ||
+    location.pathname === "/email-confirmed"
+
+  // Mock user data
+  const user: UserType = {
+    id: "1",
+    name: "John Smith",
+    email: "john.smith@example.com",
+  }
+
+  // Mock logout function
+  const handleLogout = () => {
+    console.log("User logged out")
+    // Add actual logout logic here
+  }
+
+  // Helper function to safely call dashboard API functions
+  const callDashboardAPI = (functionName: string, ...args: any[]) => {
+    if (
+      typeof window !== "undefined" &&
+      window.chatDashboardAPI &&
+      window.chatDashboardAPI[functionName as keyof typeof window.chatDashboardAPI]
+    ) {
+      ;(window.chatDashboardAPI[functionName as keyof typeof window.chatDashboardAPI] as Function)(...args)
+    }
+  }
+
+  return (
+    <div className="flex h-screen">
+      {/* Only show sidebar on non-landing pages and non-auth pages */}
+      {!isLandingPage && !isAuthPage && <Sidebar />}
+
+      <div className="flex flex-col flex-1">
+        {/* Conditionally render the appropriate header */}
+        {isLandingPage ? (
+          <LandingHeader user={user} logout={handleLogout} />
+        ) : isAuthPage ? // No header on auth pages
+        null : (
+          <AppHeader
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            showSidePanel={showSidePanel}
+            setShowSidePanel={setShowSidePanel}
+            showRightPanel={showRightPanel}
+            setShowRightPanel={setShowRightPanel}
+            user={user}
+            logout={handleLogout}
+          />
+        )}
+
+        {/* Main content area */}
+        <div className="flex-1 overflow-auto">
+          <Routes>
+            {/* Public routes */}
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/signup" element={<SignupPage />} />
+            <Route path="/confirm-email" element={<EmailVerificationPage />} />
+            <Route path="/email-confirmed" element={<EmailConfirmationPage />} />
+            <Route path="/onboarding" element={<OnboardingPage />} />
+
+            {/* Protected routes */}
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard hideSidebar={true} />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/fleet"
+              element={
+                <ProtectedRoute>
+                  <VesselsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/document-hub"
+              element={
+                <ProtectedRoute>
+                  <DocumentHub />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/port-preparation"
+              element={
+                <ProtectedRoute>
+                  <PortPreparation />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/document-sharing"
+              element={
+                <ProtectedRoute>
+                  <DocumentSharing />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/pricing"
+              element={
+                <ProtectedRoute>
+                  <PricingPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <SettingsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/notifications"
+              element={
+                <ProtectedRoute>
+                  <NotificationsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/share"
+              element={
+                <ProtectedRoute>
+                  <DocumentSharingRecipientView />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </div>
+        {!isAuthPage && <Footer />}
+      </div>
+    </div>
+  )
+}
+
+function App() {
+  return (
+    <Router>
+      <AppContent />
+    </Router>
+  )
+}
+
+export default App
