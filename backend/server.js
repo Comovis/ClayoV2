@@ -6,6 +6,8 @@ const { createUserWithCompany } = require("./Auth/SignupAuthService")
 const { authenticateUser } = require("./Auth/AuthenticateUser")
 const { createAndSendInvitation } = require("./Emails/InviteTeamEmail/InviteAuthService")
 const { handleCancelTeamInvitationRequest } = require("./Team/CancelTeamInvite")
+const { handleInviteSignup } = require("./Auth/SignupInviteAPI")
+
 
 // Create Express app
 const app = express()
@@ -105,6 +107,19 @@ app.post("/api/signup", async (req, res) => {
     })
   }
 })
+
+
+// Add this to your existing routes in server.js
+app.post("/api/invite-signup", async (req, res) => {
+  try {
+    await handleInviteSignup(req, res)
+  } catch (error) {
+    console.error("Error in invite signup:", error)
+    res.status(500).json({ error: "Failed to process invitation signup" })
+  }
+})
+
+
 
 app.post("/api/send-team-invitation", authenticateUser, async (req, res) => {
   try {

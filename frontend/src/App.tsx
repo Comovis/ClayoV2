@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom"
 import { Footer } from "./MainComponents/Footer/Footer"
 import Dashboard from "./MainPages/Dashboard/MainDashboard"
@@ -25,6 +25,7 @@ import LoginPage from "./Auth/Login/LoginPage"
 import EmailVerificationPage from "./Auth/Signup/ConfirmEmail"
 import EmailConfirmationPage from "./Auth/Signup/EmailConfirmed"
 import InvitationAccept from "./Auth/Signup/InvitationAccept"
+import UnauthorizedMessage from "./Auth/UnauthorisedMsg"
 
 // Define a simple user type for demonstration
 interface UserType {
@@ -52,7 +53,34 @@ function AppContent() {
     location.pathname === "/email-confirmed" ||
     location.pathname === "/accept-invite"
 
-    
+  // Define all known paths in the application
+  const knownPaths = useMemo(
+    () => [
+      "/",
+      "/login",
+      "/signup",
+      "/accept-invite",
+      "/confirm-email",
+      "/email-confirmed",
+      "/onboarding",
+      "/dashboard",
+      "/fleet",
+      "/document-hub",
+      "/port-preparation",
+      "/document-sharing",
+      "/pricing",
+      "/settings",
+      "/notifications",
+      "/share",
+    ],
+    [],
+  )
+
+  // Check if current path is a known path
+  const isKnownPath = knownPaths.includes(location.pathname)
+
+  // If path is unknown, we should hide navbar, sidebar, and footer
+  const isUnknownPath = !isKnownPath
 
   // Mock user data
   const user: UserType = {
@@ -80,14 +108,14 @@ function AppContent() {
 
   return (
     <div className="flex h-screen">
-      {/* Only show sidebar on non-landing pages and non-auth pages */}
-      {!isLandingPage && !isAuthPage && <Sidebar />}
+      {/* Only show sidebar on known paths that are not landing pages or auth pages */}
+      {!isLandingPage && !isAuthPage && !isUnknownPath && <Sidebar />}
 
       <div className="flex flex-col flex-1">
         {/* Conditionally render the appropriate header */}
         {isLandingPage ? (
           <LandingHeader user={user} logout={handleLogout} />
-        ) : isAuthPage ? // No header on auth pages
+        ) : isAuthPage || isUnknownPath ? // No header on auth pages or unknown paths
         null : (
           <AppHeader
             activeTab={activeTab}
@@ -186,9 +214,12 @@ function AppContent() {
                 </ProtectedRoute>
               }
             />
+            {/* Catch-all route for unauthorized access */}
+            <Route path="*" element={<UnauthorizedMessage />} />
           </Routes>
         </div>
-        {!isAuthPage && <Footer />}
+        {/* Only show footer on known paths that are not auth pages */}
+        {!isAuthPage && !isUnknownPath && <Footer />}
       </div>
     </div>
   )

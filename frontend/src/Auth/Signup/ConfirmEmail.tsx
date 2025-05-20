@@ -1,32 +1,47 @@
+"use client"
+
 import { useState, useEffect } from "react"
-import { Mail, RefreshCw, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
+import { Mail, RefreshCw, CheckCircle, AlertCircle, Loader2 } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { supabase } from "../../Auth/SupabaseAuth"
 
 // Simple image import for logo
 import LogoBlack from "../../ReusableAssets/Logos/LogoBlack.svg"
 
-
 // API Base URL Configuration
-const apiBaseUrl = import.meta.env.MODE === "development"
-  ? import.meta.env.VITE_DEVELOPMENT_URL
-  : import.meta.env.VITE_API_URL;
+const apiBaseUrl =
+  import.meta.env.MODE === "development" ? import.meta.env.VITE_DEVELOPMENT_URL : import.meta.env.VITE_API_URL
 
 export default function EmailVerificationPage() {
   const [email, setEmail] = useState<string>("")
   const [isResending, setIsResending] = useState(false)
   const [resendSuccess, setResendSuccess] = useState(false)
   const [resendError, setResendError] = useState<string | null>(null)
+  const [isInvitedUser, setIsInvitedUser] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
+    // Check if this is an invited user
+    const invitedUserFlag = localStorage.getItem("isInvitedUser")
+    if (invitedUserFlag === "true") {
+      setIsInvitedUser(true)
+    }
+
     // Get email from session or localStorage
     const getEmail = async () => {
       const { data } = await supabase.auth.getSession()
       if (data.session?.user.email) {
         setEmail(data.session.user.email)
+
         // If we already have a session, the user is verified
-        navigate("/onboarding")
+        // Check if this is an invited user to determine where to redirect
+        if (invitedUserFlag === "true") {
+          // Clear the flag as we're now redirecting
+          localStorage.removeItem("isInvitedUser")
+          navigate("/dashboard")
+        } else {
+          navigate("/onboarding")
+        }
       } else {
         // Fallback to localStorage if you stored it there during signup
         const storedEmail = localStorage.getItem("userEmail")
@@ -38,35 +53,35 @@ export default function EmailVerificationPage() {
   }, [navigate])
 
   const handleResendEmail = async () => {
-    if (!email) return;
+    if (!email) return
 
-    setIsResending(true);
-    setResendSuccess(false);
-    setResendError(null);
+    setIsResending(true)
+    setResendSuccess(false)
+    setResendError(null)
 
     try {
       // Call our API to resend the confirmation email
-      const response = await fetch(`${apiBaseUrl}/resend-confirmation-email`, {
-        method: 'POST',
+      const response = await fetch(`${apiBaseUrl}/api/resend-confirmation-email`, {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ email }),
-      });
+      })
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to resend confirmation email');
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to resend confirmation email")
       }
 
-      setResendSuccess(true);
+      setResendSuccess(true)
     } catch (error: any) {
-      console.error("Error resending email:", error);
-      setResendError(error.message || "Failed to resend email");
+      console.error("Error resending email:", error)
+      setResendError(error.message || "Failed to resend email")
     } finally {
-      setIsResending(false);
+      setIsResending(false)
     }
-  };
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
@@ -82,9 +97,7 @@ export default function EmailVerificationPage() {
               <Mail className="h-8 w-8 text-blue-600" />
             </div>
             <h1 className="text-2xl font-bold">Verify your email</h1>
-            <p className="text-gray-600 mt-2">
-              We've sent a verification link to:
-            </p>
+            <p className="text-gray-600 mt-2">We've sent a verification link to:</p>
             <p className="font-medium text-lg mt-1">{email || "your email address"}</p>
           </div>
 
@@ -93,8 +106,8 @@ export default function EmailVerificationPage() {
               <div className="flex">
                 <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
                 <p>
-                  Please check your inbox and click the verification link to activate your account. 
-                  After verification, you'll be automatically redirected to set up your account.
+                  Please check your inbox and click the verification link to activate your account. After verification,
+                  you'll be automatically redirected to {isInvitedUser ? "your dashboard" : "set up your account"}.
                 </p>
               </div>
             </div>

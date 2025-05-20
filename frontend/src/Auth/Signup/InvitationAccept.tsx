@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
-import { CheckCircle2, Ship, Shield, FileText, Globe, Loader2, AlertCircle } from "lucide-react"
+import { CheckCircle2, Ship, Shield, FileText, Globe, Loader2, AlertCircle, Mail, RefreshCw } from 'lucide-react'
 import { supabase } from "../../Auth/SupabaseAuth"
 import LogoBlack from "../../ReusableAssets/Logos/LogoBlack.svg"
 
@@ -26,9 +26,15 @@ export default function InvitationAccept() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [userData, setUserData] = useState<any>(null)
   const [token, setToken] = useState<string | null>(null)
+  const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false)
+  const [resendSuccess, setResendSuccess] = useState(false)
 
   // Get the token from the URL query parameter
   const location = useLocation()
+
+  // API Base URL Configuration
+  const apiBaseUrl =
+    import.meta.env.MODE === "development" ? import.meta.env.VITE_DEVELOPMENT_URL : import.meta.env.VITE_API_URL
 
   useEffect(() => {
     // Get token from query params
@@ -55,6 +61,7 @@ export default function InvitationAccept() {
   async function checkInvitation(inviteToken: string) {
     try {
       setLoading(true)
+      console.log("Checking invitation with token:", inviteToken)
 
       // Check if user is already logged in
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
@@ -66,45 +73,60 @@ export default function InvitationAccept() {
           id: sessionData.session.user.id,
           email: sessionData.session.user.email,
         })
+        console.log("User is logged in:", sessionData.session.user.email)
       }
 
       // Step 1: Get the invitation details without any joins
+      // IMPORTANT: Make sure we're not using .single() yet to avoid the 406 error
       const { data, error } = await supabase
         .from("team_invitations")
         .select("id, email, role, invitation_token, company_id, invited_by, invitation_status")
         .eq("invitation_token", inviteToken)
-        .single()
 
-      if (error) throw error
+      console.log("Invitation query result:", { data, error })
 
-      if (!data) {
+      if (error) {
+        console.error("Error fetching invitation:", error)
+        throw error
+      }
+
+      if (!data || data.length === 0) {
+        console.error("No invitation found with token:", inviteToken)
         setError("This invitation is invalid or has expired.")
+        setLoading(false)
         return
       }
 
+      // Use the first result if multiple are returned (shouldn't happen with a unique token)
+      const invitationData = data[0]
+
       // Check if the invitation has been cancelled
-      if (data.invitation_status === "cancelled") {
+      if (invitationData.invitation_status === "cancelled" || invitationData.invitation_status === "revoked") {
         setError("This invitation has been cancelled by the sender.")
+        setLoading(false)
         return
       }
 
       // Check if the invitation has already been used
-      if (data.invitation_status !== "pending") {
+      if (invitationData.invitation_status !== "pending") {
         setError("This invitation has already been used or has expired.")
+        setLoading(false)
         return
       }
 
       // Step 2: Get company name in a separate query
       let companyName = "Comovis"
-      if (data.company_id) {
+      if (invitationData.company_id) {
         try {
-          const { data: companyData } = await supabase
+          const { data: companyData, error: companyError } = await supabase
             .from("companies")
             .select("name")
-            .eq("id", data.company_id)
+            .eq("id", invitationData.company_id)
             .single()
 
-          if (companyData) {
+          if (companyError) {
+            console.warn("Error fetching company:", companyError)
+          } else if (companyData) {
             companyName = companyData.name || companyName
           }
         } catch (companyError) {
@@ -114,12 +136,18 @@ export default function InvitationAccept() {
 
       // Step 3: Get inviter name in a separate query
       let inviterName = "A team administrator"
-      if (data.invited_by) {
+      if (invitationData.invited_by) {
         try {
-          const { data: inviterData } = await supabase.from("users").select("name").eq("id", data.invited_by).single()
+          const { data: inviterData, error: inviterError } = await supabase
+            .from("users")
+            .select("full_name")
+            .eq("id", invitationData.invited_by)
+            .single()
 
-          if (inviterData) {
-            inviterName = inviterData.name || inviterName
+          if (inviterError) {
+            console.warn("Error fetching inviter:", inviterError)
+          } else if (inviterData) {
+            inviterName = inviterData.full_name || inviterName
           }
         } catch (inviterError) {
           console.error("Error fetching inviter:", inviterError)
@@ -127,15 +155,22 @@ export default function InvitationAccept() {
       }
 
       setInvitation({
-        id: data.id,
-        email: data.email,
-        role: data.role,
-        token: data.invitation_token,
-        companyId: data.company_id,
-        invitedBy: data.invited_by,
+        id: invitationData.id,
+        email: invitationData.email,
+        role: invitationData.role,
+        token: invitationData.invitation_token,
+        companyId: invitationData.company_id,
+        invitedBy: invitationData.invited_by,
         companyName: companyName,
         inviterName: inviterName,
-        status: data.invitation_status,
+        status: invitationData.invitation_status,
+      })
+
+      console.log("Invitation processed successfully:", {
+        id: invitationData.id,
+        email: invitationData.email,
+        role: invitationData.role,
+        status: invitationData.invitation_status,
       })
     } catch (error) {
       console.error("Error checking invitation:", error)
@@ -174,30 +209,58 @@ export default function InvitationAccept() {
     setIsProcessing(true)
 
     try {
-      // Create a new user account
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email: invitation.email,
-        password: password,
-        options: {
-          data: {
-            name: fullName.trim(), // Use the collected name
-            role: invitation.role,
-            company_id: invitation.companyId,
-          },
+      // Use our custom API endpoint instead of direct Supabase auth
+      const response = await fetch(`${apiBaseUrl}/api/invite-signup`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
+        body: JSON.stringify({
+          email: invitation.email,
+          password: password,
+          fullName: fullName.trim(),
+          invitationToken: token,
+          companyId: invitation.companyId,
+          role: invitation.role,
+        }),
       })
 
-      if (signUpError) throw signUpError
+      const data = await response.json()
 
-      if (!signUpData.user) {
-        throw new Error("Failed to create user account")
+      if (!response.ok) {
+        throw new Error(data.message || data.error || "Failed to create account")
       }
 
-      // Accept the invitation
-      await acceptInvitation(signUpData.user.id)
-    } catch (error) {
+      // Handle the case where email confirmation is required
+      if (data.requiresEmailConfirmation) {
+        // Set the invited user flag
+        localStorage.setItem("isInvitedUser", "true")
+        
+        // Store email in localStorage for verification page
+        localStorage.setItem("userEmail", invitation.email)
+        
+        // Show the email confirmation UI
+        setNeedsEmailConfirmation(true)
+        setIsProcessing(false)
+        return
+      }
+
+      // Set the invited user flag
+      localStorage.setItem("isInvitedUser", "true")
+
+      // Store email in localStorage for verification page
+      localStorage.setItem("userEmail", invitation.email)
+
+      // If we have a user ID, accept the invitation
+      if (data.user && data.user.id) {
+        await acceptInvitation(data.user.id)
+      } else {
+        // Otherwise, redirect to the email verification page
+        window.location.href = "/confirm-email"
+      }
+    } catch (error: any) {
       console.error("Error accepting invitation:", error)
-      setError("Failed to create your account. Please try again.")
+      setError(error.message || "Failed to create your account. Please try again.")
       setIsProcessing(false)
     }
   }
@@ -205,13 +268,14 @@ export default function InvitationAccept() {
   const acceptInvitation = async (userId: string) => {
     try {
       setIsProcessing(true)
+      console.log("Accepting invitation with token:", token, "for user:", userId)
 
       // If the user is already logged in, we might want to update their name
       // if they don't have one set yet
       if (isLoggedIn && fullName.trim()) {
         try {
           // Update the user's name in the public.users table
-          const { error: updateError } = await supabase.from("users").update({ name: fullName.trim() }).eq("id", userId)
+          const { error: updateError } = await supabase.from("users").update({ full_name: fullName.trim() }).eq("id", userId)
 
           if (updateError) {
             console.error("Error updating user name:", updateError)
@@ -228,9 +292,16 @@ export default function InvitationAccept() {
         p_name: fullName.trim() || null,
       })
 
-      if (error) throw error
+      if (error) {
+        console.error("Error in accept_team_invitation RPC:", error)
+        throw error
+      }
 
+      console.log("Invitation accepted successfully:", data)
       setIsComplete(true)
+
+      // Add this:
+      localStorage.removeItem("isInvitedUser") // Clear the flag as we're now redirecting
 
       // Redirect to dashboard after 2 seconds
       setTimeout(() => {
@@ -239,6 +310,31 @@ export default function InvitationAccept() {
     } catch (error) {
       console.error("Error accepting invitation:", error)
       setError("Failed to accept invitation. Please try again.")
+      setIsProcessing(false)
+    }
+  }
+
+  const handleResendConfirmationEmail = async () => {
+    setIsProcessing(true)
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/resend-confirmation-email`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: invitation.email }),
+      })
+      
+      if (!response.ok) {
+        throw new Error("Failed to resend confirmation email")
+      }
+      
+      // Show success message
+      setResendSuccess(true)
+      setTimeout(() => setResendSuccess(false), 3000)
+    } catch (error) {
+      setError("Failed to resend confirmation email. Please try again.")
+    } finally {
       setIsProcessing(false)
     }
   }
@@ -272,6 +368,71 @@ export default function InvitationAccept() {
           </CardContent>
           <CardFooter className="flex justify-center">
             <Button onClick={() => (window.location.href = "/")}>Return to Home</Button>
+          </CardFooter>
+        </Card>
+      </div>
+    )
+  }
+
+  if (needsEmailConfirmation) {
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-slate-50 dark:bg-slate-900">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-center text-blue-600">Email Confirmation Required</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
+              <Mail className="h-6 w-6 text-blue-600" />
+            </div>
+            <p className="text-center mb-4">
+              We've sent a confirmation email to <strong>{invitation.email}</strong>
+            </p>
+            <p className="text-center mb-4">
+              Please check your inbox and click the confirmation link before you can accept this invitation.
+            </p>
+            <Alert className="bg-amber-50 text-amber-800 mb-4">
+              <AlertCircle className="h-4 w-4 mr-2" />
+              <AlertTitle>Important</AlertTitle>
+              <AlertDescription>
+                After confirming your email, please return to this page to complete the invitation process.
+              </AlertDescription>
+            </Alert>
+            <div className="rounded-lg bg-slate-50 p-4">
+              <p className="text-sm text-slate-600 mb-2">Didn't receive the email?</p>
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={handleResendConfirmationEmail}
+                disabled={isProcessing}
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Resend Confirmation Email
+                  </>
+                )}
+              </Button>
+              {resendSuccess && (
+                <p className="text-green-600 text-sm mt-2 flex items-center justify-center">
+                  <CheckCircle2 className="h-4 w-4 mr-1" />
+                  Confirmation email sent successfully!
+                </p>
+              )}
+            </div>
+          </CardContent>
+          <CardFooter className="flex justify-center">
+            <Button 
+              variant="link"
+              onClick={() => window.location.reload()}
+            >
+              I've confirmed my email, continue
+            </Button>
           </CardFooter>
         </Card>
       </div>
