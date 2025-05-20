@@ -68,21 +68,11 @@ export default function InvitationAccept() {
         })
       }
 
-      // Get the invitation details - MODIFIED QUERY
+      // Step 1: Get the invitation details without any joins
       const { data, error } = await supabase
         .from("team_invitations")
-        .select(`
-        id,
-        email,
-        role,
-        invitation_token,
-        company_id,
-        invited_by,
-        companies(name)
-      `)
+        .select("id, email, role, invitation_token, company_id, invited_by, invitation_status")
         .eq("invitation_token", inviteToken)
-        .eq("invitation_status", "pending")
-        .gt("expires_at", new Date().toISOString())
         .single()
 
       if (error) throw error
@@ -92,17 +82,47 @@ export default function InvitationAccept() {
         return
       }
 
-      // Get the inviter's name in a separate query
+      // Check if the invitation has been cancelled
+      if (data.invitation_status === "cancelled") {
+        setError("This invitation has been cancelled by the sender.")
+        return
+      }
+
+      // Check if the invitation has already been used
+      if (data.invitation_status !== "pending") {
+        setError("This invitation has already been used or has expired.")
+        return
+      }
+
+      // Step 2: Get company name in a separate query
+      let companyName = "Comovis"
+      if (data.company_id) {
+        try {
+          const { data: companyData } = await supabase
+            .from("companies")
+            .select("name")
+            .eq("id", data.company_id)
+            .single()
+
+          if (companyData) {
+            companyName = companyData.name || companyName
+          }
+        } catch (companyError) {
+          console.error("Error fetching company:", companyError)
+        }
+      }
+
+      // Step 3: Get inviter name in a separate query
       let inviterName = "A team administrator"
       if (data.invited_by) {
-        const { data: inviterData, error: inviterError } = await supabase
-          .from("users")
-          .select("name")
-          .eq("id", data.invited_by)
-          .single()
+        try {
+          const { data: inviterData } = await supabase.from("users").select("name").eq("id", data.invited_by).single()
 
-        if (!inviterError && inviterData) {
-          inviterName = inviterData.name || inviterName
+          if (inviterData) {
+            inviterName = inviterData.name || inviterName
+          }
+        } catch (inviterError) {
+          console.error("Error fetching inviter:", inviterError)
         }
       }
 
@@ -113,8 +133,9 @@ export default function InvitationAccept() {
         token: data.invitation_token,
         companyId: data.company_id,
         invitedBy: data.invited_by,
-        companyName: data.companies?.name || "Comovis",
+        companyName: companyName,
         inviterName: inviterName,
+        status: data.invitation_status,
       })
     } catch (error) {
       console.error("Error checking invitation:", error)
@@ -204,6 +225,7 @@ export default function InvitationAccept() {
       const { data, error } = await supabase.rpc("accept_team_invitation", {
         p_invitation_token: token,
         p_user_id: userId,
+        p_name: fullName.trim() || null,
       })
 
       if (error) throw error

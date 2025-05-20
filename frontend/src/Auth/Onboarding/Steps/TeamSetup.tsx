@@ -33,6 +33,7 @@ export default function TeamSetup() {
   const [error, setError] = useState("")
   const [isInviting, setIsInviting] = useState(false)
   const [invitationSuccess, setInvitationSuccess] = useState(false)
+  const [isCancelling, setIsCancelling] = useState(false)
 
   // Update the handleAddTeamMember function to include the auth token
   const handleAddTeamMember = async () => {
@@ -117,23 +118,72 @@ export default function TeamSetup() {
 
   const handleRemoveTeamMember = async (id: string) => {
     try {
-      // If the invitation has already been sent to the database, delete it
+      setIsCancelling(true)
+      setError("")
+
+      // Find the member to remove
       const memberToRemove = onboardingData.teamMembers.find((member: any) => member.id === id)
 
-      if (memberToRemove && memberToRemove.invitationSent && memberToRemove.invitationId) {
-        // Delete the invitation from the database
-        const { error } = await supabase.from("team_invitations").delete().eq("id", memberToRemove.invitationId)
-
-        if (error) throw error
+      if (!memberToRemove) {
+        throw new Error("Team member not found")
       }
 
-      // Remove from local state
-      updateData({
-        teamMembers: onboardingData.teamMembers.filter((member: any) => member.id !== id),
-      })
+      if (memberToRemove.invitationSent) {
+        // Get the current session to include the auth token
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+
+        if (sessionError || !sessionData.session) {
+          throw new Error("Authentication required. Please log in again.")
+        }
+
+        // Get the access token from the session
+        const token = sessionData.session.access_token
+
+        console.log("Cancelling invitation for email:", memberToRemove.email)
+
+        // Call the API to cancel the invitation using email instead of ID
+        console.log("Cancelling invitation for email:", memberToRemove.email)
+        const response = await fetch(`${apiBaseUrl}/api/cancel-team-invitation`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            email: memberToRemove.email,
+          }),
+        })
+
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to cancel invitation")
+        }
+
+        console.log("Invitation cancelled successfully:", data)
+
+        // Update the local state to show the invitation as revoked
+        const updatedTeamMembers = onboardingData.teamMembers.map((member: any) => {
+          if (member.id === id) {
+            return { ...member, status: "revoked" }
+          }
+          return member
+        })
+
+        updateData({
+          teamMembers: updatedTeamMembers,
+        })
+      } else {
+        // If it's just a local entry (not yet sent to server), remove it from local state
+        updateData({
+          teamMembers: onboardingData.teamMembers.filter((member: any) => member.id !== id),
+        })
+      }
     } catch (error) {
       console.error("Error removing team member:", error)
       setError("Failed to remove team member. Please try again.")
+    } finally {
+      setIsCancelling(false)
     }
   }
 
@@ -166,6 +216,28 @@ export default function TeamSetup() {
   const getRoleLabel = (role: string) => {
     const roleObj = maritimeRoles.find((r) => r.value === role)
     return roleObj ? roleObj.label : role
+  }
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "pending":
+        return <Badge variant="outline">Invitation Pending</Badge>
+      case "revoked":
+      case "rejected":
+        return (
+          <Badge variant="outline" className="bg-red-50 text-red-800">
+            Invitation Revoked
+          </Badge>
+        )
+      case "accepted":
+        return (
+          <Badge variant="outline" className="bg-green-50 text-green-800">
+            Invitation Accepted
+          </Badge>
+        )
+      default:
+        return <Badge variant="outline">{status}</Badge>
+    }
   }
 
   return (
@@ -263,13 +335,21 @@ export default function TeamSetup() {
                       <p className="font-medium">{member.email}</p>
                       <div className="flex items-center mt-1">
                         <Badge className={getRoleBadgeColor(member.role)}>{getRoleLabel(member.role)}</Badge>
-                        <Badge variant="outline" className="ml-2">
-                          Invitation Pending
-                        </Badge>
+                        {getStatusBadge(member.status)}
                       </div>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={() => handleRemoveTeamMember(member.id)}>
-                      <X className="h-4 w-4" />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleRemoveTeamMember(member.id)}
+                      title={member.status === "pending" ? "Cancel invitation" : "Remove member"}
+                      disabled={isCancelling}
+                    >
+                      {isCancelling ? (
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      ) : (
+                        <X className="h-4 w-4" />
+                      )}
                     </Button>
                   </div>
                 ))}
