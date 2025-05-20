@@ -24,6 +24,7 @@ import SignupPage from "./Auth/Signup/SignupPage"
 import LoginPage from "./Auth/Login/LoginPage"
 import EmailVerificationPage from "./Auth/Signup/ConfirmEmail"
 import EmailConfirmationPage from "./Auth/Signup/EmailConfirmed"
+import InvitationAccept from "./Auth/Signup/InvitationAccept"
 
 // Define a simple user type for demonstration
 interface UserType {
@@ -48,7 +49,10 @@ function AppContent() {
     location.pathname === "/signup" ||
     location.pathname === "/onboarding" ||
     location.pathname === "/confirm-email" ||
-    location.pathname === "/email-confirmed"
+    location.pathname === "/email-confirmed" ||
+    location.pathname === "/accept-invite"
+
+    
 
   // Mock user data
   const user: UserType = {
@@ -104,6 +108,7 @@ function AppContent() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
+            <Route path="/accept-invite" element={<InvitationAccept />} />
             <Route path="/confirm-email" element={<EmailVerificationPage />} />
             <Route path="/email-confirmed" element={<EmailConfirmationPage />} />
             <Route path="/onboarding" element={<OnboardingPage />} />

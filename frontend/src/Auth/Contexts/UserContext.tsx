@@ -27,16 +27,16 @@ interface UserContextType {
   // Authentication state
   isAuthenticated: boolean
   isLoading: boolean
-  
+
   // User data
   user: User | null
   company: Company | null
-  
+
   // Authentication functions
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
   signup: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
   logout: () => Promise<void>
-  
+
   // User data functions
   refreshUserData: () => Promise<void>
   updateUserProfile: (data: Partial<User>) => Promise<void>
@@ -48,25 +48,27 @@ const UserContext = createContext<UserContextType | undefined>(undefined)
 // Provider component
 export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate()
-  
+
   // State
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false)
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [user, setUser] = useState<User | null>(null)
   const [company, setCompany] = useState<Company | null>(null)
-  
+
   // Initialize auth state
   useEffect(() => {
     const initializeAuth = async () => {
       setIsLoading(true)
-      
+
       try {
         // Check for existing session
-        const { data: { session } } = await supabase.auth.getSession()
-        
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+
         if (session) {
           setIsAuthenticated(true)
-          await fetchUserData(session.user.id)
+          await fetchUserData()
         } else {
           setIsAuthenticated(false)
           setUser(null)
@@ -78,51 +80,45 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsLoading(false)
       }
     }
-    
+
     initializeAuth()
-    
+
     // Set up auth state change listener
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === "SIGNED_IN" && session) {
         setIsAuthenticated(true)
-        await fetchUserData(session.user.id)
+        await fetchUserData()
       } else if (event === "SIGNED_OUT") {
         setIsAuthenticated(false)
         setUser(null)
         setCompany(null)
       }
     })
-    
+
     return () => {
       authListener.subscription.unsubscribe()
     }
   }, [])
-  
-  // Fetch user data from database
-  const fetchUserData = async (userId: string) => {
+
+  // Fetch user data from database using secure RPC functions
+  const fetchUserData = async () => {
     try {
-      // Fetch user profile
-      const { data: userData, error: userError } = await supabase
-        .from("users")
-        .select("*")
-        .eq("id", userId)
-        .single()
-      
+      // Fetch user profile using the secure RPC function
+      const { data: userData, error: userError } = await supabase.rpc("get_user_data")
+
       if (userError) throw userError
-      
+
       if (userData) {
         setUser(userData as User)
-        
+
         // Fetch company data if user has a company
-        if (userData.company_id) {
-          const { data: companyData, error: companyError } = await supabase
-            .from("companies")
-            .select("*")
-            .eq("id", userData.company_id)
-            .single()
-          
+        if (userData.companyId) {
+          const { data: companyData, error: companyError } = await supabase.rpc("get_company_data_by_id", {
+            p_company_id: userData.companyId,
+          })
+
           if (companyError) throw companyError
-          
+
           if (companyData) {
             setCompany(companyData as Company)
           }
@@ -132,7 +128,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error("Error fetching user data:", error)
     }
   }
-  
+
   // Authentication functions
   const login = async (email: string, password: string) => {
     try {
@@ -140,9 +136,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email,
         password,
       })
-      
+
       if (error) throw error
-      
+
       return { success: true }
     } catch (error: any) {
       console.error("Login error:", error)
@@ -152,19 +148,19 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
   }
-  
+
   const signup = async (email: string, password: string) => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
       })
-      
+
       if (error) throw error
-      
+
       // Store email in localStorage for verification page
       localStorage.setItem("userEmail", email)
-      
+
       return { success: true }
     } catch (error: any) {
       console.error("Signup error:", error)
@@ -174,7 +170,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
   }
-  
+
   const logout = async () => {
     try {
       await supabase.auth.signOut()
@@ -183,25 +179,27 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error("Logout error:", error)
     }
   }
-  
+
   // User data functions
   const refreshUserData = async () => {
-    if (user?.id) {
-      await fetchUserData(user.id)
-    }
+    await fetchUserData()
   }
-  
+
+  // Create a secure function to update user profile
   const updateUserProfile = async (data: Partial<User>) => {
     if (!user?.id) return
-    
+
     try {
-      const { error } = await supabase
-        .from("users")
-        .update(data)
-        .eq("id", user.id)
-      
+      // Convert the data object to match the database column names
+      const dbData: any = {}
+      if (data.firstName) dbData.first_name = data.firstName
+      if (data.lastName) dbData.last_name = data.lastName
+      if (data.role) dbData.role = data.role
+
+      const { error } = await supabase.from("users").update(dbData).eq("id", user.id)
+
       if (error) throw error
-      
+
       // Refresh user data
       await refreshUserData()
     } catch (error) {
@@ -209,7 +207,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw error
     }
   }
-  
+
   // Context value
   const contextValue: UserContextType = {
     isAuthenticated,
@@ -222,17 +220,17 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshUserData,
     updateUserProfile,
   }
-  
+
   return <UserContext.Provider value={contextValue}>{children}</UserContext.Provider>
 }
 
 // Custom hook to use the context
 export const useUser = (): UserContextType => {
   const context = useContext(UserContext)
-  
+
   if (context === undefined) {
     throw new Error("useUser must be used within a UserProvider")
   }
-  
+
   return context
 }

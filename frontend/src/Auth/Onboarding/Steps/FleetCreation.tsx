@@ -11,6 +11,7 @@ import { useOnboarding } from "./OnboardingContainer"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { supabase } from "../../SupabaseAuth"
 
 // Vessel types
 const vesselTypes = [
@@ -59,6 +60,7 @@ export default function FleetSetup() {
   const [isSearching, setIsSearching] = useState(false)
   const [uploadState, setUploadState] = useState("initial") // initial, uploading, success, error
   const [uploadError, setUploadError] = useState("")
+  const [isAddingVessel, setIsAddingVessel] = useState(false)
   const [currentVessel, setCurrentVessel] = useState({
     name: "",
     type: "",
@@ -118,30 +120,61 @@ export default function FleetSetup() {
     }, 1500)
   }
 
-  const handleAddVessel = () => {
+  const handleAddVessel = async () => {
     if (!currentVessel.name || !currentVessel.type || !currentVessel.flag) return
 
-    const newVessel = {
-      id: Date.now().toString(),
-      name: currentVessel.name,
-      type: currentVessel.type,
-      flag: currentVessel.flag,
-      imo: currentVessel.imo || imoNumber,
+    setIsAddingVessel(true)
+
+    try {
+      // Get the current user's session
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError) throw sessionError
+
+      if (!sessionData.session) {
+        throw new Error("No active session found")
+      }
+
+      const userId = sessionData.session.user.id
+
+      // Add the vessel directly to the database
+      const { data: vesselId, error: vesselError } = await supabase.rpc("add_vessel", {
+        p_vessel_name: currentVessel.name,
+        p_imo_number: currentVessel.imo || imoNumber,
+        p_vessel_type: currentVessel.type,
+        p_flag_state: currentVessel.flag,
+        p_user_id: userId,
+      })
+
+      if (vesselError) throw vesselError
+
+      // Add to local state for UI
+      const newVessel = {
+        id: vesselId || Date.now().toString(),
+        name: currentVessel.name,
+        type: currentVessel.type,
+        flag: currentVessel.flag,
+        imo: currentVessel.imo || imoNumber,
+      }
+
+      updateData({
+        vessels: [...(onboardingData.vessels || []), newVessel],
+        fleetSetupMethod: "manual",
+      })
+
+      // Reset form
+      setImoNumber("")
+      setCurrentVessel({
+        name: "",
+        type: "",
+        flag: "",
+        imo: "",
+      })
+    } catch (error) {
+      console.error("Error adding vessel:", error)
+      // Show error message
+    } finally {
+      setIsAddingVessel(false)
     }
-
-    updateData({
-      vessels: [...(onboardingData.vessels || []), newVessel],
-      fleetSetupMethod: "manual",
-    })
-
-    // Reset form
-    setImoNumber("")
-    setCurrentVessel({
-      name: "",
-      type: "",
-      flag: "",
-      imo: "",
-    })
   }
 
   const handleUpload = () => {
@@ -157,10 +190,23 @@ export default function FleetSetup() {
     }, 2000)
   }
 
-  const handleRemoveVessel = (id: string) => {
-    updateData({
-      vessels: onboardingData.vessels.filter((vessel: any) => vessel.id !== id),
-    })
+  const handleRemoveVessel = async (id: string) => {
+    try {
+      // If the vessel has a UUID format, it's already in the database
+      if (id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)) {
+        // Delete from database
+        const { error } = await supabase.from("vessels").delete().eq("id", id)
+
+        if (error) throw error
+      }
+
+      // Update local state
+      updateData({
+        vessels: onboardingData.vessels.filter((vessel: any) => vessel.id !== id),
+      })
+    } catch (error) {
+      console.error("Error removing vessel:", error)
+    }
   }
 
   const handleDownloadTemplate = () => {
@@ -267,11 +313,20 @@ export default function FleetSetup() {
             <CardFooter className="border-t pt-4">
               <Button
                 onClick={handleAddVessel}
-                disabled={!currentVessel.name || !currentVessel.type || !currentVessel.flag}
+                disabled={!currentVessel.name || !currentVessel.type || !currentVessel.flag || isAddingVessel}
                 className="ml-auto"
               >
-                <PlusCircle className="h-4 w-4 mr-2" />
-                Add Vessel
+                {isAddingVessel ? (
+                  <>
+                    <div className="animate-spin mr-2 h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <PlusCircle className="h-4 w-4 mr-2" />
+                    Add Vessel
+                  </>
+                )}
               </Button>
             </CardFooter>
           </Card>

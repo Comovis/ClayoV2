@@ -1,6 +1,6 @@
 "use client"
 
-import { Building, MapPin, Anchor, Ship } from "lucide-react"
+import { Building, MapPin, Anchor, Ship, AlertCircle } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -23,7 +23,7 @@ const companyTypes = [
   { value: "other", label: "Other" },
 ]
 
-// Maritime regions - hello
+// Maritime regions
 const regions = [
   { id: "asia_pacific", name: "Asia Pacific" },
   { id: "europe", name: "Europe" },
@@ -49,14 +49,19 @@ const vesselTypes = [
 ]
 
 export default function OrganizationProfile() {
-  const { onboardingData, updateData } = useOnboarding()
+  const { onboardingData, updateData, validationErrors } = useOnboarding()
   const [companyName, setCompanyName] = useState("")
   const [isLoading, setIsLoading] = useState(true)
+  const [generalError, setGeneralError] = useState("")
 
-  // Initialize vesselTypes in onboardingData if it doesn't exist
+  // Initialize arrays in onboardingData if they don't exist
   useEffect(() => {
-    if (!onboardingData.vesselTypes) {
-      updateData({ vesselTypes: [] })
+    const updates: any = {}
+    if (!onboardingData.vesselTypes) updates.vesselTypes = []
+    if (!onboardingData.regions) updates.regions = []
+
+    if (Object.keys(updates).length > 0) {
+      updateData(updates)
     }
   }, [])
 
@@ -64,12 +69,14 @@ export default function OrganizationProfile() {
     async function fetchCompanyName() {
       try {
         setIsLoading(true)
+        setGeneralError("")
 
         // Use the RPC function to get the company name safely
         const { data, error } = await supabase.rpc("get_company_name")
 
         if (error) {
           console.error("Error fetching company name:", error)
+          setGeneralError("Unable to fetch company information. Please try again later.")
           return
         }
 
@@ -82,6 +89,7 @@ export default function OrganizationProfile() {
         }
       } catch (error) {
         console.error("Error in fetchCompanyName:", error)
+        setGeneralError("An unexpected error occurred. Please try again later.")
       } finally {
         setIsLoading(false)
       }
@@ -117,6 +125,16 @@ export default function OrganizationProfile() {
         </p>
       </div>
 
+      {generalError && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-md flex items-start">
+          <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium">Error</p>
+            <p className="text-sm">{generalError}</p>
+          </div>
+        </div>
+      )}
+
       <Card className="mb-6">
         <CardHeader>
           <CardTitle>Company Details</CardTitle>
@@ -124,24 +142,37 @@ export default function OrganizationProfile() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="companyName">Company Name</Label>
+            <Label htmlFor="companyName" className={validationErrors?.companyName ? "text-red-500" : ""}>
+              Company Name{validationErrors?.companyName ? " *" : ""}
+            </Label>
             <div className="relative">
-              <Building className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+              <Building
+                className={`absolute left-3 top-3 h-4 w-4 ${
+                  validationErrors?.companyName ? "text-red-500" : "text-slate-400"
+                }`}
+              />
               <Input
                 id="companyName"
                 value={isLoading ? "Loading..." : companyName || onboardingData.companyName}
                 onChange={(e) => updateData({ companyName: e.target.value })}
-                className="pl-10 bg-slate-50 dark:bg-slate-800"
+                className={`pl-10 ${
+                  validationErrors?.companyName ? "border-red-500" : "bg-slate-50 dark:bg-slate-800"
+                }`}
                 readOnly={isLoading || !!companyName}
                 disabled={isLoading}
               />
             </div>
+            {validationErrors?.companyName && (
+              <p className="text-sm text-red-500 mt-1">{validationErrors.companyName}</p>
+            )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="companyType">Company Type</Label>
+            <Label htmlFor="companyType" className={validationErrors?.companyType ? "text-red-500" : ""}>
+              Company Type{validationErrors?.companyType ? " *" : ""}
+            </Label>
             <Select value={onboardingData.companyType} onValueChange={(value) => updateData({ companyType: value })}>
-              <SelectTrigger id="companyType">
+              <SelectTrigger id="companyType" className={validationErrors?.companyType ? "border-red-500" : ""}>
                 <SelectValue placeholder="Select company type" />
               </SelectTrigger>
               <SelectContent>
@@ -152,6 +183,9 @@ export default function OrganizationProfile() {
                 ))}
               </SelectContent>
             </Select>
+            {validationErrors?.companyType && (
+              <p className="text-sm text-red-500 mt-1">{validationErrors.companyType}</p>
+            )}
           </div>
         </CardContent>
       </Card>
