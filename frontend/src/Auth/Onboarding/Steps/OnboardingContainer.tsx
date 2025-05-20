@@ -84,6 +84,7 @@ export default function OnboardingContainer() {
     // Team data
     teamMembers: [],
     skipTeamSetup: false,
+    invitationsSent: false,
 
     // Completion
     completed: false,
@@ -239,6 +240,11 @@ export default function OnboardingContainer() {
 
         // Save each vessel to the database
         for (const vessel of onboardingData.vessels) {
+          // Skip vessels that are already in the database (have a UUID)
+          if (vessel.id && vessel.id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)) {
+            continue
+          }
+
           const { data: vesselId, error: vesselError } = await supabase.rpc("add_vessel", {
             p_vessel_name: vessel.name,
             p_imo_number: vessel.imo || "",
@@ -251,8 +257,9 @@ export default function OnboardingContainer() {
         }
 
         // Update the user's onboarding step
-        const { error: userUpdateError } = await supabase.rpc("complete_fleet_setup", {
+        const { error: userUpdateError } = await supabase.rpc("update_user_onboarding_step", {
           p_user_id: userId,
+          p_step: "team",
         })
 
         if (userUpdateError) throw userUpdateError
@@ -267,12 +274,114 @@ export default function OnboardingContainer() {
       return
     }
 
-    // Handle team setup skip
-    if (steps[currentStepIndex].id === "team" && onboardingData.skipTeamSetup) {
-      setCurrentStepIndex(currentStepIndex + 1)
-    } else {
-      nextStep()
+    // If we're on the team step, handle team setup
+    if (steps[currentStepIndex].id === "team") {
+      // If skipping team setup or no team members added, just go to next step
+      if (onboardingData.skipTeamSetup || !onboardingData.teamMembers || onboardingData.teamMembers.length === 0) {
+        setIsLoading(true)
+
+        try {
+          // Get the current user's session
+          const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+          if (sessionError) throw sessionError
+
+          if (!sessionData.session) {
+            throw new Error("No active session found")
+          }
+
+          const userId = sessionData.session.user.id
+
+          // Update the user's onboarding step
+          const { error: userUpdateError } = await supabase.rpc("update_user_onboarding_step", {
+            p_user_id: userId,
+            p_step: "complete",
+          })
+
+          if (userUpdateError) throw userUpdateError
+
+          nextStep()
+        } catch (error) {
+          console.error("Error updating onboarding step:", error)
+          setGeneralError("An unexpected error occurred. Please try again.")
+        } finally {
+          setIsLoading(false)
+        }
+        return
+      }
+
+      // If team members were added and invitations not yet sent, mark as complete
+      setIsLoading(true)
+
+      try {
+        // Get the current user's session
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+        if (sessionError) throw sessionError
+
+        if (!sessionData.session) {
+          throw new Error("No active session found")
+        }
+
+        const userId = sessionData.session.user.id
+
+        // Update the user's onboarding step
+        const { error: userUpdateError } = await supabase.rpc("update_user_onboarding_step", {
+          p_user_id: userId,
+          p_step: "complete",
+        })
+
+        if (userUpdateError) throw userUpdateError
+
+        // Mark invitations as sent
+        updateData({ invitationsSent: true })
+
+        nextStep()
+      } catch (error) {
+        console.error("Error completing team setup:", error)
+        setGeneralError("There was an error completing team setup. Please try again.")
+      } finally {
+        setIsLoading(false)
+      }
+      return
     }
+
+    // If we're on the complete step, mark onboarding as complete
+    if (steps[currentStepIndex].id === "complete") {
+      setIsLoading(true)
+
+      try {
+        // Get the current user's session
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+        if (sessionError) throw sessionError
+
+        if (!sessionData.session) {
+          throw new Error("No active session found")
+        }
+
+        const userId = sessionData.session.user.id
+
+        // Mark onboarding as complete
+        const { error: completeError } = await supabase.rpc("complete_onboarding", {
+          p_user_id: userId,
+        })
+
+        if (completeError) throw completeError
+
+        // Update local state
+        updateData({ completed: true })
+
+        // Redirect to dashboard or reload the page
+        window.location.href = "/dashboard"
+      } catch (error) {
+        console.error("Error completing onboarding:", error)
+        setGeneralError("There was an error completing onboarding. Please try again.")
+      } finally {
+        setIsLoading(false)
+      }
+      return
+    }
+
+    // Default action - just go to next step
+    nextStep()
   }
 
   // Get current step component
@@ -418,7 +527,7 @@ export default function OnboardingContainer() {
                 </Button>
               </div>
             ) : (
-              <Button onClick={() => updateData({ completed: true })} disabled={isLoading}>
+              <Button onClick={handleContinue} disabled={isLoading}>
                 {isLoading ? (
                   <>
                     <div className="animate-spin mr-2 h-4 w-4 border-2 border-current border-t-transparent rounded-full" />

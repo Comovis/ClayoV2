@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useLocation } from "react-router-dom"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,82 +12,117 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
 import { CheckCircle2, Ship, Shield, FileText, Globe, Loader2, AlertCircle } from "lucide-react"
 import { supabase } from "../../Auth/SupabaseAuth"
-import LogoBlack from "../../../ReusableAssets/Logos/LogoBlack.svg"
+import LogoBlack from "../../ReusableAssets/Logos/LogoBlack.svg"
 
-export default function InvitationPage({ params }: { params: { token: string } }) {
-  const router = useRouter()
+export default function InvitationAccept() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [invitation, setInvitation] = useState<any>(null)
+  const [fullName, setFullName] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [isProcessing, setIsProcessing] = useState(false)
   const [isComplete, setIsComplete] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [userData, setUserData] = useState<any>(null)
+  const [token, setToken] = useState<string | null>(null)
+
+  // Get the token from the URL query parameter
+  const location = useLocation()
 
   useEffect(() => {
-    async function checkInvitation() {
-      try {
-        setLoading(true)
+    // Get token from query params
+    const queryParams = new URLSearchParams(location.search)
+    const tokenFromUrl = queryParams.get("token")
 
-        // Check if user is already logged in
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
-        if (sessionError) throw sessionError
+    if (tokenFromUrl) {
+      setToken(tokenFromUrl)
+      console.log("Invitation token found in URL:", tokenFromUrl)
+    } else {
+      console.error("No invitation token found in URL")
+      setError("Invalid invitation link. Please check your email and try again.")
+      setLoading(false)
+    }
+  }, [location])
 
-        if (sessionData.session) {
-          setIsLoggedIn(true)
-          setUserData({
-            id: sessionData.session.user.id,
-            email: sessionData.session.user.email,
-          })
-        }
+  useEffect(() => {
+    // Only proceed with invitation check if we have a token
+    if (token) {
+      checkInvitation(token)
+    }
+  }, [token])
 
-        // Get the invitation details
-        const { data, error } = await supabase
-          .from("team_invitations")
-          .select(`
-            id,
-            email,
-            role,
-            invitation_token,
-            company_id,
-            invited_by,
-            companies(name),
-            users!team_invitations_invited_by_fkey(name)
-          `)
-          .eq("invitation_token", params.token)
-          .eq("invitation_status", "pending")
-          .gt("expires_at", new Date().toISOString())
+  async function checkInvitation(inviteToken: string) {
+    try {
+      setLoading(true)
+
+      // Check if user is already logged in
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError) throw sessionError
+
+      if (sessionData.session) {
+        setIsLoggedIn(true)
+        setUserData({
+          id: sessionData.session.user.id,
+          email: sessionData.session.user.email,
+        })
+      }
+
+      // Get the invitation details - MODIFIED QUERY
+      const { data, error } = await supabase
+        .from("team_invitations")
+        .select(`
+        id,
+        email,
+        role,
+        invitation_token,
+        company_id,
+        invited_by,
+        companies(name)
+      `)
+        .eq("invitation_token", inviteToken)
+        .eq("invitation_status", "pending")
+        .gt("expires_at", new Date().toISOString())
+        .single()
+
+      if (error) throw error
+
+      if (!data) {
+        setError("This invitation is invalid or has expired.")
+        return
+      }
+
+      // Get the inviter's name in a separate query
+      let inviterName = "A team administrator"
+      if (data.invited_by) {
+        const { data: inviterData, error: inviterError } = await supabase
+          .from("users")
+          .select("name")
+          .eq("id", data.invited_by)
           .single()
 
-        if (error) throw error
-
-        if (!data) {
-          setError("This invitation is invalid or has expired.")
-          return
+        if (!inviterError && inviterData) {
+          inviterName = inviterData.name || inviterName
         }
-
-        setInvitation({
-          id: data.id,
-          email: data.email,
-          role: data.role,
-          token: data.invitation_token,
-          companyId: data.company_id,
-          invitedBy: data.invited_by,
-          companyName: data.companies?.name || "Comovis",
-          inviterName: data.users?.name || "A team administrator",
-        })
-      } catch (error) {
-        console.error("Error checking invitation:", error)
-        setError("Failed to verify invitation. It may be invalid or expired.")
-      } finally {
-        setLoading(false)
       }
-    }
 
-    checkInvitation()
-  }, [params.token])
+      setInvitation({
+        id: data.id,
+        email: data.email,
+        role: data.role,
+        token: data.invitation_token,
+        companyId: data.company_id,
+        invitedBy: data.invited_by,
+        companyName: data.companies?.name || "Comovis",
+        inviterName: inviterName,
+      })
+    } catch (error) {
+      console.error("Error checking invitation:", error)
+      setError("Failed to verify invitation. It may be invalid or expired.")
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleAcceptInvitation = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -99,6 +134,11 @@ export default function InvitationPage({ params }: { params: { token: string } }
     }
 
     // Basic validation
+    if (!fullName.trim()) {
+      setError("Please enter your full name")
+      return
+    }
+
     if (password.length < 8) {
       setError("Password must be at least 8 characters long")
       return
@@ -119,7 +159,7 @@ export default function InvitationPage({ params }: { params: { token: string } }
         password: password,
         options: {
           data: {
-            name: "",
+            name: fullName.trim(), // Use the collected name
             role: invitation.role,
             company_id: invitation.companyId,
           },
@@ -145,9 +185,24 @@ export default function InvitationPage({ params }: { params: { token: string } }
     try {
       setIsProcessing(true)
 
+      // If the user is already logged in, we might want to update their name
+      // if they don't have one set yet
+      if (isLoggedIn && fullName.trim()) {
+        try {
+          // Update the user's name in the public.users table
+          const { error: updateError } = await supabase.from("users").update({ name: fullName.trim() }).eq("id", userId)
+
+          if (updateError) {
+            console.error("Error updating user name:", updateError)
+          }
+        } catch (err) {
+          console.error("Error updating user name:", err)
+        }
+      }
+
       // Accept the invitation
       const { data, error } = await supabase.rpc("accept_team_invitation", {
-        p_invitation_token: params.token,
+        p_invitation_token: token,
         p_user_id: userId,
       })
 
@@ -157,7 +212,7 @@ export default function InvitationPage({ params }: { params: { token: string } }
 
       // Redirect to dashboard after 2 seconds
       setTimeout(() => {
-        router.push("/dashboard")
+        window.location.href = "/dashboard"
       }, 2000)
     } catch (error) {
       console.error("Error accepting invitation:", error)
@@ -194,7 +249,7 @@ export default function InvitationPage({ params }: { params: { token: string } }
             </Alert>
           </CardContent>
           <CardFooter className="flex justify-center">
-            <Button onClick={() => router.push("/")}>Return to Home</Button>
+            <Button onClick={() => (window.location.href = "/")}>Return to Home</Button>
           </CardFooter>
         </Card>
       </div>
@@ -238,9 +293,26 @@ export default function InvitationPage({ params }: { params: { token: string } }
             </div>
           </CardContent>
           <CardFooter>
-            <Button className="w-full" size="lg" onClick={() => router.push("/dashboard")}>
+            <Button className="w-full" size="lg" onClick={() => (window.location.href = "/dashboard")}>
               Go to Dashboard
             </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    )
+  }
+
+  if (!invitation) {
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-slate-50 dark:bg-slate-900">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6 text-center">
+            <AlertCircle className="h-8 w-8 mx-auto mb-4 text-amber-600" />
+            <p className="text-lg font-medium">No valid invitation found</p>
+            <p className="text-sm text-slate-500 mt-2">Please check your invitation link and try again.</p>
+          </CardContent>
+          <CardFooter className="flex justify-center">
+            <Button onClick={() => (window.location.href = "/")}>Return to Home</Button>
           </CardFooter>
         </Card>
       </div>
@@ -257,7 +329,7 @@ export default function InvitationPage({ params }: { params: { token: string } }
           <CardTitle className="text-xl">Accept Invitation</CardTitle>
           <CardDescription>
             {invitation.inviterName} has invited you to join {invitation.companyName}'s maritime compliance platform as
-            a <strong>{invitation.role}</strong>
+            a <strong>{formatRoleName(invitation.role)}</strong>
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -269,6 +341,20 @@ export default function InvitationPage({ params }: { params: { token: string } }
                   invitation with your current account.
                 </p>
               </Alert>
+              {/* Add name field for logged-in users if needed */}
+              <div className="space-y-2">
+                <Label htmlFor="fullName">Your Full Name</Label>
+                <Input
+                  id="fullName"
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Enter your full name"
+                />
+                <p className="text-xs text-slate-500">
+                  We'll use this name to identify you in the platform. Leave blank to keep your current name.
+                </p>
+              </div>
               <Button
                 onClick={() => acceptInvitation(userData.id)}
                 disabled={isProcessing}
@@ -302,6 +388,17 @@ export default function InvitationPage({ params }: { params: { token: string } }
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input id="email" type="email" value={invitation.email} disabled />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="fullName">Your Full Name</Label>
+                <Input
+                  id="fullName"
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Enter your full name"
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Create Password</Label>
@@ -370,4 +467,15 @@ export default function InvitationPage({ params }: { params: { token: string } }
       </Card>
     </div>
   )
+}
+
+// Function to format role names
+function formatRoleName(role: string): string {
+  if (!role) return ""
+
+  // Replace underscores with spaces and capitalize each word
+  return role
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ")
 }

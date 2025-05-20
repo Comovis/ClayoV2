@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Users, UserPlus, X, Mail, AlertCircle } from "lucide-react"
+import { Users, UserPlus, X, Mail, AlertCircle, CheckCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,6 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useOnboarding } from "./OnboardingContainer"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { supabase } from "../../SupabaseAuth"
+
+// API Base URL Configuration
+const apiBaseUrl =
+  import.meta.env.MODE === "development" ? import.meta.env.VITE_DEVELOPMENT_URL : import.meta.env.VITE_API_URL
 
 // Maritime-specific roles
 const maritimeRoles = [
@@ -26,8 +31,11 @@ export default function TeamSetup() {
   const [newMemberEmail, setNewMemberEmail] = useState("")
   const [newMemberRole, setNewMemberRole] = useState("team")
   const [error, setError] = useState("")
+  const [isInviting, setIsInviting] = useState(false)
+  const [invitationSuccess, setInvitationSuccess] = useState(false)
 
-  const handleAddTeamMember = () => {
+  // Update the handleAddTeamMember function to include the auth token
+  const handleAddTeamMember = async () => {
     if (!newMemberEmail) {
       setError("Please enter an email address")
       return
@@ -44,25 +52,89 @@ export default function TeamSetup() {
       return
     }
 
-    const newMember = {
-      id: Date.now().toString(),
-      email: newMemberEmail,
-      role: newMemberRole,
-      status: "pending",
-    }
-
-    updateData({
-      teamMembers: [...onboardingData.teamMembers, newMember],
-    })
-
-    setNewMemberEmail("")
+    setIsInviting(true)
     setError("")
+
+    try {
+      // Get the current session to include the auth token
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+
+      if (sessionError || !sessionData.session) {
+        throw new Error("Authentication required. Please log in again.")
+      }
+
+      // Get the access token from the session
+      const token = sessionData.session.access_token
+
+      // Send the invitation email via API with the auth token
+      const response = await fetch(`${apiBaseUrl}/api/send-team-invitation`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`, // Add the auth token here
+        },
+        body: JSON.stringify({
+          email: newMemberEmail,
+          role: newMemberRole,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to send invitation")
+      }
+
+      // Add to local state
+      const newMember = {
+        id: data.invitationId || Date.now().toString(),
+        email: newMemberEmail,
+        role: newMemberRole,
+        status: "pending",
+        invitationSent: true,
+        invitationId: data.invitationId,
+      }
+
+      updateData({
+        teamMembers: [...onboardingData.teamMembers, newMember],
+      })
+
+      setNewMemberEmail("")
+      setNewMemberRole("team")
+      setInvitationSuccess(true)
+
+      // Hide success message after 3 seconds
+      setTimeout(() => {
+        setInvitationSuccess(false)
+      }, 3000)
+    } catch (error) {
+      console.error("Error sending invitation:", error)
+      setError("Failed to send invitation. Please try again.")
+    } finally {
+      setIsInviting(false)
+    }
   }
 
-  const handleRemoveTeamMember = (id: string) => {
-    updateData({
-      teamMembers: onboardingData.teamMembers.filter((member: any) => member.id !== id),
-    })
+  const handleRemoveTeamMember = async (id: string) => {
+    try {
+      // If the invitation has already been sent to the database, delete it
+      const memberToRemove = onboardingData.teamMembers.find((member: any) => member.id === id)
+
+      if (memberToRemove && memberToRemove.invitationSent && memberToRemove.invitationId) {
+        // Delete the invitation from the database
+        const { error } = await supabase.from("team_invitations").delete().eq("id", memberToRemove.invitationId)
+
+        if (error) throw error
+      }
+
+      // Remove from local state
+      updateData({
+        teamMembers: onboardingData.teamMembers.filter((member: any) => member.id !== id),
+      })
+    } catch (error) {
+      console.error("Error removing team member:", error)
+      setError("Failed to remove team member. Please try again.")
+    }
   }
 
   const handleSkip = () => {
@@ -143,9 +215,18 @@ export default function TeamSetup() {
               </SelectContent>
             </Select>
 
-            <Button onClick={handleAddTeamMember} className="whitespace-nowrap">
-              <UserPlus className="h-4 w-4 mr-2" />
-              Add Member
+            <Button onClick={handleAddTeamMember} className="whitespace-nowrap" disabled={isInviting}>
+              {isInviting ? (
+                <>
+                  <div className="animate-spin mr-2 h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
+                  Inviting...
+                </>
+              ) : (
+                <>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Add Member
+                </>
+              )}
             </Button>
           </div>
 
@@ -154,6 +235,14 @@ export default function TeamSetup() {
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Error</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          {invitationSuccess && (
+            <Alert className="bg-green-50 text-green-800 dark:bg-green-900 dark:text-green-200">
+              <CheckCircle className="h-4 w-4" />
+              <AlertTitle>Success</AlertTitle>
+              <AlertDescription>Invitation sent successfully!</AlertDescription>
             </Alert>
           )}
 

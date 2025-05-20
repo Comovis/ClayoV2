@@ -3,6 +3,8 @@ const cors = require('cors');
 require('dotenv').config();
 const { sendUserConfirmationEmail, resendConfirmationEmail } = require('./Emails/EmailAuthLinkService');
 const { createUserWithCompany } = require('./Auth/SignupAuthService');
+const { authenticateUser } = require('./Auth/AuthenticateUser');
+const { createAndSendInvitation } = require('./Emails/InviteTeamEmail/InviteAuthService');
 
 // Create Express app
 const app = express();
@@ -109,6 +111,38 @@ app.post('/api/signup', async (req, res) => {
 });
 
 
+
+app.post('/api/send-team-invitation', authenticateUser, async (req, res) => {
+  try {
+    const { email, role } = req.body;
+    
+    if (!email || !role) {
+      return res.status(400).json({ error: 'Email and role are required' });
+    }
+    
+    // Get user ID from the authenticated user object
+    const userId = req.user.user_id;
+    
+    // If somehow the user ID is missing, return an error
+    if (!userId) {
+      return res.status(401).json({ error: 'User ID not found in authenticated session' });
+    }
+    
+    const result = await createAndSendInvitation(email, role, userId);
+    
+    if (!result.success) {
+      return res.status(500).json({ error: result.error });
+    }
+    
+    res.status(200).json({ 
+      message: 'Team invitation sent successfully',
+      invitationId: result.invitationId 
+    });
+  } catch (error) {
+    console.error('Error sending team invitation:', error);
+    res.status(500).json({ error: 'Failed to send team invitation' });
+  }
+});
 
 
 // Start server
