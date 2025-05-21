@@ -7,15 +7,11 @@ const { supabaseAdmin } = require("../SupabaseClient")
  */
 async function fetchTeamMembers(userId) {
   try {
-    console.log(`[fetchTeamMembers] Starting team data fetch for user: ${userId}`)
-
     if (!userId) {
-      console.error("[fetchTeamMembers] No user ID provided")
       throw new Error("User ID is required")
     }
 
     // First, get the user's company ID
-    console.log(`[fetchTeamMembers] Fetching company information for user: ${userId}`)
     const { data: userData, error: userError } = await supabaseAdmin
       .from("users")
       .select("company_id, role, is_company_admin")
@@ -23,34 +19,26 @@ async function fetchTeamMembers(userId) {
       .single()
 
     if (userError) {
-      console.error(`[fetchTeamMembers] Error fetching user data: ${userError.message}`)
       throw new Error("Failed to verify user company")
     }
 
     if (!userData || !userData.company_id) {
-      console.error(`[fetchTeamMembers] User ${userId} does not belong to a company`)
       throw new Error("User does not belong to a company")
     }
 
     const companyId = userData.company_id
-    console.log(`[fetchTeamMembers] User ${userId} belongs to company: ${companyId}`)
 
     // Fetch active users from the same company
-    console.log(`[fetchTeamMembers] Fetching active users for company: ${companyId}`)
     const { data: activeUsers, error: activeUsersError } = await supabaseAdmin
       .from("users")
       .select("id, email, full_name, role, is_company_admin, created_at")
       .eq("company_id", companyId)
 
     if (activeUsersError) {
-      console.error(`[fetchTeamMembers] Error fetching active users: ${activeUsersError.message}`)
       throw new Error("Failed to fetch active team members")
     }
 
-    console.log(`[fetchTeamMembers] Found ${activeUsers.length} active users for company: ${companyId}`)
-
     // Fetch all invitations (pending and revoked) for the company
-    console.log(`[fetchTeamMembers] Fetching invitations for company: ${companyId}`)
     const { data: invitations, error: invitationsError } = await supabaseAdmin
       .from("team_invitations")
       .select("id, email, role, invitation_status, created_at, email_sent_at, updated_at")
@@ -58,16 +46,11 @@ async function fetchTeamMembers(userId) {
       .in("invitation_status", ["pending", "revoked"])
 
     if (invitationsError) {
-      console.error(`[fetchTeamMembers] Error fetching invitations: ${invitationsError.message}`)
       throw new Error("Failed to fetch team invitations")
     }
 
     const pendingInvitations = invitations.filter((inv) => inv.invitation_status === "pending")
     const revokedInvitations = invitations.filter((inv) => inv.invitation_status === "revoked")
-
-    console.log(
-      `[fetchTeamMembers] Found ${pendingInvitations.length} pending invitations and ${revokedInvitations.length} revoked invitations for company: ${companyId}`,
-    )
 
     // Format active users
     const formattedActiveUsers = activeUsers.map((user) => ({
@@ -103,11 +86,6 @@ async function fetchTeamMembers(userId) {
     // Combine all sets of team members
     const teamMembers = [...formattedActiveUsers, ...formattedPendingInvitations, ...formattedRevokedInvitations]
 
-    console.log(`[fetchTeamMembers] Successfully fetched ${teamMembers.length} team members for company: ${companyId}`)
-    console.log(
-      `[fetchTeamMembers] Team members breakdown: ${formattedActiveUsers.length} active, ${formattedPendingInvitations.length} pending, ${formattedRevokedInvitations.length} revoked`,
-    )
-
     return {
       success: true,
       teamMembers,
@@ -119,7 +97,6 @@ async function fetchTeamMembers(userId) {
       },
     }
   } catch (error) {
-    console.error(`[fetchTeamMembers] Error: ${error.message}`, error)
     return {
       success: false,
       error: error.message || "Failed to fetch team members",
@@ -134,34 +111,25 @@ async function fetchTeamMembers(userId) {
  * @returns {Promise<void>}
  */
 async function handleFetchTeamMembersRequest(req, res) {
-  console.log("[handleFetchTeamMembersRequest] Received request to fetch team members")
-
   try {
     // Verify authentication
     const authHeader = req.headers.authorization
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      console.error("[handleFetchTeamMembersRequest] Missing or invalid authorization header")
       return res.status(401).json({ error: "Unauthorized" })
     }
 
     // Extract user ID from the authenticated user object
     const userId = req.user?.user_id
     if (!userId) {
-      console.error("[handleFetchTeamMembersRequest] User ID not found in authenticated session")
       return res.status(401).json({ error: "User ID not found in authenticated session" })
     }
-
-    console.log(`[handleFetchTeamMembersRequest] Fetching team members for user: ${userId}`)
 
     // Call the fetchTeamMembers function
     const result = await fetchTeamMembers(userId)
 
     if (!result.success) {
-      console.error(`[handleFetchTeamMembersRequest] Error fetching team members: ${result.error}`)
       return res.status(400).json({ error: result.error })
     }
-
-    console.log(`[handleFetchTeamMembersRequest] Successfully fetched ${result.teamMembers.length} team members`)
 
     return res.status(200).json({
       success: true,
@@ -174,7 +142,6 @@ async function handleFetchTeamMembersRequest(req, res) {
       },
     })
   } catch (error) {
-    console.error(`[handleFetchTeamMembersRequest] Unhandled error: ${error.message}`, error)
     return res.status(500).json({
       success: false,
       error: "Internal server error",
