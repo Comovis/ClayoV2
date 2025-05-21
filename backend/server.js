@@ -13,7 +13,7 @@ const { handleFetchUserDataRequest } = require("./Users/FetchAuthenticatedUser")
 const { handleGetUserData } = require("./Users/GetUserData")
 const { handleSignIn } = require("./Auth/SignInAuthService")
 const { handleAcceptInvitationRequest } = require("./Team/AcceptInvitation")
-
+const { handleGetVesselsRequest } = require("./AppFeatures/Vessels/FetchVessels")
 
 
 // Create Express app
@@ -25,6 +25,12 @@ const port = process.env.PORT || 2807
 // Basic middleware
 app.use(express.json())
 app.use(cors())
+
+
+
+
+
+//----Auth & User Setup -----//
 
 app.post("/api/send-confirmation-email", async (req, res) => {
   try {
@@ -263,6 +269,29 @@ app.get("/api/auth/current-user", authenticateUser, async (req, res) => {
     })
   }
 })
+
+
+//---- Features Main App API Endpoints -----//
+
+// GET endpoint for fetching vessels with query parameters
+app.get("/api/get-vessels", authenticateUser, async (req, res) => {
+  try {
+    await handleGetVesselsRequest(req, res)
+  } catch (error) {
+    console.error("Error fetching vessels:", error)
+    res.status(500).json({ error: "Failed to fetch vessels" })
+  }
+})
+
+
+
+
+
+
+
+
+
+
 
 // Start server
 app.listen(port, "0.0.0.0", () => {
