@@ -11,12 +11,11 @@ import "./App.css"
 import VesselsPage from "./MainPages/Vessels/VesselsPage"
 import DocumentHub from "./MainPages/DocumentHub/DocumentHub"
 import ProtectedRoute from "./Auth/ProtectedRoute"
-
 import PortPreparation from "./MainPages/PortPrep/PortPrep"
 import DocumentSharing from "./MainPages/DocumentSharing/DocumentSharing"
 import PricingPage from "./MainPages/Pricing/PricingPage"
-import SettingsPage from "./MainPages/Settings/SettingsPage"
 import NotificationsPage from "./MainPages/Notifications/Notifications"
+import TeamPage from "./MainPages/TeamManagement/TeamManagement" // Import the TeamPage component
 import OnboardingPage from "./Auth/Onboarding/OnboardingPage"
 import LandingPage from "./MainPages/LandingPage/LandingPage"
 import DocumentSharingRecipientView from "./MainPages/SharePage/DocumentSharingRecipientView"
@@ -26,6 +25,7 @@ import EmailVerificationPage from "./Auth/Signup/ConfirmEmail"
 import EmailConfirmationPage from "./Auth/Signup/EmailConfirmed"
 import InvitationAccept from "./Auth/Signup/InvitationAccept"
 import UnauthorizedMessage from "./Auth/UnauthorisedMsg"
+import { UserProvider } from "./Auth/Contexts/UserContext"
 
 // Define a simple user type for demonstration
 interface UserType {
@@ -69,7 +69,7 @@ function AppContent() {
       "/port-preparation",
       "/document-sharing",
       "/pricing",
-      "/settings",
+      "/team", // Add team path to known paths
       "/notifications",
       "/share",
     ],
@@ -93,17 +93,6 @@ function AppContent() {
   const handleLogout = () => {
     console.log("User logged out")
     // Add actual logout logic here
-  }
-
-  // Helper function to safely call dashboard API functions
-  const callDashboardAPI = (functionName: string, ...args: any[]) => {
-    if (
-      typeof window !== "undefined" &&
-      window.chatDashboardAPI &&
-      window.chatDashboardAPI[functionName as keyof typeof window.chatDashboardAPI]
-    ) {
-      ;(window.chatDashboardAPI[functionName as keyof typeof window.chatDashboardAPI] as Function)(...args)
-    }
   }
 
   return (
@@ -190,11 +179,12 @@ function AppContent() {
                 </ProtectedRoute>
               }
             />
+            {/* Add Team Management route */}
             <Route
-              path="/settings"
+              path="/team"
               element={
                 <ProtectedRoute>
-                  <SettingsPage />
+                  <TeamPage />
                 </ProtectedRoute>
               }
             />
@@ -228,7 +218,9 @@ function AppContent() {
 function App() {
   return (
     <Router>
-      <AppContent />
+      <UserProvider>
+        <AppContent />
+      </UserProvider>
     </Router>
   )
 }

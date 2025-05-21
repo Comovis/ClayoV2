@@ -3,6 +3,7 @@
 import { CheckCircle, ArrowRight } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { useOnboarding } from "./OnboardingContainer"
+import { Link } from 'react-router-dom'
 
 export default function OnboardingComplete() {
   const { onboardingData } = useOnboarding()
@@ -18,27 +19,12 @@ export default function OnboardingComplete() {
         Your Comovis platform is ready to help you manage maritime compliance and prevent vessel detentions.
       </p>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-2xl mb-8">
-        <div className="border rounded-lg p-4 text-center">
-          <div className="font-semibold mb-1">{onboardingData.vessels ? onboardingData.vessels.length : 0}</div>
-          <p className="text-sm text-slate-500">Vessels Added</p>
-        </div>
-
-        <div className="border rounded-lg p-4 text-center">
-          <div className="font-semibold mb-1">{onboardingData.preferences ? onboardingData.preferences.length : 0}</div>
-          <p className="text-sm text-slate-500">Features Enabled</p>
-        </div>
-
-        <div className="border rounded-lg p-4 text-center">
-          <div className="font-semibold mb-1">{onboardingData.teamMembers ? onboardingData.teamMembers.length : 0}</div>
-          <p className="text-sm text-slate-500">Team Members</p>
-        </div>
-      </div>
-
       <div className="space-y-4 w-full max-w-md">
-        <Button className="w-full">
-          Go to Dashboard
-          <ArrowRight className="ml-2 h-4 w-4" />
+        <Button asChild className="w-full">
+          <Link to="/dashboard">
+            Go to Dashboard
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Link>
         </Button>
 
         <div className="text-sm text-slate-500">

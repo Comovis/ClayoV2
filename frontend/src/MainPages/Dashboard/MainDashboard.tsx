@@ -7,8 +7,14 @@ import { Badge } from "@/components/ui/badge"
 import { AlertTriangle, CheckCircle, AlertCircle, Ship, Calendar, FileText, Clock, MapPin, Eye, Share2, Upload, Shield } from 'lucide-react'
 import { Progress } from "@/components/ui/progress"
 import DocumentUploadModal from "../../MainComponents/UploadModal/UploadModal"
+import { useUser } from "../../Auth/Contexts/UserContext"
 
-export default function Dashboard() {
+export default function Dashboard({ hideSidebar = false }) {
+  // Add this near the top of your component
+  const { isAuthenticated, isLoading, user, company } = useUser()
+
+  console.log("Dashboard rendering with auth state:", { isAuthenticated, isLoading, user, company })
+
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
   const [selectedVesselForUpload, setSelectedVesselForUpload] = useState<string | undefined>(undefined)
 
@@ -18,6 +24,38 @@ export default function Dashboard() {
     // You would update your documents state/cache here
     setUploadModalOpen(false)
     // Optionally show a success notification
+  }
+
+  // Add conditional rendering based on loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading your dashboard...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // If not authenticated and not loading, this should be handled by ProtectedRoute
+  // But we can add an extra check here for safety
+  if (!isAuthenticated && !isLoading) {
+    console.log("Dashboard: User not authenticated but somehow reached this component")
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <p className="text-gray-600">You need to be logged in to view this page.</p>
+          <Button 
+            className="mt-4" 
+            onClick={() => window.location.href = "/login"}
+          >
+            Go to Login
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -455,7 +493,20 @@ export default function Dashboard() {
   )
 }
 
-function VesselOverviewItem({ name, type, flag, complianceScore, documentStatus }) {
+interface VesselOverviewItemProps {
+  name: string
+  type: string
+  flag: string
+  complianceScore: number
+  documentStatus: {
+    valid: number
+    expiringSoon: number
+    expired: number
+    missing: number
+  }
+}
+
+function VesselOverviewItem({ name, type, flag, complianceScore, documentStatus }: VesselOverviewItemProps) {
   let scoreColor = "bg-red-500"
   if (complianceScore >= 90) scoreColor = "bg-green-500"
   else if (complianceScore >= 70) scoreColor = "bg-yellow-500"
@@ -511,7 +562,17 @@ function VesselOverviewItem({ name, type, flag, complianceScore, documentStatus 
   )
 }
 
-function ActivityItem({ icon: Icon, iconColor, iconBg, title, description, timestamp, user }) {
+interface ActivityItemProps {
+  icon: any
+  iconColor: string
+  iconBg: string
+  title: string
+  description: string
+  timestamp: string
+  user: string
+}
+
+function ActivityItem({ icon: Icon, iconColor, iconBg, title, description, timestamp, user }: ActivityItemProps) {
   return (
     <div className="p-4 flex items-start">
       <div className={`w-10 h-10 rounded-full ${iconBg} flex items-center justify-center mr-3 flex-shrink-0`}>
@@ -531,7 +592,15 @@ function ActivityItem({ icon: Icon, iconColor, iconBg, title, description, times
   )
 }
 
-function QuickAccessCard({ icon: Icon, title, description, link, color }) {
+interface QuickAccessCardProps {
+  icon: any
+  title: string
+  description: string
+  link: string
+  color: string
+}
+
+function QuickAccessCard({ icon: Icon, title, description, link, color }: QuickAccessCardProps) {
   return (
     <div 
       className="cursor-pointer"

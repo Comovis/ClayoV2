@@ -7,6 +7,10 @@ const { authenticateUser } = require("./Auth/AuthenticateUser")
 const { createAndSendInvitation } = require("./Emails/InviteTeamEmail/InviteAuthService")
 const { handleCancelTeamInvitationRequest } = require("./Team/CancelTeamInvite")
 const { handleInviteSignup } = require("./Auth/SignupInviteAPI")
+const { handleFetchTeamMembersRequest } = require("./Team/FetchTeamData")
+const { handleFetchUserDataRequest } = require("./Auth/FetchUser")
+
+
 
 
 // Create Express app
@@ -162,7 +166,88 @@ app.post("/api/cancel-team-invitation", authenticateUser, async (req, res) => {
     console.error("Error cancelling team invitation:", error)
     res.status(500).json({ error: "Failed to cancel team invitation" })
   }
-}) // Added missing closing curly brace here
+}) 
+
+
+app.get("/api/team-members", authenticateUser, async (req, res) => {
+  console.log("🔍 [SERVER] /api/team-members endpoint hit")
+
+  try {
+    // Log the authenticated user
+    console.log(`👤 [SERVER] Authenticated user: ${req.user?.user_id}`)
+
+    // Log the request headers for debugging
+    console.log("📋 [SERVER] Request headers:", {
+      authorization: req.headers.authorization ? "Bearer [REDACTED]" : "None",
+      "content-type": req.headers["content-type"],
+      origin: req.headers.origin,
+      referer: req.headers.referer,
+    })
+
+    // Call the handler with additional logging
+    console.log("🔄 [SERVER] Calling handleFetchTeamMembersRequest")
+    await handleFetchTeamMembersRequest(req, res)
+    console.log("✅ [SERVER] handleFetchTeamMembersRequest completed")
+  } catch (error) {
+    console.error("❌ [SERVER] Error fetching team members:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch team members",
+    })
+  }
+})
+
+
+// Add this to your existing routes file or where you define your API routes
+app.get("/api/auth/current-user", authenticateUser, async (req, res) => {
+  console.log("🔍 [SERVER] /api/auth/current-user endpoint hit")
+
+  try {
+    // Log the authenticated user
+    console.log(`👤 [SERVER] Authenticated user: ${req.user?.user_id}`)
+
+    // Get user ID from auth or header as backup
+    const userId = req.user?.user_id || req.headers["x-user-id"]
+
+    if (!userId) {
+      console.error("❌ [SERVER] No user ID found in request")
+      return res.status(401).json({
+        success: false,
+        error: "User ID not found"
+      })
+    }
+
+    console.log(`👤 [SERVER] Using user ID: ${userId}`)
+
+    // Log the request headers for debugging
+    console.log("📋 [SERVER] Request headers:", {
+      authorization: req.headers.authorization ? "Bearer [REDACTED]" : "None",
+      "content-type": req.headers["content-type"],
+      "x-user-id": req.headers["x-user-id"],
+      origin: req.headers.origin,
+      referer: req.headers.referer,
+    })
+
+    // Call the handler with additional logging
+    console.log("🔄 [SERVER] Calling handleFetchUserDataRequest")
+
+    // Ensure req.user exists
+    if (!req.user && userId) {
+      req.user = { user_id: userId }
+    }
+
+    await handleFetchUserDataRequest(req, res)
+    console.log("✅ [SERVER] handleFetchUserDataRequest completed")
+  } catch (error) {
+    console.error("❌ [SERVER] Error fetching user data:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch user data"
+    })
+  }
+})
+
+
 
 // Start server
 app.listen(port, "0.0.0.0", () => {

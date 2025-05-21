@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Link, useLocation } from "react-router-dom"
-import { BarChart3, Ship, FileText, MapPin, Share2, Bell, Settings, LogOut } from "lucide-react"
+import { BarChart3, Ship, FileText, MapPin, Share2, Bell, LogOut, Users } from "lucide-react"
 
 import IconComovisBlack from "../../ReusableAssets/Logos/IconComovisBlack.svg"
 import LogoBlack from "../../ReusableAssets/Logos/LogoBlack.svg"
@@ -50,10 +50,10 @@ export default function Sidebar() {
       <div className="flex-1 overflow-auto py-4">
         <nav className="space-y-1 px-2">
           <NavItem
-            href="/"
+            href="/dashboard"
             icon={BarChart3}
             label="Dashboard"
-            active={location.pathname === "/"}
+            active={location.pathname === "/dashboard"}
             collapsed={!isSidebarExpanded}
           />
           <NavItem
@@ -85,17 +85,17 @@ export default function Sidebar() {
             collapsed={!isSidebarExpanded}
           />
           <NavItem
+            href="/team"
+            icon={Users}
+            label="Team Management"
+            active={location.pathname === "/team"}
+            collapsed={!isSidebarExpanded}
+          />
+          <NavItem
             href="/notifications"
             icon={Bell}
             label="Notifications"
             active={location.pathname === "/notifications"}
-            collapsed={!isSidebarExpanded}
-          />
-          <NavItem
-            href="/settings"
-            icon={Settings}
-            label="Settings"
-            active={location.pathname === "/settings"}
             collapsed={!isSidebarExpanded}
           />
         </nav>

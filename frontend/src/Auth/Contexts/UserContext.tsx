@@ -5,22 +5,32 @@ import { createContext, useContext, useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { supabase } from "../../Auth/SupabaseAuth"
 
-// Define types for user data
+// API Base URL Configuration
+const apiBaseUrl =
+  import.meta.env.MODE === "development" ? import.meta.env.VITE_DEVELOPMENT_URL : import.meta.env.VITE_API_URL
+
+// Define types for user data based on your actual database schema
 interface User {
   id: string
   email: string
-  firstName?: string
-  lastName?: string
+  full_name: string
+  company_id: string | null
   role: string
-  companyId: string
-  createdAt: string
-  lastLogin?: string
+  is_company_admin: boolean
+  onboarding_step: string
+  created_at: string
+  updated_at: string
 }
 
 interface Company {
   id: string
   name: string
-  operatingRegions: string[]
+  company_type: string | null
+  vessel_count: number | null
+  operating_regions: string[] | null
+  onboarding_completed: boolean
+  created_at: string
+  updated_at: string
 }
 
 interface UserContextType {
@@ -64,11 +74,21 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Check for existing session
         const {
           data: { session },
+          error: sessionError,
         } = await supabase.auth.getSession()
 
+        if (sessionError) {
+          console.error("Error getting session:", sessionError)
+          setIsLoading(false)
+          return
+        }
+
         if (session) {
+          // We have a session, so we're authenticated
           setIsAuthenticated(true)
-          await fetchUserData()
+
+          // Proceed with fetching user data using the API
+          await fetchUserDataFromAPI(session.access_token)
         } else {
           setIsAuthenticated(false)
           setUser(null)
@@ -87,11 +107,12 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === "SIGNED_IN" && session) {
         setIsAuthenticated(true)
-        await fetchUserData()
+        await fetchUserDataFromAPI(session.access_token)
       } else if (event === "SIGNED_OUT") {
         setIsAuthenticated(false)
         setUser(null)
         setCompany(null)
+        localStorage.removeItem("userId")
       }
     })
 
@@ -100,32 +121,70 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [])
 
-  // Fetch user data from database using secure RPC functions
-  const fetchUserData = async () => {
+  // Fetch user data from our backend API
+  const fetchUserDataFromAPI = async (token: string) => {
+    // Set a timeout to detect if the function is hanging
+    const timeoutId = setTimeout(() => {
+      console.error("API request timeout - forcing completion")
+      setIsLoading(false)
+    }, 5000)
+
     try {
-      // Fetch user profile using the secure RPC function
-      const { data: userData, error: userError } = await supabase.rpc("get_user_data")
+      // Call our backend API to get the user data
+      const response = await fetch(`${apiBaseUrl}/api/auth/current-user`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
 
-      if (userError) throw userError
+      // Clear the timeout since we got a response
+      clearTimeout(timeoutId)
 
-      if (userData) {
-        setUser(userData as User)
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
 
-        // Fetch company data if user has a company
-        if (userData.companyId) {
-          const { data: companyData, error: companyError } = await supabase.rpc("get_company_data_by_id", {
-            p_company_id: userData.companyId,
-          })
-
-          if (companyError) throw companyError
-
-          if (companyData) {
-            setCompany(companyData as Company)
-          }
+        // If user not found (404), handle gracefully
+        if (response.status === 404) {
+          setIsAuthenticated(false)
+          return
         }
+
+        throw new Error(errorData.error || `Failed to fetch user data: ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      if (data.success && data.user) {
+        // Store user ID in localStorage for backup
+        localStorage.setItem("userId", data.user.id)
+
+        // Set the user and company data
+        setUser(data.user)
+        setCompany(data.company || null)
+      } else {
+        throw new Error("Failed to fetch user data")
       }
     } catch (error) {
       console.error("Error fetching user data:", error)
+    } finally {
+      clearTimeout(timeoutId)
+      setIsLoading(false)
+    }
+  }
+
+  // Fetch user data - this is a wrapper that will be used by other functions
+  const fetchUserData = async () => {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (session && session.user) {
+        await fetchUserDataFromAPI(session.access_token)
+      }
+    } catch (error) {
+      console.error("Error refreshing user data:", error)
     }
   }
 
@@ -137,11 +196,13 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password,
       })
 
-      if (error) throw error
+      if (error) {
+        console.error("Login error:", error)
+        throw error
+      }
 
       return { success: true }
     } catch (error: any) {
-      console.error("Login error:", error)
       return {
         success: false,
         error: error.message || "Failed to log in",
@@ -156,14 +217,16 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password,
       })
 
-      if (error) throw error
+      if (error) {
+        console.error("Signup error:", error)
+        throw error
+      }
 
       // Store email in localStorage for verification page
       localStorage.setItem("userEmail", email)
 
       return { success: true }
     } catch (error: any) {
-      console.error("Signup error:", error)
       return {
         success: false,
         error: error.message || "Failed to sign up",
@@ -182,23 +245,48 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // User data functions
   const refreshUserData = async () => {
-    await fetchUserData()
+    try {
+      await fetchUserData()
+    } catch (error) {
+      console.error("Error refreshing user data:", error)
+    }
   }
 
-  // Create a secure function to update user profile
+  // Update user profile using our backend API
   const updateUserProfile = async (data: Partial<User>) => {
-    if (!user?.id) return
+    if (!user?.id) {
+      console.error("Cannot update profile: No user ID")
+      return
+    }
 
     try {
-      // Convert the data object to match the database column names
-      const dbData: any = {}
-      if (data.firstName) dbData.first_name = data.firstName
-      if (data.lastName) dbData.last_name = data.lastName
-      if (data.role) dbData.role = data.role
+      // Get the current session to include the auth token
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
 
-      const { error } = await supabase.from("users").update(dbData).eq("id", user.id)
+      if (sessionError || !sessionData.session) {
+        throw new Error("Authentication required. Please log in again.")
+      }
 
-      if (error) throw error
+      // Call our backend API to update the user profile
+      const response = await fetch(`${apiBaseUrl}/api/auth/update-profile`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+        },
+        body: JSON.stringify(data),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `Failed to update profile: ${response.status}`)
+      }
+
+      const responseData = await response.json()
+
+      if (!responseData.success) {
+        throw new Error(responseData.error || "Failed to update profile")
+      }
 
       // Refresh user data
       await refreshUserData()
