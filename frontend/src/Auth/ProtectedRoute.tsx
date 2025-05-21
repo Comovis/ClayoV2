@@ -9,9 +9,14 @@ import UnauthorizedMessage from "./UnauthorisedMsg"
 interface ProtectedRouteProps {
   children: ReactNode
   requireFullAuth?: boolean // New prop to distinguish between semi-auth and full-auth routes
+  checkOnboardingStatus?: boolean // New prop to check if onboarding is complete
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requireFullAuth = true }) => {
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
+  children,
+  requireFullAuth = true,
+  checkOnboardingStatus = false,
+}) => {
   const { isAuthenticated, isLoading, user } = useUser()
   const navigate = useNavigate()
   const location = useLocation()
@@ -25,9 +30,13 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requireFullAu
 
   const isPublicPath = publicRoutes.includes(pathname)
   const isSemiAuthPath = semiAuthRoutes.includes(pathname)
+  const isOnboardingPath = pathname === "/onboarding"
 
   // Check if user has at least a profile (semi-authenticated)
   const hasSemiAuth = !!user?.id
+
+  // Check if user has completed onboarding
+  const hasCompletedOnboarding = user?.onboarding_step === "complete"
 
   useEffect(() => {
     if (isLoading) return
@@ -35,13 +44,31 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requireFullAu
     // For fully protected routes
     if (requireFullAuth && !isAuthenticated && !isPublicPath) {
       navigate(`/login?redirect=${encodeURIComponent(pathname)}`)
+      return
     }
 
     // For semi-auth routes
     if (!requireFullAuth && !hasSemiAuth && !isPublicPath) {
       navigate(`/signup?redirect=${encodeURIComponent(pathname)}`)
+      return
     }
-  }, [isAuthenticated, isLoading, pathname, navigate, isPublicPath, requireFullAuth, hasSemiAuth])
+
+    // Prevent users who have completed onboarding from accessing the onboarding page
+    if (isOnboardingPath && hasCompletedOnboarding) {
+      navigate("/dashboard")
+      return
+    }
+  }, [
+    isAuthenticated,
+    isLoading,
+    pathname,
+    navigate,
+    isPublicPath,
+    requireFullAuth,
+    hasSemiAuth,
+    isOnboardingPath,
+    hasCompletedOnboarding,
+  ])
 
   // If loading, show a loading state
   if (isLoading) {
@@ -60,6 +87,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requireFullAu
   // For semi-auth routes
   if (!requireFullAuth && !hasSemiAuth && !isPublicPath) {
     return <UnauthorizedMessage />
+  }
+
+  // Prevent users who have completed onboarding from accessing the onboarding page
+  if (isOnboardingPath && hasCompletedOnboarding) {
+    return null // This will be handled by the useEffect redirect
   }
 
   // If authentication requirements are met, render children

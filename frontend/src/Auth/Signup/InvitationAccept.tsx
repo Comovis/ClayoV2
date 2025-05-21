@@ -26,9 +26,9 @@ export default function InvitationAccept() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [userData, setUserData] = useState<any>(null)
   const [token, setToken] = useState<string | null>(null)
-  // const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false)
   const [resendSuccess, setResendSuccess] = useState(false)
   const [wrongEmailError, setWrongEmailError] = useState(false)
+  const [redirectCountdown, setRedirectCountdown] = useState(7)
 
   // Get the token from the URL query parameter
   const location = useLocation()
@@ -58,6 +58,24 @@ export default function InvitationAccept() {
       checkInvitation(token)
     }
   }, [token])
+
+  // Countdown timer for redirect
+  useEffect(() => {
+    let timer: NodeJS.Timeout
+
+    if (isComplete && redirectCountdown > 0) {
+      timer = setTimeout(() => {
+        setRedirectCountdown(redirectCountdown - 1)
+      }, 1000)
+    } else if (isComplete && redirectCountdown === 0) {
+      // Redirect to login page when countdown reaches 0
+      window.location.href = "/login"
+    }
+
+    return () => {
+      if (timer) clearTimeout(timer)
+    }
+  }, [isComplete, redirectCountdown])
 
   async function checkInvitation(inviteToken: string) {
     try {
@@ -237,42 +255,16 @@ export default function InvitationAccept() {
 
       console.log("Invitation accepted successfully")
       setIsComplete(true)
+      setIsProcessing(false)
 
-      // Clear the invited user flag as we're now redirecting
+      // Clear the invited user flag as we're now done with the invitation
       localStorage.removeItem("isInvitedUser")
 
-      // Redirect to dashboard after 2 seconds
-      setTimeout(() => {
-        window.location.href = "/dashboard"
-      }, 2000)
+      // Store the email in localStorage for the login page
+      localStorage.setItem("lastInvitedEmail", invitation.email)
     } catch (error: any) {
       console.error("Error accepting invitation:", error)
       setError(error.message || "Failed to accept invitation. Please try again.")
-      setIsProcessing(false)
-    }
-  }
-
-  const handleResendConfirmationEmail = async () => {
-    setIsProcessing(true)
-    try {
-      const response = await fetch(`${apiBaseUrl}/api/resend-confirmation-email`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email: invitation.email }),
-      })
-
-      if (!response.ok) {
-        throw new Error("Failed to resend confirmation email")
-      }
-
-      // Show success message
-      setResendSuccess(true)
-      setTimeout(() => setResendSuccess(false), 3000)
-    } catch (error) {
-      setError("Failed to resend confirmation email. Please try again.")
-    } finally {
       setIsProcessing(false)
     }
   }
@@ -351,7 +343,6 @@ export default function InvitationAccept() {
     )
   }
 
-  
   if (isComplete) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-slate-50 dark:bg-slate-900">
@@ -366,7 +357,7 @@ export default function InvitationAccept() {
             <p className="text-center mb-4">
               You have successfully joined {invitation.companyName}'s maritime compliance platform
             </p>
-            <div className="rounded-lg bg-slate-50 p-4">
+            <div className="rounded-lg bg-slate-50 p-4 mb-6">
               <p className="mb-2 text-sm font-medium">You now have access to:</p>
               <ul className="space-y-3">
                 <li className="flex items-start">
@@ -387,12 +378,19 @@ export default function InvitationAccept() {
                 </li>
               </ul>
             </div>
-          </CardContent>
-          <CardFooter>
-            <Button className="w-full" size="lg" onClick={() => (window.location.href = "/dashboard")}>
-              Go to Dashboard
+
+            {/* Redirect message and countdown */}
+            <Alert className="mb-4 bg-blue-50 text-blue-800">
+              <AlertDescription>
+                You will be redirected to the login page in {redirectCountdown} seconds. Please sign in for your
+                security.
+              </AlertDescription>
+            </Alert>
+
+            <Button className="w-full" onClick={() => (window.location.href = "/login")}>
+              Go to Login
             </Button>
-          </CardFooter>
+          </CardContent>
         </Card>
       </div>
     )

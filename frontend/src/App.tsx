@@ -127,8 +127,15 @@ function AppContent() {
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/accept-invite" element={<InvitationAccept />} />
             <Route path="/confirm-email" element={<EmailVerificationPage />} />
-          
-            <Route path="/onboarding" element={<OnboardingPage />} />
+
+            <Route
+              path="/onboarding"
+              element={
+                <ProtectedRoute requireFullAuth={false} checkOnboardingStatus={true}>
+                  <OnboardingPage />
+                </ProtectedRoute>
+              }
+            />
 
             {/* Protected routes */}
             <Route

@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react" // Added useEffect import
 import { Mail, Lock, Loader2, AlertCircle } from "lucide-react"
 import { Link, useNavigate } from "react-router-dom"
 import { useUser } from "../../Auth/Contexts/UserContext" // Import the useUser hook
@@ -24,6 +24,18 @@ export default function LoginPage() {
 
   // Get the login function from your UserContext
   const { login, refreshUserData } = useUser()
+
+  // Add useEffect to check for lastInvitedEmail in localStorage
+  useEffect(() => {
+    // Check if there's a lastInvitedEmail in localStorage
+    const lastInvitedEmail = localStorage.getItem("lastInvitedEmail")
+    if (lastInvitedEmail) {
+      // Pre-fill the email field
+      setEmail(lastInvitedEmail)
+      // Clear it from localStorage
+      localStorage.removeItem("lastInvitedEmail")
+    }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()

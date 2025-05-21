@@ -142,36 +142,75 @@ async function createUserForInvitation({ email, password, fullName, companyId, r
       throw new Error("Created user has incorrect email. Please contact support.")
     }
 
-    // Check if user exists in the users table
-    const { data: existingDbUser, error: dbLookupError } = await supabaseAdmin
-      .from("users")
-      .select("id")
-      .eq("id", userId)
-      .single()
-
     // Create or update the user record in the users table
-    const userData = {
-      id: userId,
-      email: email.toLowerCase(),
-      full_name: fullName,
-      role: role || "team",
-      company_id: companyId,
-      is_company_admin: false,
-      updated_at: new Date().toISOString(),
-      onboarding_step: "completed", // Skip onboarding for invited users
-    }
+    // IMPORTANT: Use the same approach as in SignupAuthService.js to ensure RLS policies are respected
+    console.log(`${isNewUser ? "Creating" : "Updating"} user record in database for email: ${email}`)
 
-    // Only set created_at for new records
-    if (!existingDbUser) {
-      userData.created_at = new Date().toISOString()
-    }
+    try {
+      // Use separate operations for insert and update instead of upsert
 
-    console.log(`${existingDbUser ? "Updating" : "Creating"} user record in database for email: ${email}`)
+      // Check if the user exists in the database
+      const { data: existingDbUser, error: existingDbUserError } = await supabaseAdmin
+        .from("users")
+        .select("*")
+        .eq("id", userId)
+        .single()
 
-    const { error: userError } = await supabaseAdmin.from("users").upsert(userData)
+      if (existingDbUserError && existingDbUserError.code !== "PGRST116") {
+        console.error("Error checking if user exists in database:", existingDbUserError)
+        throw new Error("Failed to check if user exists in database")
+      }
 
-    if (userError) {
-      console.error("Error upserting user in database:", userError)
+      if (!existingDbUser) {
+        // For new users, use insert
+        const userData = {
+          id: userId,
+          email: email.toLowerCase(),
+          full_name: fullName,
+          role: role || "team",
+          company_id: companyId,
+          is_company_admin: false,
+          onboarding_step: "complete", // Skip onboarding for invited users
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+
+        const { error: insertError } = await supabaseAdmin.from("users").insert(userData)
+
+        if (insertError) {
+          console.error("Error inserting user in database:", insertError)
+
+          // If this is a new user, attempt to clean up the auth user
+          try {
+            console.log(`Cleaning up auth user ${userId} due to database error...`)
+            await supabaseAdmin.auth.admin.deleteUser(userId)
+          } catch (cleanupError) {
+            console.error(`Failed to clean up auth user ${userId}:`, cleanupError)
+          }
+
+          throw new Error("Failed to create user record in database")
+        }
+      } else {
+        // For existing users, use update
+        const userData = {
+          email: email.toLowerCase(),
+          full_name: fullName,
+          role: role || "team",
+          company_id: companyId,
+          is_company_admin: false,
+          onboarding_step: "completed", // Skip onboarding for invited users
+          updated_at: new Date().toISOString(),
+        }
+
+        const { error: updateError } = await supabaseAdmin.from("users").update(userData).eq("id", userId)
+
+        if (updateError) {
+          console.error("Error updating user in database:", updateError)
+          throw new Error("Failed to update user record in database")
+        }
+      }
+    } catch (dbError) {
+      console.error("Database operation failed:", dbError)
       throw new Error("Failed to create or update user record in database")
     }
 
