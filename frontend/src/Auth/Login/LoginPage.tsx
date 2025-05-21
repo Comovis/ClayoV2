@@ -3,28 +3,99 @@
 import type React from "react"
 
 import { useState } from "react"
-import { Mail, Lock, Loader2 } from "lucide-react"
-import { Link } from "react-router-dom"
+import { Mail, Lock, Loader2, AlertCircle } from 'lucide-react'
+import { Link, useNavigate } from "react-router-dom"
+import { useUser } from "../../Auth/Contexts/UserContext" // Import the useUser hook
 
 // Simple image import for logo
 import LogoBlack from "../../ReusableAssets/Logos/LogoBlack.svg"
 
+// API Base URL Configuration
+const apiBaseUrl =
+  import.meta.env.MODE === "development" ? import.meta.env.VITE_DEVELOPMENT_URL : import.meta.env.VITE_API_URL
+
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [rememberMe, setRememberMe] = useState(false)
+  const navigate = useNavigate()
+  
+  // Get the login function from your UserContext
+  const { login, refreshUserData } = useUser()
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError(null)
     setIsLoading(true)
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+    try {
+      // Validate inputs
+      if (!email || !password) {
+        throw new Error("Email and password are required")
+      }
 
-    // For demo purposes, always succeed
-    // In a real app, you would handle authentication errors here
-    setIsLoading(false)
-    // Navigate to dashboard or next step
+      // Sanitize email
+      const sanitizedEmail = email.toLowerCase().trim()
+
+      console.log(`Attempting to sign in user: ${sanitizedEmail}`)
+
+      // First, use the context's login function to authenticate with Supabase
+      const loginResult = await login(sanitizedEmail, password)
+      
+      if (!loginResult.success) {
+        throw new Error(loginResult.error || "Authentication failed")
+      }
+      
+      // Now call our custom API endpoint to get additional user data
+      const response = await fetch(`${apiBaseUrl}/api/signin`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: sanitizedEmail,
+          password,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Sign in failed")
+      }
+
+      if (!data.success) {
+        throw new Error(data.error || "Authentication unsuccessful")
+      }
+
+      console.log("User authenticated successfully:", data.user.email)
+
+      // Store user data in localStorage if remember me is checked
+      if (rememberMe) {
+        localStorage.setItem("userId", data.user.id)
+        localStorage.setItem("userEmail", data.user.email)
+        localStorage.setItem("userRole", data.user.role || "")
+        localStorage.setItem("companyId", data.user.company_id || "")
+      }
+
+      // Store session data regardless
+      localStorage.setItem("accessToken", data.user.session.access_token)
+      localStorage.setItem("refreshToken", data.user.session.refresh_token)
+      localStorage.setItem("tokenExpiry", data.user.session.expires_at)
+      
+      // Refresh user data to ensure the context is updated
+      await refreshUserData()
+
+      // Use navigate instead of window.location for a smoother transition
+      navigate("/dashboard")
+    } catch (error) {
+      console.error("Login error:", error)
+      setError(error.message || "Failed to sign in. Please check your credentials and try again.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -39,7 +110,10 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">{error}</div>
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm flex items-start">
+                <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
+                <span>{error}</span>
+              </div>
             )}
 
             <div>
@@ -54,6 +128,8 @@ export default function LoginPage() {
                   id="email"
                   name="email"
                   type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   placeholder="john@oceanicshipping.com"
                   required
                   className="w-full pl-10 py-3 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
@@ -78,6 +154,8 @@ export default function LoginPage() {
                   id="password"
                   name="password"
                   type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
                   className="w-full pl-10 py-3 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
@@ -90,6 +168,8 @@ export default function LoginPage() {
                 id="remember"
                 name="remember"
                 type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
                 className="h-4 w-4 text-black focus:ring-black border-gray-300 rounded"
               />
               <label htmlFor="remember" className="ml-2 block text-sm text-gray-700">
@@ -126,6 +206,7 @@ export default function LoginPage() {
 
       {/* Maritime Media Section - RIGHT */}
       <div className="hidden lg:block lg:w-1/2 relative bg-blue-900">
+        {/* Maritime-themed sidebar content remains the same */}
         <div className="absolute inset-0 z-10 bg-gradient-to-b from-blue-900/70 to-blue-900/40" />
         <img
           src="/container-ship-at-sea.png"

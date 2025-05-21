@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
-import { CheckCircle2, Ship, Shield, FileText, Globe, Loader2, AlertCircle, Mail, RefreshCw } from 'lucide-react'
+import { CheckCircle2, Ship, Shield, FileText, Globe, Loader2, AlertCircle, Mail, RefreshCw } from "lucide-react"
 import { supabase } from "../../Auth/SupabaseAuth"
 import LogoBlack from "../../ReusableAssets/Logos/LogoBlack.svg"
 
@@ -76,105 +76,29 @@ export default function InvitationAccept() {
         console.log("User is logged in:", sessionData.session.user.email)
       }
 
-      // Step 1: Get the invitation details without any joins
-      // IMPORTANT: Make sure we're not using .single() yet to avoid the 406 error
-      const { data, error } = await supabase
-        .from("team_invitations")
-        .select("id, email, role, invitation_token, company_id, invited_by, invitation_status")
-        .eq("invitation_token", inviteToken)
-
-      console.log("Invitation query result:", { data, error })
-
-      if (error) {
-        console.error("Error fetching invitation:", error)
-        throw error
-      }
-
-      if (!data || data.length === 0) {
-        console.error("No invitation found with token:", inviteToken)
-        setError("This invitation is invalid or has expired.")
-        setLoading(false)
-        return
-      }
-
-      // Use the first result if multiple are returned (shouldn't happen with a unique token)
-      const invitationData = data[0]
-
-      // Check if the invitation has been cancelled
-      if (invitationData.invitation_status === "cancelled" || invitationData.invitation_status === "revoked") {
-        setError("This invitation has been cancelled by the sender.")
-        setLoading(false)
-        return
-      }
-
-      // Check if the invitation has already been used
-      if (invitationData.invitation_status !== "pending") {
-        setError("This invitation has already been used or has expired.")
-        setLoading(false)
-        return
-      }
-
-      // Step 2: Get company name in a separate query
-      let companyName = "Comovis"
-      if (invitationData.company_id) {
-        try {
-          const { data: companyData, error: companyError } = await supabase
-            .from("companies")
-            .select("name")
-            .eq("id", invitationData.company_id)
-            .single()
-
-          if (companyError) {
-            console.warn("Error fetching company:", companyError)
-          } else if (companyData) {
-            companyName = companyData.name || companyName
-          }
-        } catch (companyError) {
-          console.error("Error fetching company:", companyError)
-        }
-      }
-
-      // Step 3: Get inviter name in a separate query
-      let inviterName = "A team administrator"
-      if (invitationData.invited_by) {
-        try {
-          const { data: inviterData, error: inviterError } = await supabase
-            .from("users")
-            .select("full_name")
-            .eq("id", invitationData.invited_by)
-            .single()
-
-          if (inviterError) {
-            console.warn("Error fetching inviter:", inviterError)
-          } else if (inviterData) {
-            inviterName = inviterData.full_name || inviterName
-          }
-        } catch (inviterError) {
-          console.error("Error fetching inviter:", inviterError)
-        }
-      }
-
-      setInvitation({
-        id: invitationData.id,
-        email: invitationData.email,
-        role: invitationData.role,
-        token: invitationData.invitation_token,
-        companyId: invitationData.company_id,
-        invitedBy: invitationData.invited_by,
-        companyName: companyName,
-        inviterName: inviterName,
-        status: invitationData.invitation_status,
+      // Use the new backend API endpoint to validate the invitation token
+      const response = await fetch(`${apiBaseUrl}/api/validate-invitation`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ token: inviteToken }),
       })
 
-      console.log("Invitation processed successfully:", {
-        id: invitationData.id,
-        email: invitationData.email,
-        role: invitationData.role,
-        status: invitationData.invitation_status,
-      })
-    } catch (error) {
+      const result = await response.json()
+
+      if (!response.ok) {
+        console.error("Error validating invitation:", result.error)
+        throw new Error(result.error || "Failed to validate invitation")
+      }
+
+      // Set the invitation data from the API response
+      setInvitation(result.invitation)
+
+      console.log("Invitation processed successfully:", result.invitation)
+    } catch (error: any) {
       console.error("Error checking invitation:", error)
-      setError("Failed to verify invitation. It may be invalid or expired.")
+      setError(error.message || "Failed to verify invitation. It may be invalid or expired.")
     } finally {
       setLoading(false)
     }
@@ -235,10 +159,10 @@ export default function InvitationAccept() {
       if (data.requiresEmailConfirmation) {
         // Set the invited user flag
         localStorage.setItem("isInvitedUser", "true")
-        
+
         // Store email in localStorage for verification page
         localStorage.setItem("userEmail", invitation.email)
-        
+
         // Show the email confirmation UI
         setNeedsEmailConfirmation(true)
         setIsProcessing(false)
@@ -275,7 +199,10 @@ export default function InvitationAccept() {
       if (isLoggedIn && fullName.trim()) {
         try {
           // Update the user's name in the public.users table
-          const { error: updateError } = await supabase.from("users").update({ full_name: fullName.trim() }).eq("id", userId)
+          const { error: updateError } = await supabase
+            .from("users")
+            .update({ full_name: fullName.trim() })
+            .eq("id", userId)
 
           if (updateError) {
             console.error("Error updating user name:", updateError)
@@ -285,31 +212,39 @@ export default function InvitationAccept() {
         }
       }
 
-      // Accept the invitation
-      const { data, error } = await supabase.rpc("accept_team_invitation", {
-        p_invitation_token: token,
-        p_user_id: userId,
-        p_name: fullName.trim() || null,
+      // Use the API endpoint to accept the invitation
+      const response = await fetch(`${apiBaseUrl}/api/accept-invitation`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          token,
+          userId,
+          fullName: fullName.trim() || null,
+        }),
       })
 
-      if (error) {
-        console.error("Error in accept_team_invitation RPC:", error)
-        throw error
+      const result = await response.json()
+
+      if (!response.ok) {
+        console.error("Error accepting invitation:", result.error)
+        throw new Error(result.error || "Failed to accept invitation")
       }
 
-      console.log("Invitation accepted successfully:", data)
+      console.log("Invitation accepted successfully")
       setIsComplete(true)
 
-      // Add this:
-      localStorage.removeItem("isInvitedUser") // Clear the flag as we're now redirecting
+      // Clear the invited user flag as we're now redirecting
+      localStorage.removeItem("isInvitedUser")
 
       // Redirect to dashboard after 2 seconds
       setTimeout(() => {
         window.location.href = "/dashboard"
       }, 2000)
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error accepting invitation:", error)
-      setError("Failed to accept invitation. Please try again.")
+      setError(error.message || "Failed to accept invitation. Please try again.")
       setIsProcessing(false)
     }
   }
@@ -324,11 +259,11 @@ export default function InvitationAccept() {
         },
         body: JSON.stringify({ email: invitation.email }),
       })
-      
+
       if (!response.ok) {
         throw new Error("Failed to resend confirmation email")
       }
-      
+
       // Show success message
       setResendSuccess(true)
       setTimeout(() => setResendSuccess(false), 3000)
@@ -400,8 +335,8 @@ export default function InvitationAccept() {
             </Alert>
             <div className="rounded-lg bg-slate-50 p-4">
               <p className="text-sm text-slate-600 mb-2">Didn't receive the email?</p>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="w-full"
                 onClick={handleResendConfirmationEmail}
                 disabled={isProcessing}
@@ -427,10 +362,7 @@ export default function InvitationAccept() {
             </div>
           </CardContent>
           <CardFooter className="flex justify-center">
-            <Button 
-              variant="link"
-              onClick={() => window.location.reload()}
-            >
+            <Button variant="link" onClick={() => window.location.reload()}>
               I've confirmed my email, continue
             </Button>
           </CardFooter>
@@ -479,6 +411,23 @@ export default function InvitationAccept() {
             <Button className="w-full" size="lg" onClick={() => (window.location.href = "/dashboard")}>
               Go to Dashboard
             </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    )
+  }
+
+  if (!invitation) {
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-slate-50 dark:bg-slate-900">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6 text-center">
+            <AlertCircle className="h-8 w-8 mx-auto mb-4 text-amber-600" />
+            <p className="text-lg font-medium">No valid invitation found</p>
+            <p className="text-sm text-slate-500 mt-2">Please check your invitation link and try again.</p>
+          </CardContent>
+          <CardFooter className="flex justify-center">
+            <Button onClick={() => (window.location.href = "/")}>Return to Home</Button>
           </CardFooter>
         </Card>
       </div>

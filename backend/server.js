@@ -8,7 +8,9 @@ const { createAndSendInvitation } = require("./Emails/InviteTeamEmail/InviteAuth
 const { handleCancelTeamInvitationRequest } = require("./Team/CancelTeamInvite")
 const { handleInviteSignup } = require("./Auth/SignupInviteAPI")
 const { handleFetchTeamMembersRequest } = require("./Team/FetchTeamData")
+const { handleValidateInvitationRequest } = require("./Team/ValidateInvite")
 const { handleFetchUserDataRequest } = require("./Auth/FetchUser")
+const { handleSignIn } = require("./Auth/SignInAuthService")
 
 
 
@@ -64,6 +66,23 @@ app.post("/api/resend-confirmation-email", async (req, res) => {
     res.status(500).json({ error: "Failed to resend confirmation email" })
   }
 })
+
+
+app.post("/api/signin", async (req, res) => {
+  try {
+    // The handleSignIn handler will manage the authentication process
+    await handleSignIn(req, res)
+  } catch (error) {
+    console.error("Error during sign in:", error)
+    res.status(500).json({ 
+      success: false, 
+      error: "Authentication failed", 
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined 
+    })
+  }
+})
+
+
 
 app.post("/api/signup", async (req, res) => {
   try {
@@ -154,6 +173,19 @@ app.post("/api/send-team-invitation", authenticateUser, async (req, res) => {
   } catch (error) {
     console.error("Error sending team invitation:", error)
     res.status(500).json({ error: "Failed to send team invitation" })
+  }
+})
+
+
+app.post("/api/validate-invitation", async (req, res) => {
+  try {
+    await handleValidateInvitationRequest(req, res)
+  } catch (error) {
+    console.error("Error validating invitation token:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to validate invitation token",
+    })
   }
 })
 

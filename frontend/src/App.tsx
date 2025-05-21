@@ -22,7 +22,7 @@ import DocumentSharingRecipientView from "./MainPages/SharePage/DocumentSharingR
 import SignupPage from "./Auth/Signup/SignupPage"
 import LoginPage from "./Auth/Login/LoginPage"
 import EmailVerificationPage from "./Auth/Signup/ConfirmEmail"
-import EmailConfirmationPage from "./Auth/Signup/EmailConfirmed"
+
 import InvitationAccept from "./Auth/Signup/InvitationAccept"
 import UnauthorizedMessage from "./Auth/UnauthorisedMsg"
 import { UserProvider } from "./Auth/Contexts/UserContext"
@@ -127,7 +127,7 @@ function AppContent() {
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/accept-invite" element={<InvitationAccept />} />
             <Route path="/confirm-email" element={<EmailVerificationPage />} />
-            <Route path="/email-confirmed" element={<EmailConfirmationPage />} />
+          
             <Route path="/onboarding" element={<OnboardingPage />} />
 
             {/* Protected routes */}
