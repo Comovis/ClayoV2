@@ -9,7 +9,8 @@ const { handleCancelTeamInvitationRequest } = require("./Team/CancelTeamInvite")
 const { handleInviteSignup } = require("./Auth/SignupInviteAPI")
 const { handleFetchTeamMembersRequest } = require("./Team/FetchTeamData")
 const { handleValidateInvitationRequest } = require("./Team/ValidateInvite")
-const { handleFetchUserDataRequest } = require("./Auth/FetchUser")
+const { handleFetchUserDataRequest } = require("./Users/FetchAuthenticatedUser")
+const { handleGetUserData } = require("./Users/GetUserData")
 const { handleSignIn } = require("./Auth/SignInAuthService")
 const { handleAcceptInvitationRequest } = require("./Team/AcceptInvitation")
 
@@ -225,6 +226,16 @@ app.get("/api/team-members", authenticateUser, async (req, res) => {
   }
 })
 
+
+app.get("/api/get-users", authenticateUser, async (req, res) => {
+  try {
+   
+    await handleGetUserData(req, res)
+  } catch (error) {
+    console.error("Error retrieving user data:", error)
+    res.status(500).json({ error: "Failed to retrieve user data" })
+  }
+})
 
 
 app.get("/api/auth/current-user", authenticateUser, async (req, res) => {

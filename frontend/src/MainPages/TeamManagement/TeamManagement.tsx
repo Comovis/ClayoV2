@@ -52,6 +52,40 @@ export default function TeamInvites() {
     }
   }, [isAuthenticated, isUserLoading, user])
 
+  // Function to fetch user details by email
+  const fetchUserDetails = async (email) => {
+    try {
+      // Get the current session to include the auth token
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+
+      if (sessionError || !sessionData.session) {
+        throw new Error("Authentication required. Please log in again.")
+      }
+
+      // Get the access token from the session
+      const token = sessionData.session.access_token
+
+      // Call the API to get user details
+      const response = await fetch(`${apiBaseUrl}/api/get-users?email=${encodeURIComponent(email)}`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to fetch user details")
+      }
+
+      return data.data
+    } catch (error) {
+      console.error("Error fetching user details:", error)
+      return null
+    }
+  }
+
   // Fetch team members from API
   const fetchTeamMembers = async () => {
     if (!isAuthenticated || !user) {
@@ -117,7 +151,20 @@ export default function TeamInvites() {
         // Ensure teamMembers is always an array
         const teamMembersArray = Array.isArray(data.teamMembers) ? data.teamMembers : []
 
-        setTeamMembers(teamMembersArray)
+        // For active members, fetch their full details if full_name is missing
+        const updatedTeamMembers = await Promise.all(
+          teamMembersArray.map(async (member) => {
+            if (member.status === "active" && !member.full_name) {
+              const userDetails = await fetchUserDetails(member.email)
+              if (userDetails) {
+                return { ...member, full_name: userDetails.full_name }
+              }
+            }
+            return member
+          })
+        )
+
+        setTeamMembers(updatedTeamMembers)
         setIsLoadingMembers(false)
       } catch (fetchError) {
         clearTimeout(timeoutId)
@@ -343,6 +390,9 @@ export default function TeamInvites() {
   const activeMembers = teamMembers.filter((member) => member.status === "active")
   const pendingMembers = teamMembers.filter((member) => member.status === "pending")
   const revokedMembers = teamMembers.filter((member) => member.status === "revoked")
+  
+  // Check if the current user is an admin
+  const isAdmin = user && user.role === "admin"
 
   // If user is not authenticated or still loading, show appropriate UI
   if (isUserLoading) {
@@ -481,32 +531,36 @@ export default function TeamInvites() {
                     {activeMembers.map((member) => (
                       <div key={member.id} className="flex items-center justify-between p-3 border rounded-md">
                         <div>
-                          <p className="font-medium">{member.email}</p>
+                          <p className="font-medium">
+                            {user && member.email === user.email
+                              ? "Me"
+                              : member.full_name || member.email.split("@")[0]}{" "}
+                            <span className="font-normal">({member.email})</span>
+                          </p>
                           <div className="flex items-center mt-1">
                             <Badge className={getRoleBadgeColor(member.role)}>{getRoleLabel(member.role)}</Badge>
                             <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-200">
-                              Active since {member.joinedAt}
+                              Active
                             </Badge>
-                            {member.isCompanyAdmin && (
-                              <Badge className="ml-2 bg-purple-50 text-purple-700 border-purple-200">
-                                Company Admin
-                              </Badge>
-                            )}
+                         
                           </div>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoveTeamMember(member.id)}
-                          disabled={isCancelling || member.isCompanyAdmin}
-                          title={member.isCompanyAdmin ? "Cannot remove company admin" : "Remove member"}
-                        >
-                          {isCancelling ? (
-                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                          ) : (
-                            <X className="h-4 w-4" />
-                          )}
-                        </Button>
+                        {/* Only show remove button for admins */}
+                        {isAdmin && !member.isCompanyAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRemoveTeamMember(member.id)}
+                            disabled={isCancelling}
+                            title="Remove member"
+                          >
+                            {isCancelling ? (
+                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                            ) : (
+                              <X className="h-4 w-4" />
+                            )}
+                          </Button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -527,7 +581,10 @@ export default function TeamInvites() {
                     {pendingMembers.map((member) => (
                       <div key={member.id} className="flex items-center justify-between p-3 border rounded-md">
                         <div>
-                          <p className="font-medium">{member.email}</p>
+                          <p className="font-medium">
+                            {member.full_name || member.email.split("@")[0]}{" "}
+                            <span className="font-normal">({member.email})</span>
+                          </p>
                           <div className="flex items-center mt-1">
                             <Badge className={getRoleBadgeColor(member.role)}>{getRoleLabel(member.role)}</Badge>
                             <Badge variant="outline" className="ml-2">
@@ -557,19 +614,22 @@ export default function TeamInvites() {
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRemoveTeamMember(member.id)}
-                            disabled={isCancelling}
-                            title="Cancel invitation"
-                          >
-                            {isCancelling ? (
-                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                            ) : (
-                              <X className="h-4 w-4" />
-                            )}
-                          </Button>
+                          {/* Only show cancel button for admins */}
+                          {isAdmin && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleRemoveTeamMember(member.id)}
+                              disabled={isCancelling}
+                              title="Cancel invitation"
+                            >
+                              {isCancelling ? (
+                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                              ) : (
+                                <X className="h-4 w-4" />
+                              )}
+                            </Button>
+                          )}
                         </div>
                       </div>
                     ))}
