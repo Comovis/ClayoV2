@@ -6,8 +6,14 @@ import { ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import UserProfileDropdown from "./UserProfileDropdown"
 import NotificationsPanel, { type Notification } from "../../MainComponents/Notifications/NotificationsPanel"
-import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead } from "../../MainComponents/Notifications/NotificationService"
+import {
+  getNotifications,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+} from "../../MainComponents/Notifications/NotificationService"
+import { useUser } from "../../Auth/Contexts/UserContext"
 
+// Update the UserType interface to match the User interface from UserContext
 interface AppHeaderProps {
   activeTab: string
   setActiveTab: (tab: string) => void
@@ -15,17 +21,9 @@ interface AppHeaderProps {
   setShowSidePanel: (show: boolean) => void
   showRightPanel: boolean
   setShowRightPanel: (show: boolean) => void
-  user: UserType | null
-  logout: () => void
 }
 
-interface UserType {
-  id?: string
-  name?: string
-  email?: string
-  profileImage?: string
-  // Add other user properties as needed
-}
+
 
 // Define the window.chatDashboardAPI interface
 declare global {
@@ -49,9 +47,8 @@ const AppHeader: FC<AppHeaderProps> = ({
   setShowSidePanel,
   showRightPanel,
   setShowRightPanel,
-  user,
-  logout,
 }) => {
+  const { user, logout } = useUser()
   const [notifications, setNotifications] = useState<Notification[]>([])
 
   // Helper function to safely call dashboard API functions

@@ -12,17 +12,41 @@ const { sendUserConfirmationEmail } = require("../Emails/EmailAuthLinkService")
  * @param {string} userData.fullName - User's full name
  * @param {string} userData.companyId - Company ID
  * @param {string} userData.role - User's role
+ * @param {string} userData.invitationToken - Invitation token
  * @returns {Promise<Object>} Created or updated user
  */
-async function createUserForInvitation({ email, password, fullName, companyId, role }) {
+async function createUserForInvitation({ email, password, fullName, companyId, role, invitationToken }) {
   try {
     console.log(`Processing invitation signup for: ${email}, company: ${companyId}, role: ${role}`)
+
+    // First, validate the invitation token and ensure it matches the email
+    const { data: invitation, error: invitationError } = await supabaseAdmin
+      .from("team_invitations")
+      .select("id, email, role, company_id")
+      .eq("invitation_token", invitationToken)
+      .eq("invitation_status", "pending")
+      .single()
+
+    if (invitationError || !invitation) {
+      console.error("Error validating invitation:", invitationError)
+      throw new Error("Invalid invitation token")
+    }
+
+    // Verify the email matches the invitation
+    if (invitation.email.toLowerCase() !== email.toLowerCase()) {
+      console.error(`Email mismatch: Invitation was sent to ${invitation.email} but signup attempt is for ${email}`)
+      throw new Error("Email does not match the invitation")
+    }
+
+    // Clear any existing session to ensure we're creating/updating the correct user
+    // This is a server-side operation so it won't affect the client's session
+    await supabaseAdmin.auth.signOut()
 
     // First, check if the user already exists in Supabase Auth
     const { data: existingUsers, error: lookupError } = await supabaseAdmin.auth.admin.listUsers({
       filter: {
-        email: email
-      }
+        email: email,
+      },
     })
 
     if (lookupError) {
@@ -39,12 +63,12 @@ async function createUserForInvitation({ email, password, fullName, companyId, r
       const existingUser = existingUsers.users[0]
       userId = existingUser.id
       isNewUser = false
-      
+
       // Check if email is confirmed
       isEmailConfirmed = existingUser.email_confirmed_at !== null
-      
+
       console.log(`User already exists in Auth with ID: ${userId}. Email confirmed: ${isEmailConfirmed}`)
-      
+
       // Update the existing user's password and metadata
       const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
         password: password,
@@ -52,9 +76,11 @@ async function createUserForInvitation({ email, password, fullName, companyId, r
           full_name: fullName,
           role,
           company_id: companyId,
-        }
+          is_invited_user: true,
+          invitation_token: invitationToken,
+        },
       })
-      
+
       if (updateError) {
         console.error("Error updating existing user:", updateError)
         throw new Error(updateError.message || "Failed to update existing user")
@@ -70,6 +96,8 @@ async function createUserForInvitation({ email, password, fullName, companyId, r
           full_name: fullName,
           role,
           company_id: companyId,
+          is_invited_user: true,
+          invitation_token: invitationToken,
         },
       })
 
@@ -83,6 +111,16 @@ async function createUserForInvitation({ email, password, fullName, companyId, r
       }
 
       userId = authData.user.id
+    }
+
+    // Double-check that the user has the correct email
+    const { data: createdUser, error: userCheckError } = await supabaseAdmin.auth.admin.getUserById(userId)
+
+    if (userCheckError) {
+      console.error("Error verifying user email:", userCheckError)
+    } else if (createdUser.user.email.toLowerCase() !== email.toLowerCase()) {
+      console.error(`Email mismatch! User has email ${createdUser.user.email} but should be ${email}`)
+      throw new Error("Created user has incorrect email. Please contact support.")
     }
 
     // Check if user exists in the users table
@@ -102,17 +140,15 @@ async function createUserForInvitation({ email, password, fullName, companyId, r
       is_company_admin: false,
       updated_at: new Date().toISOString(),
     }
-    
+
     // Only set created_at for new records
     if (!existingDbUser) {
       userData.created_at = new Date().toISOString()
     }
 
     console.log(`${existingDbUser ? "Updating" : "Creating"} user record in database...`)
-    
-    const { error: userError } = await supabaseAdmin
-      .from("users")
-      .upsert(userData)
+
+    const { error: userError } = await supabaseAdmin.from("users").upsert(userData)
 
     if (userError) {
       console.error("Error upserting user in database:", userError)
@@ -128,7 +164,7 @@ async function createUserForInvitation({ email, password, fullName, companyId, r
         full_name: fullName,
         role,
         isNewUser,
-        isEmailConfirmed
+        isEmailConfirmed,
       },
     }
   } catch (error) {
@@ -162,21 +198,22 @@ async function handleInviteSignup(req, res) {
       fullName,
       companyId,
       role: role || "team",
+      invitationToken, // Pass the invitation token to validate
     })
 
     // If user exists but email is not confirmed, resend confirmation email
     let emailResult = { success: true }
-    
+
     if (!result.user.isNewUser && !result.user.isEmailConfirmed) {
       console.log(`User exists but email not confirmed. Resending confirmation for: ${email}`)
-      
+
       // Resend confirmation email
       emailResult = await sendUserConfirmationEmail(email)
-      
+
       if (!emailResult.success) {
         console.warn(`Failed to resend confirmation email: ${emailResult.error}`)
       }
-      
+
       // Return with special status for frontend to handle
       return res.status(200).json({
         success: true,
@@ -184,10 +221,10 @@ async function handleInviteSignup(req, res) {
         user: result.user,
         emailSent: emailResult.success,
         isInvitedUser: true,
-        requiresEmailConfirmation: true
+        requiresEmailConfirmation: true,
       })
     }
-    
+
     // Only send confirmation email for new users
     if (result.user.isNewUser) {
       // Send confirmation email
@@ -203,9 +240,7 @@ async function handleInviteSignup(req, res) {
     // Return success response
     res.status(200).json({
       success: true,
-      message: result.user.isNewUser 
-        ? "Account created successfully" 
-        : "Existing account updated successfully",
+      message: result.user.isNewUser ? "Account created successfully" : "Existing account updated successfully",
       user: result.user,
       emailSent: emailResult.success,
       isInvitedUser: true,
@@ -217,6 +252,8 @@ async function handleInviteSignup(req, res) {
     let errorMessage = "Failed to create account"
     if (error.message && error.message.includes("already been registered")) {
       errorMessage = "This email is already registered. Please try logging in or use a different email."
+    } else if (error.message && error.message.includes("Email does not match")) {
+      errorMessage = error.message
     }
 
     res.status(500).json({
@@ -230,5 +267,5 @@ async function handleInviteSignup(req, res) {
 // Export both functions
 module.exports = {
   handleInviteSignup,
-  createUserForInvitation
+  createUserForInvitation,
 }

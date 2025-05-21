@@ -11,7 +11,7 @@ const { handleFetchTeamMembersRequest } = require("./Team/FetchTeamData")
 const { handleValidateInvitationRequest } = require("./Team/ValidateInvite")
 const { handleFetchUserDataRequest } = require("./Auth/FetchUser")
 const { handleSignIn } = require("./Auth/SignInAuthService")
-
+const { handleAcceptInvitationRequest } = require("./Team/AcceptInvitation")
 
 
 
@@ -173,6 +173,19 @@ app.post("/api/send-team-invitation", authenticateUser, async (req, res) => {
   } catch (error) {
     console.error("Error sending team invitation:", error)
     res.status(500).json({ error: "Failed to send team invitation" })
+  }
+})
+
+
+app.post("/api/accept-invitation", async (req, res) => {
+  try {
+    await handleAcceptInvitationRequest(req, res)
+  } catch (error) {
+    console.error("Error accepting invitation:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to accept invitation",
+    })
   }
 })
 

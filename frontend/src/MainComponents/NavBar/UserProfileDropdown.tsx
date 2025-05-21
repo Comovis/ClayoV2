@@ -12,26 +12,25 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { SettingsModal } from "./Settings/SettingsModal"
+import { useUser } from "../../Auth/Contexts/UserContext"
 
+// Update the UserType interface to match the User interface from UserContext
 interface UserProfileDropdownProps {
-  user: UserType | null
+  user: {
+    id?: string
+    full_name?: string
+    email?: string
+    company_id?: string | null
+    role?: string
+  } | null
   onSignOut: () => void
-}
-
-interface UserType {
-  id?: string
-  name?: string
-  email?: string
-  profileImage?: string
-  role?: string
-  company?: string
-  fleetSize?: number
 }
 
 const UserProfileDropdown: FC<UserProfileDropdownProps> = ({ user, onSignOut }) => {
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const { isLoggingOut } = useUser()
 
   if (!user) {
     return (
@@ -41,8 +40,9 @@ const UserProfileDropdown: FC<UserProfileDropdownProps> = ({ user, onSignOut }) 
     )
   }
 
-  const initials = user.name
-    ? user.name
+  // Update to use full_name instead of name
+  const initials = user.full_name
+    ? user.full_name
         .split(" ")
         .map((n) => n[0])
         .join("")
@@ -56,7 +56,6 @@ const UserProfileDropdown: FC<UserProfileDropdownProps> = ({ user, onSignOut }) 
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon" className="rounded-full">
             <Avatar className="h-8 w-8">
-              <AvatarImage src={user.profileImage || "/placeholder.svg"} alt={user.name || user.email || "User"} />
               <AvatarFallback>{initials}</AvatarFallback>
             </Avatar>
           </Button>
@@ -64,9 +63,9 @@ const UserProfileDropdown: FC<UserProfileDropdownProps> = ({ user, onSignOut }) 
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuLabel>
             <div className="flex flex-col space-y-1">
-              <p className="text-sm font-medium leading-none">{user.name || "User"}</p>
+              <p className="text-sm font-medium leading-none">{user.full_name || "User"}</p>
               <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
-              {user.company && <p className="text-xs leading-none text-muted-foreground">{user.company}</p>}
+              {user.role && <p className="text-xs leading-none text-muted-foreground">{user.role}</p>}
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
@@ -122,9 +121,28 @@ const UserProfileDropdown: FC<UserProfileDropdownProps> = ({ user, onSignOut }) 
             </div>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={onSignOut}>
+          <DropdownMenuItem onClick={onSignOut} disabled={isLoggingOut}>
             <LogOut className="mr-2 h-4 w-4" />
-            <span>Sign out</span>
+            {isLoggingOut ? (
+              <span className="flex items-center">
+                <svg
+                  className="animate-spin -ml-1 mr-2 h-4 w-4"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+                Signing out...
+              </span>
+            ) : (
+              <span>Sign out</span>
+            )}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

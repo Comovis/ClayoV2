@@ -37,6 +37,7 @@ interface UserContextType {
   // Authentication state
   isAuthenticated: boolean
   isLoading: boolean
+  isLoggingOut: boolean // New state to track logout process
 
   // User data
   user: User | null
@@ -45,7 +46,7 @@ interface UserContextType {
   // Authentication functions
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
   signup: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
-  logout: () => Promise<void>
+  logout: () => Promise<{ success: boolean; error?: any }>
 
   // User data functions
   refreshUserData: () => Promise<void>
@@ -62,6 +63,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // State
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false)
   const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [isLoggingOut, setIsLoggingOut] = useState<boolean>(false)
   const [user, setUser] = useState<User | null>(null)
   const [company, setCompany] = useState<Company | null>(null)
 
@@ -234,12 +236,43 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }
 
+  // Simple and robust logout function
   const logout = async () => {
+    // Set logging out state to true
+    setIsLoggingOut(true)
+
     try {
-      await supabase.auth.signOut()
+      // Clear application state first for immediate UI feedback
+      setUser(null)
+      setCompany(null)
+      setIsAuthenticated(false)
+
+      // Sign out from Supabase with global scope to sign out from all devices
+      const { error } = await supabase.auth.signOut({ scope: "global" })
+
+      if (error) {
+        console.error("Supabase sign out error:", error)
+      }
+
+      // Clear ALL localStorage items to ensure complete cleanup
+      localStorage.clear()
+
+      console.log("Logged out successfully, localStorage cleared")
+
+      // Redirect to login page
       navigate("/login")
+
+      return { success: true }
     } catch (error) {
       console.error("Logout error:", error)
+
+      // Even if there's an error, clear localStorage and redirect
+      localStorage.clear()
+      navigate("/login")
+
+      return { success: false, error }
+    } finally {
+      setIsLoggingOut(false)
     }
   }
 
@@ -300,6 +333,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const contextValue: UserContextType = {
     isAuthenticated,
     isLoading,
+    isLoggingOut,
     user,
     company,
     login,

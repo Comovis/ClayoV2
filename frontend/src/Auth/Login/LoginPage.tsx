@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
-import { Mail, Lock, Loader2, AlertCircle } from 'lucide-react'
+import { Mail, Lock, Loader2, AlertCircle } from "lucide-react"
 import { Link, useNavigate } from "react-router-dom"
 import { useUser } from "../../Auth/Contexts/UserContext" // Import the useUser hook
 
@@ -21,7 +21,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [rememberMe, setRememberMe] = useState(false)
   const navigate = useNavigate()
-  
+
   // Get the login function from your UserContext
   const { login, refreshUserData } = useUser()
 
@@ -43,11 +43,12 @@ export default function LoginPage() {
 
       // First, use the context's login function to authenticate with Supabase
       const loginResult = await login(sanitizedEmail, password)
-      
+
       if (!loginResult.success) {
-        throw new Error(loginResult.error || "Authentication failed")
+        // Show a user-friendly error message for authentication failures
+        throw new Error("Your email or password does not match our records")
       }
-      
+
       // Now call our custom API endpoint to get additional user data
       const response = await fetch(`${apiBaseUrl}/api/signin`, {
         method: "POST",
@@ -60,14 +61,20 @@ export default function LoginPage() {
         }),
       })
 
-      const data = await response.json()
-
       if (!response.ok) {
-        throw new Error(data.error || "Sign in failed")
+        // Handle API errors with user-friendly messages
+        if (response.status === 401 || response.status === 403) {
+          throw new Error("Your email or password does not match our records")
+        } else {
+          throw new Error("Unable to sign in. Please try again later.")
+        }
       }
 
+      const data = await response.json()
+
       if (!data.success) {
-        throw new Error(data.error || "Authentication unsuccessful")
+        // Handle unsuccessful login with user-friendly message
+        throw new Error("Your email or password does not match our records")
       }
 
       console.log("User authenticated successfully:", data.user.email)
@@ -84,7 +91,7 @@ export default function LoginPage() {
       localStorage.setItem("accessToken", data.user.session.access_token)
       localStorage.setItem("refreshToken", data.user.session.refresh_token)
       localStorage.setItem("tokenExpiry", data.user.session.expires_at)
-      
+
       // Refresh user data to ensure the context is updated
       await refreshUserData()
 
@@ -92,7 +99,18 @@ export default function LoginPage() {
       navigate("/dashboard")
     } catch (error) {
       console.error("Login error:", error)
-      setError(error.message || "Failed to sign in. Please check your credentials and try again.")
+
+      // Display user-friendly error message
+      if (
+        error.message.includes("auth/invalid-email") ||
+        error.message.includes("auth/user-not-found") ||
+        error.message.includes("auth/wrong-password") ||
+        error.message.includes("Invalid login credentials")
+      ) {
+        setError("Your email or password does not match our records")
+      } else {
+        setError(error.message || "Failed to sign in. Please try again later.")
+      }
     } finally {
       setIsLoading(false)
     }

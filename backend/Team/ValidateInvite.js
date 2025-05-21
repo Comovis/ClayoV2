@@ -63,10 +63,10 @@ async function validateInvitationToken(token) {
       console.warn("Error fetching company:", companyError)
     }
 
-    // Get inviter name
+    // Get inviter name - FIX: Use full_name instead of name
     const { data: inviterData, error: inviterError } = await supabaseAdmin
       .from("users")
-      .select("full_name")
+      .select("full_name") // Changed from "name" to "full_name"
       .eq("id", data.invited_by)
       .single()
 
@@ -85,7 +85,7 @@ async function validateInvitationToken(token) {
         companyId: data.company_id,
         invitedBy: data.invited_by,
         companyName: companyData?.name || "Comovis",
-        inviterName: inviterData?.full_name || "A team administrator",
+        inviterName: inviterData?.full_name || "A team administrator", // Changed from "name" to "full_name"
         status: data.invitation_status,
         createdAt: data.created_at,
         expiresAt: data.expires_at,

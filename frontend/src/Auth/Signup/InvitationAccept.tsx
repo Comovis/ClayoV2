@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
-import { CheckCircle2, Ship, Shield, FileText, Globe, Loader2, AlertCircle, Mail, RefreshCw } from "lucide-react"
+import { CheckCircle2, Ship, Shield, FileText, Globe, Loader2, AlertCircle } from "lucide-react"
 import { supabase } from "../../Auth/SupabaseAuth"
 import LogoBlack from "../../ReusableAssets/Logos/LogoBlack.svg"
 
@@ -26,8 +26,9 @@ export default function InvitationAccept() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [userData, setUserData] = useState<any>(null)
   const [token, setToken] = useState<string | null>(null)
-  const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false)
+  // const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false)
   const [resendSuccess, setResendSuccess] = useState(false)
+  const [wrongEmailError, setWrongEmailError] = useState(false)
 
   // Get the token from the URL query parameter
   const location = useLocation()
@@ -107,6 +108,17 @@ export default function InvitationAccept() {
   const handleAcceptInvitation = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    // If we're not logged in, make sure to clear any existing session data
+    if (!isLoggedIn) {
+      try {
+        // Sign out any existing session to ensure we're starting fresh
+        await supabase.auth.signOut()
+        console.log("Cleared any existing session before signup")
+      } catch (err) {
+        console.error("Error clearing session:", err)
+      }
+    }
+
     // If user is already logged in, just accept the invitation
     if (isLoggedIn) {
       await acceptInvitation(userData.id)
@@ -155,32 +167,13 @@ export default function InvitationAccept() {
         throw new Error(data.message || data.error || "Failed to create account")
       }
 
-      // Handle the case where email confirmation is required
-      if (data.requiresEmailConfirmation) {
-        // Set the invited user flag
-        localStorage.setItem("isInvitedUser", "true")
-
-        // Store email in localStorage for verification page
-        localStorage.setItem("userEmail", invitation.email)
-
-        // Show the email confirmation UI
-        setNeedsEmailConfirmation(true)
-        setIsProcessing(false)
-        return
-      }
-
-      // Set the invited user flag
-      localStorage.setItem("isInvitedUser", "true")
-
-      // Store email in localStorage for verification page
-      localStorage.setItem("userEmail", invitation.email)
-
       // If we have a user ID, accept the invitation
       if (data.user && data.user.id) {
         await acceptInvitation(data.user.id)
       } else {
-        // Otherwise, redirect to the email verification page
-        window.location.href = "/confirm-email"
+        // This should not happen, but just in case
+        setError("Failed to create or identify your account. Please try again.")
+        setIsProcessing(false)
       }
     } catch (error: any) {
       console.error("Error accepting invitation:", error)
@@ -189,6 +182,7 @@ export default function InvitationAccept() {
     }
   }
 
+  // Update the acceptInvitation function to handle the specific error
   const acceptInvitation = async (userId: string) => {
     try {
       setIsProcessing(true)
@@ -229,6 +223,15 @@ export default function InvitationAccept() {
 
       if (!response.ok) {
         console.error("Error accepting invitation:", result.error)
+
+        // Check if this is a wrong email error
+        if (result.error && result.error.includes("You are currently logged in as")) {
+          setWrongEmailError(true)
+          setError(result.error)
+          setIsProcessing(false)
+          return
+        }
+
         throw new Error(result.error || "Failed to accept invitation")
       }
 
@@ -309,68 +312,46 @@ export default function InvitationAccept() {
     )
   }
 
-  if (needsEmailConfirmation) {
+  // Add this new UI component to handle wrong email error
+  // Add this right after the error check in your component
+  if (wrongEmailError) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-slate-50 dark:bg-slate-900">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="text-center text-blue-600">Email Confirmation Required</CardTitle>
+            <CardTitle className="text-center text-amber-600">Wrong Account</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
-              <Mail className="h-6 w-6 text-blue-600" />
-            </div>
-            <p className="text-center mb-4">
-              We've sent a confirmation email to <strong>{invitation.email}</strong>
-            </p>
-            <p className="text-center mb-4">
-              Please check your inbox and click the confirmation link before you can accept this invitation.
-            </p>
-            <Alert className="bg-amber-50 text-amber-800 mb-4">
-              <AlertCircle className="h-4 w-4 mr-2" />
-              <AlertTitle>Important</AlertTitle>
-              <AlertDescription>
-                After confirming your email, please return to this page to complete the invitation process.
-              </AlertDescription>
+            <Alert variant="warning" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Email Mismatch</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
             </Alert>
-            <div className="rounded-lg bg-slate-50 p-4">
-              <p className="text-sm text-slate-600 mb-2">Didn't receive the email?</p>
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={handleResendConfirmationEmail}
-                disabled={isProcessing}
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Sending...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Resend Confirmation Email
-                  </>
-                )}
-              </Button>
-              {resendSuccess && (
-                <p className="text-green-600 text-sm mt-2 flex items-center justify-center">
-                  <CheckCircle2 className="h-4 w-4 mr-1" />
-                  Confirmation email sent successfully!
-                </p>
-              )}
-            </div>
+            <p className="text-center mb-4">To accept this invitation, you need to:</p>
+            <ol className="list-decimal pl-6 mb-4 space-y-2">
+              <li>Sign out of your current account</li>
+              <li>Sign in with the email address the invitation was sent to</li>
+              <li>Open the invitation link again</li>
+            </ol>
           </CardContent>
-          <CardFooter className="flex justify-center">
-            <Button variant="link" onClick={() => window.location.reload()}>
-              I've confirmed my email, continue
+          <CardFooter className="flex justify-center space-x-4">
+            <Button
+              variant="outline"
+              onClick={async () => {
+                await supabase.auth.signOut()
+                window.location.href = "/login"
+              }}
+            >
+              Sign Out
             </Button>
+            <Button onClick={() => window.location.reload()}>Try Again</Button>
           </CardFooter>
         </Card>
       </div>
     )
   }
 
+  
   if (isComplete) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-slate-50 dark:bg-slate-900">
@@ -411,23 +392,6 @@ export default function InvitationAccept() {
             <Button className="w-full" size="lg" onClick={() => (window.location.href = "/dashboard")}>
               Go to Dashboard
             </Button>
-          </CardFooter>
-        </Card>
-      </div>
-    )
-  }
-
-  if (!invitation) {
-    return (
-      <div className="flex justify-center items-center min-h-screen bg-slate-50 dark:bg-slate-900">
-        <Card className="w-full max-w-md">
-          <CardContent className="pt-6 text-center">
-            <AlertCircle className="h-8 w-8 mx-auto mb-4 text-amber-600" />
-            <p className="text-lg font-medium">No valid invitation found</p>
-            <p className="text-sm text-slate-500 mt-2">Please check your invitation link and try again.</p>
-          </CardContent>
-          <CardFooter className="flex justify-center">
-            <Button onClick={() => (window.location.href = "/")}>Return to Home</Button>
           </CardFooter>
         </Card>
       </div>
