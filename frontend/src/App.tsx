@@ -123,8 +123,25 @@ function AppContent() {
           <Routes>
             {/* Public routes */}
             <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/signup" element={<SignupPage />} />
+
+            {/* Auth pages with redirect for authenticated users */}
+            <Route
+              path="/login"
+              element={
+                <ProtectedRoute authRedirect={true} requireFullAuth={false}>
+                  <LoginPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/signup"
+              element={
+                <ProtectedRoute authRedirect={true} requireFullAuth={false}>
+                  <SignupPage />
+                </ProtectedRoute>
+              }
+            />
+
             <Route path="/accept-invite" element={<InvitationAccept />} />
             <Route path="/confirm-email" element={<EmailVerificationPage />} />
 

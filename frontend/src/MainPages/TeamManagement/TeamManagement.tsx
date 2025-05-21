@@ -151,13 +151,17 @@ export default function TeamInvites() {
         // Ensure teamMembers is always an array
         const teamMembersArray = Array.isArray(data.teamMembers) ? data.teamMembers : []
 
-        // For active members, fetch their full details if full_name is missing
+        // For active members, fetch their full details if name/full_name is missing
         const updatedTeamMembers = await Promise.all(
           teamMembersArray.map(async (member) => {
-            if (member.status === "active" && !member.full_name) {
+            if (member.status === "active" && !member.name && !member.full_name) {
               const userDetails = await fetchUserDetails(member.email)
               if (userDetails) {
-                return { ...member, full_name: userDetails.full_name }
+                return { 
+                  ...member, 
+                  name: userDetails.name || userDetails.full_name,
+                  full_name: userDetails.full_name || userDetails.name 
+                }
               }
             }
             return member
@@ -517,7 +521,8 @@ export default function TeamInvites() {
                 Try Again
               </Button>
             </div>
-          ) : (
+          ) : isAdmin ? (
+            // Admin view with tabs
             <Tabs defaultValue="active" value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="mb-4">
                 <TabsTrigger value="active">Active Members ({activeMembers.length})</TabsTrigger>
@@ -534,7 +539,7 @@ export default function TeamInvites() {
                           <p className="font-medium">
                             {user && member.email === user.email
                               ? "Me"
-                              : member.full_name || member.email.split("@")[0]}{" "}
+                              : member.full_name || member.name || member.email.split("@")[0]}{" "}
                             <span className="font-normal">({member.email})</span>
                           </p>
                           <div className="flex items-center mt-1">
@@ -542,11 +547,10 @@ export default function TeamInvites() {
                             <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-200">
                               Active
                             </Badge>
-                         
                           </div>
                         </div>
-                        {/* Only show remove button for admins */}
-                        {isAdmin && !member.isCompanyAdmin && (
+                        {/* Only show remove button for admins and not for company admins */}
+                        {!member.isCompanyAdmin && (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -582,7 +586,7 @@ export default function TeamInvites() {
                       <div key={member.id} className="flex items-center justify-between p-3 border rounded-md">
                         <div>
                           <p className="font-medium">
-                            {member.full_name || member.email.split("@")[0]}{" "}
+                            {member.full_name || member.name || member.email.split("@")[0]}{" "}
                             <span className="font-normal">({member.email})</span>
                           </p>
                           <div className="flex items-center mt-1">
@@ -614,22 +618,19 @@ export default function TeamInvites() {
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
-                          {/* Only show cancel button for admins */}
-                          {isAdmin && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleRemoveTeamMember(member.id)}
-                              disabled={isCancelling}
-                              title="Cancel invitation"
-                            >
-                              {isCancelling ? (
-                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                              ) : (
-                                <X className="h-4 w-4" />
-                              )}
-                            </Button>
-                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRemoveTeamMember(member.id)}
+                            disabled={isCancelling}
+                            title="Cancel invitation"
+                          >
+                            {isCancelling ? (
+                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                            ) : (
+                              <X className="h-4 w-4" />
+                            )}
+                          </Button>
                         </div>
                       </div>
                     ))}
@@ -689,6 +690,41 @@ export default function TeamInvites() {
                 )}
               </TabsContent>
             </Tabs>
+          ) : (
+            // Non-admin view without tabs - just a simple list of active members
+            <div>
+              <h3 className="text-lg font-medium mb-4">Active Team Members</h3>
+              {activeMembers.length > 0 ? (
+                <div className="space-y-2">
+                  {activeMembers.map((member) => (
+                    <div key={member.id} className="flex items-center justify-between p-3 border rounded-md">
+                      <div>
+                        <p className="font-medium">
+                          {user && member.email === user.email
+                            ? "Me"
+                            : member.full_name || member.name || member.email.split("@")[0]}{" "}
+                          <span className="font-normal">({member.email})</span>
+                        </p>
+                        <div className="flex items-center mt-1">
+                          <Badge className={getRoleBadgeColor(member.role)}>{getRoleLabel(member.role)}</Badge>
+                          <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-200">
+                            Active
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center p-8 border rounded-md border-dashed">
+                  <Users className="h-8 w-8 mx-auto mb-2 text-slate-400" />
+                  <p className="font-medium mb-1">No active team members</p>
+                  <p className="text-sm text-slate-500">
+                    Your team members will appear here once they join
+                  </p>
+                </div>
+              )}
+            </div>
           )}
         </CardContent>
         <CardFooter className="border-t pt-4 text-sm text-slate-500">
