@@ -28,7 +28,7 @@ import {
   type SubscriptionData,
 } from "../../MainComponents/UserSubscriptions/SubscriptionIndicator"
 import { useUser } from "../../Auth/Contexts/UserContext"
-import { supabase } from "../../Auth/SupabaseAuth" // Import supabase client
+import { useFetchVessels } from "../../Hooks/useFetchVessels" // Import our new hook
 
 export default function FleetPage() {
   const { isAuthenticated, isLoading: isUserLoading, user } = useUser()
@@ -36,10 +36,10 @@ export default function FleetPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [viewMode, setViewMode] = useState("grid")
   const [isAddVesselModalOpen, setIsAddVesselModalOpen] = useState(false)
-  const [vessels, setVessels] = useState([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState("")
   const [vesselType, setVesselType] = useState("all")
+
+  // Use our new hook
+  const { vessels, isLoading, error, fetchVessels, refreshVessels } = useFetchVessels()
 
   // Mock subscription data - would come from user context in real app
   const subscriptionData: SubscriptionData = {
@@ -49,128 +49,15 @@ export default function FleetPage() {
     expiresAt: "December 15, 2023",
   }
 
-  // Mock data for fields we don't have yet
-  const mockPortData = {
-    nextPort: "Singapore",
-    eta: "Nov 15, 2023",
-    location: { lat: 1.352083, lng: 103.819839 },
-  }
-
-  // Document status mock data - would be calculated from actual documents in a real app
-  const getRandomDocStatus = () => {
-    return {
-      valid: Math.floor(Math.random() * 15) + 5,
-      expiringSoon: Math.floor(Math.random() * 5),
-      expired: Math.floor(Math.random() * 2),
-      missing: Math.floor(Math.random() * 3),
-    }
-  }
-
-  // Calculate compliance score based on document status
-  const calculateComplianceScore = (docStatus) => {
-    const total = docStatus.valid + docStatus.expiringSoon + docStatus.expired + docStatus.missing
-    const validWeight = 1
-    const expiringSoonWeight = 0.5
-    const expiredWeight = 0
-    const missingWeight = 0
-
-    if (total === 0) return 80 // Default score if no documents
-
-    const score =
-      ((docStatus.valid * validWeight +
-        docStatus.expiringSoon * expiringSoonWeight +
-        docStatus.expired * expiredWeight +
-        docStatus.missing * missingWeight) /
-        total) *
-      100
-
-    return Math.round(score)
-  }
-
-  // Fetch vessels from API
-  const fetchVessels = async () => {
-    // Don't fetch if user is not authenticated yet
-    if (!isAuthenticated || isUserLoading) {
-      return
-    }
-
-    setIsLoading(true)
-    setError("")
-
-    try {
-      // API Base URL Configuration
-      const apiBaseUrl =
-        import.meta.env.MODE === "development" ? import.meta.env.VITE_DEVELOPMENT_URL : import.meta.env.VITE_API_URL
-
-      // Build query string from options
-      const queryParams = new URLSearchParams()
-
-      if (searchQuery) queryParams.append("search", searchQuery)
-      if (vesselType !== "all") queryParams.append("vesselType", vesselType)
-
-      const queryString = queryParams.toString() ? `?${queryParams.toString()}` : ""
-
-      // Get the current session to include the auth token
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
-
-      if (sessionError || !sessionData.session) {
-        throw new Error("Authentication required. Please log in again.")
-      }
-
-      // Get the access token from the session
-      const token = sessionData.session.access_token
-
-      // Call the API to get vessels
-      const response = await fetch(`${apiBaseUrl}/api/get-vessels${queryString}`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to fetch vessels")
-      }
-
-      // Enhance vessel data with mock data for fields we don't have yet
-      const enhancedVessels = data.vessels.map((vessel) => {
-        // Generate random document status for each vessel
-        const documentStatus = getRandomDocStatus()
-
-        return {
-          id: vessel.id,
-          name: vessel.name,
-          type: vessel.vessel_type,
-          flag: vessel.flag_state,
-          imo: vessel.imo_number || "N/A",
-          documentStatus,
-          complianceScore: calculateComplianceScore(documentStatus),
-          // Add mock data for fields we don't have yet
-          nextPort: mockPortData.nextPort,
-          eta: mockPortData.eta,
-          location: mockPortData.location,
-        }
-      })
-
-      setVessels(enhancedVessels)
-    } catch (error) {
-      console.error("Error loading vessels:", error)
-      setError("Failed to load vessels. Please try again.")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const refreshVessels = () => {
-    fetchVessels()
-  }
-
   // Load vessels when user is authenticated and when search or filter changes
   useEffect(() => {
     if (isAuthenticated && !isUserLoading) {
-      fetchVessels()
+      // Create a debounce timer to prevent too many API calls when typing in search
+      const timer = setTimeout(() => {
+        fetchVessels({ searchQuery, vesselType })
+      }, 300)
+
+      return () => clearTimeout(timer)
     }
   }, [isAuthenticated, isUserLoading, searchQuery, vesselType])
 
@@ -318,7 +205,7 @@ export default function FleetPage() {
             <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
             <h2 className="text-xl font-bold mb-2">Failed to load vessels</h2>
             <p className="text-gray-500 mb-4">{error}</p>
-            <Button onClick={fetchVessels}>
+            <Button onClick={refreshVessels}>
               <RefreshCw className="mr-2 h-4 w-4" />
               Try Again
             </Button>
