@@ -1,10 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Link, useLocation } from "react-router-dom"
-import { BarChart3, Ship, FileText, MapPin, Share2, Bell, LogOut, Users } from "lucide-react"
+import { BarChart3, Ship, FileText, MapPin, Share2, Bell, Users } from "lucide-react"
 
 import IconComovisBlack from "../../ReusableAssets/Logos/IconComovisBlack.svg"
 import LogoBlack from "../../ReusableAssets/Logos/LogoBlack.svg"
@@ -103,19 +101,16 @@ export default function Sidebar() {
 
       <div className="p-4 border-t">
         <div className="flex items-center">
-          <Avatar className="h-8 w-8">
-            <AvatarFallback>JS</AvatarFallback>
-          </Avatar>
-          {isSidebarExpanded && (
+          <div className="relative">
+            <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></div>
+          </div>
+          {isSidebarExpanded ? (
             <div className="ml-2">
-              <p className="text-sm font-medium">John Smith</p>
-              <p className="text-xs text-gray-500">Fleet Manager</p>
+              <p className="text-sm font-medium text-green-600">Operational</p>
+              <p className="text-xs text-gray-500">All systems online</p>
             </div>
-          )}
-          {isSidebarExpanded && (
-            <Button variant="ghost" size="sm" className="ml-auto">
-              <LogOut className="h-4 w-4" />
-            </Button>
+          ) : (
+            <span className="ml-2 text-xs font-medium text-green-600">OK</span>
           )}
         </div>
       </div>

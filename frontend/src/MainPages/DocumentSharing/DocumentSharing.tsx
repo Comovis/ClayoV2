@@ -2,7 +2,7 @@
 
 import React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -54,11 +54,12 @@ import { ShareHistoryTable } from "./ShareHistoryTable"
 import { ShareTemplateList } from "./ShareTemplateList"
 import { VesselSelector, type Vessel, type PortInfo } from "../../MainComponents/VesselSelector/VesselSelector"
 import { AccessLogsModal } from "../../MainComponents/AccessLogs/AccessLogs"
+import { useFetchVessels } from "../../Hooks/useFetchVessels"
 
 export default function PortDocumentSharing() {
   const [activeTab, setActiveTab] = useState("upcoming")
   const [selectedPort, setSelectedPort] = useState("singapore")
-  const [selectedVessel, setSelectedVessel] = useState("humble-warrior")
+  const [selectedVessel, setSelectedVessel] = useState("")
   const [selectedDocuments, setSelectedDocuments] = useState([])
   const [shareStatus, setShareStatus] = useState(null)
   const [showPreview, setShowPreview] = useState(false)
@@ -78,6 +79,21 @@ export default function PortDocumentSharing() {
   const [accessLogsOpen, setAccessLogsOpen] = useState(false)
   const [sendingDirectEmail, setSendingDirectEmail] = useState(false)
   const [directEmailSent, setDirectEmailSent] = useState(false)
+
+  // Use the fetch vessels hook
+  const { vessels: fetchedVessels, isLoading, error, fetchVessels } = useFetchVessels()
+
+  // Fetch vessels on component mount
+  useEffect(() => {
+    fetchVessels()
+  }, [fetchVessels])
+
+  // Set the first vessel as selected when vessels are loaded
+  useEffect(() => {
+    if (fetchedVessels.length > 0 && !selectedVessel) {
+      setSelectedVessel(fetchedVessels[0].id)
+    }
+  }, [fetchedVessels, selectedVessel])
 
   // Ports data
   const ports = [
@@ -146,8 +162,8 @@ export default function PortDocumentSharing() {
     },
   ]
 
-  // Vessels
-  const vessels: Vessel[] = [
+  // Dummy vessels data for fallback
+  const dummyVessels: Vessel[] = [
     {
       id: "humble-warrior",
       name: "Humble Warrior",
@@ -197,6 +213,22 @@ export default function PortDocumentSharing() {
       isFavorite: favoriteVessels["northern-star"],
     },
   ]
+
+  // Use fetched vessels if available, otherwise use dummy data
+  const vessels =
+    fetchedVessels.length > 0
+      ? // Map fetched vessels to include status and isFavorite properties
+        fetchedVessels.map((vessel) => ({
+          ...vessel,
+          status: vessel.documentStatus || {
+            valid: 10,
+            expiringSoon: 2,
+            expired: 0,
+            missing: 1,
+          },
+          isFavorite: favoriteVessels[vessel.id] || false,
+        }))
+      : dummyVessels
 
   // Documents
   const documents = [
@@ -516,7 +548,7 @@ ${localStorage.getItem("userName") || "Comovis User"}`
         </div>
       </div>
 
-      {/* Use the improved VesselSelector component */}
+      {/* Use the improved VesselSelector component with fetched vessels */}
       <VesselSelector
         vessels={vessels}
         selectedVessel={selectedVessel}
@@ -524,6 +556,8 @@ ${localStorage.getItem("userName") || "Comovis User"}`
         portInfo={getPortInfoForVesselSelector()}
         formatDate={formatDate}
         onToggleFavorite={handleToggleFavorite}
+        isLoading={isLoading}
+        error={error}
       />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>

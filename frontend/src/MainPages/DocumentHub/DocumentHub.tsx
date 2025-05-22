@@ -423,10 +423,7 @@ export default function DocumentHub() {
                 <Filter className="mr-2 h-4 w-4" />
                 Filter
               </Button>
-              <Button variant="outline" size="sm">
-                <Download className="mr-2 h-4 w-4" />
-                Export
-              </Button>
+           
 
               {/* Split Button in Main Content */}
               <div className="flex">

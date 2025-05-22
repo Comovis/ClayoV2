@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -29,17 +29,33 @@ import { PortNotesTab } from "../../MainComponents/PortNotes/PortNotes"
 import DocumentUploadModal from "../../MainComponents/UploadModal/UploadModal"
 import { VesselSelector, type Vessel, type PortInfo } from "../../MainComponents/VesselSelector/VesselSelector"
 import PortAlerts from "../../MainComponents/PortAlerts/PortIntelAlerts"
+import { useFetchVessels } from "../../Hooks/useFetchVessels"
 
 export default function PortPreparation() {
   const [activeTab, setActiveTab] = useState("required")
   const [selectedPort, setSelectedPort] = useState("singapore")
-  const [selectedVessel, setSelectedVessel] = useState("humble-warrior")
+  const [selectedVessel, setSelectedVessel] = useState("")
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
   const [selectedDocumentType, setSelectedDocumentType] = useState("")
   const [verificationInProgress, setVerificationInProgress] = useState(false)
 
-  // Vessels data
-  const vessels: Vessel[] = [
+  // Use the fetch vessels hook
+  const { vessels: fetchedVessels, isLoading, error, fetchVessels } = useFetchVessels()
+
+  // Fetch vessels on component mount
+  useEffect(() => {
+    fetchVessels()
+  }, [fetchVessels])
+
+  // Set the first vessel as selected when vessels are loaded
+  useEffect(() => {
+    if (fetchedVessels.length > 0 && !selectedVessel) {
+      setSelectedVessel(fetchedVessels[0].id)
+    }
+  }, [fetchedVessels, selectedVessel])
+
+  // Fallback vessels data if API fails
+  const dummyVessels: Vessel[] = [
     {
       id: "humble-warrior",
       name: "Humble Warrior",
@@ -68,6 +84,9 @@ export default function PortPreparation() {
       callsign: "V7CK9",
     },
   ]
+
+  // Use fetched vessels if available, otherwise use dummy data
+  const vessels = fetchedVessels.length > 0 ? fetchedVessels : dummyVessels
 
   // Ports data
   const ports = [
@@ -153,13 +172,15 @@ export default function PortPreparation() {
         </div>
       </div>
 
-      {/* Use the reusable VesselSelector component */}
+      {/* Use the reusable VesselSelector component with fetched vessels */}
       <VesselSelector
         vessels={vessels}
         selectedVessel={selectedVessel}
         onVesselChange={setSelectedVessel}
         portInfo={getPortInfoForVesselSelector()}
         formatDate={formatDate}
+        isLoading={isLoading}
+        error={error}
       />
 
       {/* Upcoming Port Calls Section */}
