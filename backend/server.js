@@ -14,6 +14,7 @@ const { handleGetUserData } = require("./Users/GetUserData")
 const { handleSignIn } = require("./Auth/SignInAuthService")
 const { handleAcceptInvitationRequest } = require("./Team/AcceptInvitation")
 const { handleGetVesselsRequest } = require("./AppFeatures/Vessels/FetchVessels")
+const { handleAddVesselRequest } = require("./AppFeatures/Vessels/AddVessel")
 
 
 // Create Express app
@@ -283,6 +284,15 @@ app.get("/api/get-vessels", authenticateUser, async (req, res) => {
   }
 })
 
+
+app.post("/api/add-vessel", authenticateUser, async (req, res) => {
+  try {
+    await handleAddVesselRequest(req, res)
+  } catch (error) {
+    console.error("Error adding vessel:", error)
+    res.status(500).json({ error: "Failed to add vessel" })
+  }
+})
 
 
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -13,21 +13,33 @@ import {
   Plus,
   Search,
   SlidersHorizontal,
-  MapPin,
   List,
   Map,
+  MapPin,
+  RefreshCw,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Link } from "react-router-dom"
 import AddVesselModal from "../../MainComponents/AddVesselModal/AddNewVessel"
-import { SubscriptionIndicator, type SubscriptionData } from "../../MainComponents/UserSubscriptions/SubscriptionIndicator"
+import {
+  SubscriptionIndicator,
+  type SubscriptionData,
+} from "../../MainComponents/UserSubscriptions/SubscriptionIndicator"
+import { useUser } from "../../Auth/Contexts/UserContext"
+import { supabase } from "../../Auth/SupabaseAuth" // Import supabase client
 
 export default function FleetPage() {
+  const { isAuthenticated, isLoading: isUserLoading, user } = useUser()
+
   const [searchQuery, setSearchQuery] = useState("")
   const [viewMode, setViewMode] = useState("grid")
   const [isAddVesselModalOpen, setIsAddVesselModalOpen] = useState(false)
+  const [vessels, setVessels] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState("")
+  const [vesselType, setVesselType] = useState("all")
 
   // Mock subscription data - would come from user context in real app
   const subscriptionData: SubscriptionData = {
@@ -37,69 +49,166 @@ export default function FleetPage() {
     expiresAt: "December 15, 2023",
   }
 
-  // Mock vessel data
-  const vessels = [
-    {
-      id: "v1",
-      name: "Humble Warrior",
-      type: "Crude Oil Tanker",
-      flag: "Panama",
-      imo: "9876543",
-      complianceScore: 80,
-      documentStatus: {
-        valid: 12,
-        expiringSoon: 3,
-        expired: 0,
-        missing: 1,
-      },
-      nextPort: "Singapore",
-      eta: "Nov 15, 2023",
-      location: { lat: 1.352083, lng: 103.819839 },
-    },
-    {
-      id: "v2",
-      name: "Pacific Explorer",
-      type: "Container Ship",
-      flag: "Singapore",
-      imo: "9765432",
-      complianceScore: 92,
-      documentStatus: {
-        valid: 14,
-        expiringSoon: 1,
-        expired: 0,
-        missing: 0,
-      },
-      nextPort: "Rotterdam",
-      eta: "Nov 25, 2023",
-      location: { lat: 51.9225, lng: 4.47917 },
-    },
-    {
-      id: "v3",
-      name: "Northern Star",
-      type: "Bulk Carrier",
-      flag: "Marshall Islands",
-      imo: "9654321",
-      complianceScore: 65,
-      documentStatus: {
-        valid: 10,
-        expiringSoon: 2,
-        expired: 1,
-        missing: 2,
-      },
-      nextPort: "Shanghai",
-      eta: "Dec 10, 2023",
-      location: { lat: 31.2304, lng: 121.4737 },
-    },
-  ]
+  // Mock data for fields we don't have yet
+  const mockPortData = {
+    nextPort: "Singapore",
+    eta: "Nov 15, 2023",
+    location: { lat: 1.352083, lng: 103.819839 },
+  }
 
-  // Filter vessels based on search query
+  // Document status mock data - would be calculated from actual documents in a real app
+  const getRandomDocStatus = () => {
+    return {
+      valid: Math.floor(Math.random() * 15) + 5,
+      expiringSoon: Math.floor(Math.random() * 5),
+      expired: Math.floor(Math.random() * 2),
+      missing: Math.floor(Math.random() * 3),
+    }
+  }
+
+  // Calculate compliance score based on document status
+  const calculateComplianceScore = (docStatus) => {
+    const total = docStatus.valid + docStatus.expiringSoon + docStatus.expired + docStatus.missing
+    const validWeight = 1
+    const expiringSoonWeight = 0.5
+    const expiredWeight = 0
+    const missingWeight = 0
+
+    if (total === 0) return 80 // Default score if no documents
+
+    const score =
+      ((docStatus.valid * validWeight +
+        docStatus.expiringSoon * expiringSoonWeight +
+        docStatus.expired * expiredWeight +
+        docStatus.missing * missingWeight) /
+        total) *
+      100
+
+    return Math.round(score)
+  }
+
+  // Fetch vessels from API
+  const fetchVessels = async () => {
+    // Don't fetch if user is not authenticated yet
+    if (!isAuthenticated || isUserLoading) {
+      return
+    }
+
+    setIsLoading(true)
+    setError("")
+
+    try {
+      // API Base URL Configuration
+      const apiBaseUrl =
+        import.meta.env.MODE === "development" ? import.meta.env.VITE_DEVELOPMENT_URL : import.meta.env.VITE_API_URL
+
+      // Build query string from options
+      const queryParams = new URLSearchParams()
+
+      if (searchQuery) queryParams.append("search", searchQuery)
+      if (vesselType !== "all") queryParams.append("vesselType", vesselType)
+
+      const queryString = queryParams.toString() ? `?${queryParams.toString()}` : ""
+
+      // Get the current session to include the auth token
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+
+      if (sessionError || !sessionData.session) {
+        throw new Error("Authentication required. Please log in again.")
+      }
+
+      // Get the access token from the session
+      const token = sessionData.session.access_token
+
+      // Call the API to get vessels
+      const response = await fetch(`${apiBaseUrl}/api/get-vessels${queryString}`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to fetch vessels")
+      }
+
+      // Enhance vessel data with mock data for fields we don't have yet
+      const enhancedVessels = data.vessels.map((vessel) => {
+        // Generate random document status for each vessel
+        const documentStatus = getRandomDocStatus()
+
+        return {
+          id: vessel.id,
+          name: vessel.name,
+          type: vessel.vessel_type,
+          flag: vessel.flag_state,
+          imo: vessel.imo_number || "N/A",
+          documentStatus,
+          complianceScore: calculateComplianceScore(documentStatus),
+          // Add mock data for fields we don't have yet
+          nextPort: mockPortData.nextPort,
+          eta: mockPortData.eta,
+          location: mockPortData.location,
+        }
+      })
+
+      setVessels(enhancedVessels)
+    } catch (error) {
+      console.error("Error loading vessels:", error)
+      setError("Failed to load vessels. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const refreshVessels = () => {
+    fetchVessels()
+  }
+
+  // Load vessels when user is authenticated and when search or filter changes
+  useEffect(() => {
+    if (isAuthenticated && !isUserLoading) {
+      fetchVessels()
+    }
+  }, [isAuthenticated, isUserLoading, searchQuery, vesselType])
+
+  // Filter vessels based on search query (client-side filtering as backup)
   const filteredVessels = vessels.filter(
     (vessel) =>
       vessel.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      vessel.imo.includes(searchQuery) ||
+      (vessel.imo && vessel.imo.includes(searchQuery)) ||
       vessel.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
       vessel.flag.toLowerCase().includes(searchQuery.toLowerCase()),
   )
+
+  // If user is not authenticated or still loading, show appropriate UI
+  if (isUserLoading) {
+    return (
+      <div className="p-6 max-w-7xl mx-auto">
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+          <p className="ml-2">Loading user data...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="p-6 max-w-7xl mx-auto">
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center p-6">
+            <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
+            <h2 className="text-xl font-bold mb-2">Authentication Required</h2>
+            <p className="text-gray-500 mb-4">You need to be logged in to view your vessels.</p>
+            <Button onClick={() => (window.location.href = "/login")}>Go to Login</Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -140,15 +249,15 @@ export default function FleetPage() {
         </div>
 
         <div className="flex gap-2">
-          <Select defaultValue="all">
+          <Select value={vesselType} onValueChange={setVesselType}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Filter by type" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="tanker">Tankers</SelectItem>
-              <SelectItem value="container">Container Ships</SelectItem>
-              <SelectItem value="bulk">Bulk Carriers</SelectItem>
+              <SelectItem value="Tanker">Tankers</SelectItem>
+              <SelectItem value="Container">Container Ships</SelectItem>
+              <SelectItem value="Bulk Carrier">Bulk Carriers</SelectItem>
             </SelectContent>
           </Select>
 
@@ -194,8 +303,48 @@ export default function FleetPage() {
         </TabsList>
       </Tabs>
 
+      {/* Loading state */}
+      {isLoading && (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+          <p className="ml-2">Loading vessels...</p>
+        </div>
+      )}
+
+      {/* Error state */}
+      {!isLoading && error && (
+        <Card className="mb-6">
+          <CardContent className="flex flex-col items-center justify-center p-6">
+            <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
+            <h2 className="text-xl font-bold mb-2">Failed to load vessels</h2>
+            <p className="text-gray-500 mb-4">{error}</p>
+            <Button onClick={fetchVessels}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* No vessels state */}
+      {!isLoading && !error && vessels.length === 0 && (
+        <Card className="mb-6">
+          <CardContent className="flex flex-col items-center justify-center p-6">
+            <Ship className="h-12 w-12 text-gray-300 mb-4" />
+            <h2 className="text-xl font-bold mb-2">No vessels found</h2>
+            <p className="text-gray-500 mb-4">
+              {searchQuery ? "No vessels match your search criteria." : "You haven't added any vessels yet."}
+            </p>
+            <Button onClick={() => setIsAddVesselModalOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Your First Vessel
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Vessels grid */}
-      {viewMode === "grid" && (
+      {!isLoading && !error && viewMode === "grid" && vessels.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredVessels.map((vessel) => (
             <VesselCard key={vessel.id} vessel={vessel} />
@@ -209,7 +358,7 @@ export default function FleetPage() {
       )}
 
       {/* Vessels list view */}
-      {viewMode === "list" && (
+      {!isLoading && !error && viewMode === "list" && vessels.length > 0 && (
         <div className="space-y-4">
           {filteredVessels.map((vessel) => (
             <VesselListItem key={vessel.id} vessel={vessel} />
@@ -229,7 +378,13 @@ export default function FleetPage() {
       )}
 
       {/* Add vessel modal */}
-      <AddVesselModal isOpen={isAddVesselModalOpen} onClose={() => setIsAddVesselModalOpen(false)} />
+      <AddVesselModal
+        isOpen={isAddVesselModalOpen}
+        onClose={() => {
+          setIsAddVesselModalOpen(false)
+          refreshVessels() // Refresh vessels when modal closes
+        }}
+      />
     </div>
   )
 }

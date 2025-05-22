@@ -17,49 +17,57 @@ import {
   Upload,
   PlusCircle,
   Files,
+  AlertCircle,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-// import DocumentUploadModal from "./UploadModal" // Remove this line
-// import DocumentUploadChoiceModal from "./document-upload-choice-modal"
 import DocumentUploadModal from "../../MainComponents/UploadModal/UploadModal"
 import BatchUploadModal from "../../MainComponents/UploadModal/BulkUpload"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useAddVessel } from "../../Hooks/useAddVessel" // Import our custom hook
+
+// Predefined vessel types
+const vesselTypes = [
+  { id: "tanker", name: "Tanker" },
+  { id: "container", name: "Container Ship" },
+  { id: "bulk", name: "Bulk Carrier" },
+  { id: "general_cargo", name: "General Cargo" },
+  { id: "roro", name: "Ro-Ro" },
+  { id: "passenger", name: "Passenger/Cruise" },
+  { id: "offshore", name: "Offshore Support" },
+  { id: "special", name: "Special Purpose" },
+  { id: "other", name: "Other" },
+]
 
 interface AddVesselModalProps {
   isOpen: boolean
   onClose: () => void
+  onVesselAdded?: () => void
 }
 
-export default function AddVesselModal({ isOpen, onClose }: AddVesselModalProps) {
+export default function AddVesselModal({ isOpen, onClose, onVesselAdded }: AddVesselModalProps) {
   const [step, setStep] = useState(1)
   const [searchQuery, setSearchQuery] = useState("")
   const [isSearching, setIsSearching] = useState(false)
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [selectedVessel, setSelectedVessel] = useState<any>(null)
   const [uploadDocuments, setUploadDocuments] = useState(false)
-  const [isAddingVessel, setIsAddingVessel] = useState(false)
   const [addComplete, setAddComplete] = useState(false)
-  // const [isDocumentUploadModalOpen, setIsDocumentUploadModalOpen] = useState(false) // Remove this line
-  // const [isDocumentUploadChoiceModalOpen, setIsDocumentUploadChoiceModalOpen] = useState(false)
   const [isManualEntry, setIsManualEntry] = useState(false)
   const [isDocumentUploadModalOpen, setIsDocumentUploadModalOpen] = useState(false)
   const [isBulkUploadModalOpen, setIsBulkUploadModalOpen] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
-  // Manual vessel entry form
+  // Use our custom hook
+  const { addVessel, isLoading: isAddingVessel, error: addVesselError } = useAddVessel()
+
+  // Simplified manual vessel entry form with only required fields
   const [manualVesselData, setManualVesselData] = useState({
     name: "",
     imo: "",
-    mmsi: "",
     type: "",
+    customType: "",
     flag: "",
-    yearBuilt: "",
-    grossTonnage: "",
-    deadweight: "",
-    length: "",
-    beam: "",
-    classificationSociety: "",
-    owner: "",
-    manager: "",
   })
 
   // Reset state when modal opens/closes
@@ -71,24 +79,16 @@ export default function AddVesselModal({ isOpen, onClose }: AddVesselModalProps)
         setSearchResults([])
         setSelectedVessel(null)
         setUploadDocuments(false)
-        setIsAddingVessel(false)
         setAddComplete(false)
         setIsManualEntry(false)
         setManualVesselData({
           name: "",
           imo: "",
-          mmsi: "",
           type: "",
+          customType: "",
           flag: "",
-          yearBuilt: "",
-          grossTonnage: "",
-          deadweight: "",
-          length: "",
-          beam: "",
-          classificationSociety: "",
-          owner: "",
-          manager: "",
         })
+        setErrors({})
       }, 300)
     }
   }, [isOpen])
@@ -176,26 +176,68 @@ export default function AddVesselModal({ isOpen, onClose }: AddVesselModalProps)
       ...prev,
       [field]: value,
     }))
+
+    // Clear error when user types
+    if (errors[field]) {
+      const newErrors = { ...errors }
+      delete newErrors[field]
+      setErrors(newErrors)
+    }
+  }
+
+  // Validate the manual entry form
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {}
+
+    if (!manualVesselData.name.trim()) {
+      newErrors.name = "Vessel name is required"
+    }
+
+    if (!manualVesselData.imo.trim()) {
+      newErrors.imo = "IMO number is required"
+    } else if (!/^\d{7}$/.test(manualVesselData.imo.trim())) {
+      newErrors.imo = "IMO number must be 7 digits"
+    }
+
+    if (!manualVesselData.type) {
+      newErrors.type = "Vessel type is required"
+    } else if (manualVesselData.type === "other" && !manualVesselData.customType.trim()) {
+      newErrors.customType = "Please specify the vessel type"
+    }
+
+    if (!manualVesselData.flag.trim()) {
+      newErrors.flag = "Flag state is required"
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
   }
 
   // Submit manual vessel data
   const submitManualVessel = () => {
+    if (!validateForm()) {
+      return
+    }
+
     // Create a vessel object from manual data
     const manualVessel = {
       id: `manual-${Date.now()}`,
       name: manualVesselData.name,
       imo: manualVesselData.imo,
-      mmsi: manualVesselData.mmsi,
-      type: manualVesselData.type,
+      mmsi: "",
+      type:
+        manualVesselData.type === "other"
+          ? manualVesselData.customType
+          : vesselTypes.find((t) => t.id === manualVesselData.type)?.name || manualVesselData.type,
       flag: manualVesselData.flag,
-      yearBuilt: Number.parseInt(manualVesselData.yearBuilt) || new Date().getFullYear(),
-      grossTonnage: Number.parseInt(manualVesselData.grossTonnage) || 0,
-      deadweight: Number.parseInt(manualVesselData.deadweight) || 0,
-      length: Number.parseInt(manualVesselData.length) || 0,
-      beam: Number.parseInt(manualVesselData.beam) || 0,
-      classificationSociety: manualVesselData.classificationSociety,
-      owner: manualVesselData.owner,
-      manager: manualVesselData.manager,
+      yearBuilt: new Date().getFullYear(),
+      grossTonnage: 0,
+      deadweight: 0,
+      length: 0,
+      beam: 0,
+      classificationSociety: "",
+      owner: "",
+      manager: "",
       image: "/vessel-generic.png",
     }
 
@@ -203,34 +245,55 @@ export default function AddVesselModal({ isOpen, onClose }: AddVesselModalProps)
     setStep(2)
   }
 
-  // Handle vessel addition
-  const addVessel = () => {
-    setIsAddingVessel(true)
+  // Handle vessel addition - now using our API hook
+  const handleAddVessel = async () => {
+    if (!selectedVessel) return
 
-    // Simulate API delay
-    setTimeout(() => {
-      setIsAddingVessel(false)
+    // Prepare vessel data for API
+    const vesselData = {
+      name: selectedVessel.name,
+      imo_number: selectedVessel.imo,
+      vessel_type: selectedVessel.type,
+      flag_state: selectedVessel.flag,
+    }
+
+    // Call our API hook
+    const result = await addVessel(vesselData)
+
+    if (result.success) {
+      // Update the selectedVessel with the returned data if needed
+      if (result.vessel) {
+        setSelectedVessel((prev) => ({
+          ...prev,
+          id: result.vessel.id,
+          // Add any other properties from the API response
+        }))
+      }
+
       setAddComplete(true)
       setStep(3)
-    }, 2000)
+
+      // Call the callback if provided
+      if (onVesselAdded) {
+        onVesselAdded()
+      }
+    } else {
+      // If there was an error, show it in the UI
+      setErrors({
+        api: result.error || "Failed to add vessel. Please try again.",
+      })
+    }
   }
 
   // Handle document upload option
   const handleDocumentUploadOption = (value: boolean) => {
     setUploadDocuments(value)
-    if (value) {
-      // If user wants to upload documents, add the vessel first
-      addVessel()
-    } else {
-      // If user doesn't want to upload documents, complete the process
-      addVessel()
-    }
+    // Call the API to add the vessel
+    handleAddVessel()
   }
 
   // Handle document upload completion
   const handleDocumentUploadComplete = (documentData: any) => {
-    // setIsDocumentUploadModalOpen(false)
-    // setIsDocumentUploadChoiceModalOpen(false)
     setIsBulkUploadModalOpen(false)
     setIsDocumentUploadModalOpen(false)
     // In a real app, you would update the vessel with the new document data
@@ -335,178 +398,131 @@ export default function AddVesselModal({ isOpen, onClose }: AddVesselModalProps)
                   <p className="text-sm text-gray-500">Please provide the basic information about your vessel below</p>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Vessel Name - Required */}
                     <div className="space-y-2">
-                      <Label htmlFor="vesselName">Vessel Name *</Label>
+                      <Label htmlFor="vesselName" className="flex items-center">
+                        Vessel Name <span className="text-red-500 ml-1">*</span>
+                      </Label>
                       <Input
                         id="vesselName"
                         value={manualVesselData.name}
                         onChange={(e) => handleManualDataChange("name", e.target.value)}
                         placeholder="Enter vessel name"
-                        className="h-10"
-                        required
+                        className={errors.name ? "border-red-500" : ""}
                       />
+                      {errors.name && (
+                        <div className="text-red-500 text-sm flex items-center mt-1">
+                          <AlertCircle className="h-4 w-4 mr-1" />
+                          {errors.name}
+                        </div>
+                      )}
                     </div>
 
+                    {/* IMO Number - Required */}
                     <div className="space-y-2">
-                      <Label htmlFor="vesselIMO">IMO Number *</Label>
+                      <Label htmlFor="vesselIMO" className="flex items-center">
+                        IMO Number <span className="text-red-500 ml-1">*</span>
+                      </Label>
                       <Input
                         id="vesselIMO"
                         value={manualVesselData.imo}
                         onChange={(e) => handleManualDataChange("imo", e.target.value)}
-                        placeholder="e.g. 9876543"
-                        className="h-10"
-                        required
+                        placeholder="7-digit IMO number"
+                        className={errors.imo ? "border-red-500" : ""}
                       />
+                      {errors.imo && (
+                        <div className="text-red-500 text-sm flex items-center mt-1">
+                          <AlertCircle className="h-4 w-4 mr-1" />
+                          {errors.imo}
+                        </div>
+                      )}
                     </div>
 
+                    {/* Vessel Type - Required (Dropdown) */}
                     <div className="space-y-2">
-                      <Label htmlFor="vesselMMSI">MMSI</Label>
-                      <Input
-                        id="vesselMMSI"
-                        value={manualVesselData.mmsi}
-                        onChange={(e) => handleManualDataChange("mmsi", e.target.value)}
-                        placeholder="e.g. 123456789"
-                        className="h-10"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="vesselType">Vessel Type *</Label>
-                      <Input
-                        id="vesselType"
+                      <Label htmlFor="vesselType" className="flex items-center">
+                        Vessel Type <span className="text-red-500 ml-1">*</span>
+                      </Label>
+                      <Select
                         value={manualVesselData.type}
-                        onChange={(e) => handleManualDataChange("type", e.target.value)}
-                        placeholder="e.g. Crude Oil Tanker"
-                        className="h-10"
-                        required
-                      />
+                        onValueChange={(value) => handleManualDataChange("type", value)}
+                      >
+                        <SelectTrigger id="vesselType" className={errors.type ? "border-red-500" : ""}>
+                          <SelectValue placeholder="Select vessel type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {vesselTypes.map((type) => (
+                            <SelectItem key={type.id} value={type.id}>
+                              {type.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {errors.type && (
+                        <div className="text-red-500 text-sm flex items-center mt-1">
+                          <AlertCircle className="h-4 w-4 mr-1" />
+                          {errors.type}
+                        </div>
+                      )}
+
+                      {/* Custom Vessel Type - shown only when "Other" is selected */}
+                      {manualVesselData.type === "other" && (
+                        <div className="mt-2">
+                          <Input
+                            id="customVesselType"
+                            value={manualVesselData.customType}
+                            onChange={(e) => handleManualDataChange("customType", e.target.value)}
+                            placeholder="Specify vessel type"
+                            className={errors.customType ? "border-red-500" : ""}
+                          />
+                          {errors.customType && (
+                            <div className="text-red-500 text-sm flex items-center mt-1">
+                              <AlertCircle className="h-4 w-4 mr-1" />
+                              {errors.customType}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
+                    {/* Flag State - Required */}
                     <div className="space-y-2">
-                      <Label htmlFor="vesselFlag">Flag *</Label>
+                      <Label htmlFor="vesselFlag" className="flex items-center">
+                        Flag State <span className="text-red-500 ml-1">*</span>
+                      </Label>
                       <Input
                         id="vesselFlag"
                         value={manualVesselData.flag}
                         onChange={(e) => handleManualDataChange("flag", e.target.value)}
                         placeholder="e.g. Panama"
-                        className="h-10"
-                        required
+                        className={errors.flag ? "border-red-500" : ""}
                       />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="vesselYearBuilt">Year Built</Label>
-                      <Input
-                        id="vesselYearBuilt"
-                        value={manualVesselData.yearBuilt}
-                        onChange={(e) => handleManualDataChange("yearBuilt", e.target.value)}
-                        placeholder="e.g. 2015"
-                        className="h-10"
-                        type="number"
-                      />
+                      {errors.flag && (
+                        <div className="text-red-500 text-sm flex items-center mt-1">
+                          <AlertCircle className="h-4 w-4 mr-1" />
+                          {errors.flag}
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  <Separator />
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="vesselGT">Gross Tonnage</Label>
-                      <Input
-                        id="vesselGT"
-                        value={manualVesselData.grossTonnage}
-                        onChange={(e) => handleManualDataChange("grossTonnage", e.target.value)}
-                        placeholder="e.g. 84000"
-                        className="h-10"
-                        type="number"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="vesselDWT">Deadweight</Label>
-                      <Input
-                        id="vesselDWT"
-                        value={manualVesselData.deadweight}
-                        onChange={(e) => handleManualDataChange("deadweight", e.target.value)}
-                        placeholder="e.g. 115000"
-                        className="h-10"
-                        type="number"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="vesselLength">Length Overall (m)</Label>
-                      <Input
-                        id="vesselLength"
-                        value={manualVesselData.length}
-                        onChange={(e) => handleManualDataChange("length", e.target.value)}
-                        placeholder="e.g. 250"
-                        className="h-10"
-                        type="number"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="vesselBeam">Beam (m)</Label>
-                      <Input
-                        id="vesselBeam"
-                        value={manualVesselData.beam}
-                        onChange={(e) => handleManualDataChange("beam", e.target.value)}
-                        placeholder="e.g. 44"
-                        className="h-10"
-                        type="number"
-                      />
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="vesselClass">Classification Society</Label>
-                      <Input
-                        id="vesselClass"
-                        value={manualVesselData.classificationSociety}
-                        onChange={(e) => handleManualDataChange("classificationSociety", e.target.value)}
-                        placeholder="e.g. DNV GL"
-                        className="h-10"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="vesselOwner">Owner</Label>
-                      <Input
-                        id="vesselOwner"
-                        value={manualVesselData.owner}
-                        onChange={(e) => handleManualDataChange("owner", e.target.value)}
-                        placeholder="e.g. Global Shipping Co."
-                        className="h-10"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="vesselManager">Manager</Label>
-                      <Input
-                        id="vesselManager"
-                        value={manualVesselData.manager}
-                        onChange={(e) => handleManualDataChange("manager", e.target.value)}
-                        placeholder="e.g. Maritime Management Ltd."
-                        className="h-10"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end">
+                  {/* Navigation buttons for manual entry */}
+                  <div className="flex justify-between items-center mt-6">
+                    <Button variant="outline" onClick={onClose}>
+                      Cancel
+                    </Button>
                     <Button
                       onClick={submitManualVessel}
                       disabled={
                         !manualVesselData.name ||
                         !manualVesselData.imo ||
                         !manualVesselData.type ||
-                        !manualVesselData.flag
+                        !manualVesselData.flag ||
+                        (manualVesselData.type === "other" && !manualVesselData.customType)
                       }
+                      className="bg-black text-white hover:bg-gray-800"
                     >
-                      Continue
+                      Next
                     </Button>
                   </div>
                 </div>
@@ -547,7 +563,7 @@ export default function AddVesselModal({ isOpen, onClose }: AddVesselModalProps)
                       </div>
                       <div>
                         <p className="text-sm text-gray-500">MMSI</p>
-                        <p className="font-medium">{selectedVessel.mmsi}</p>
+                        <p className="font-medium">{selectedVessel.mmsi || "N/A"}</p>
                       </div>
                       <div>
                         <p className="text-sm text-gray-500">Gross Tonnage</p>
@@ -572,15 +588,15 @@ export default function AddVesselModal({ isOpen, onClose }: AddVesselModalProps)
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <p className="text-sm text-gray-500">Classification Society</p>
-                        <p className="font-medium">{selectedVessel.classificationSociety}</p>
+                        <p className="font-medium">{selectedVessel.classificationSociety || "N/A"}</p>
                       </div>
                       <div>
                         <p className="text-sm text-gray-500">Owner</p>
-                        <p className="font-medium">{selectedVessel.owner}</p>
+                        <p className="font-medium">{selectedVessel.owner || "N/A"}</p>
                       </div>
                       <div>
                         <p className="text-sm text-gray-500">Manager</p>
-                        <p className="font-medium">{selectedVessel.manager}</p>
+                        <p className="font-medium">{selectedVessel.manager || "N/A"}</p>
                       </div>
                     </div>
                   </div>
@@ -619,6 +635,19 @@ export default function AddVesselModal({ isOpen, onClose }: AddVesselModalProps)
                   </div>
                 </div>
 
+                {/* API Error message if any */}
+                {errors.api && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <div className="flex items-start">
+                      <AlertCircle className="h-5 w-5 text-red-500 mr-2 mt-0.5" />
+                      <div>
+                        <h4 className="text-sm font-medium text-red-800 mb-1">Error</h4>
+                        <p className="text-sm text-red-700">{errors.api}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <Separator />
 
                 {/* Document upload option */}
@@ -633,8 +662,13 @@ export default function AddVesselModal({ isOpen, onClose }: AddVesselModalProps)
                       variant="outline"
                       className="flex-1 h-24 flex flex-col items-center justify-center"
                       onClick={() => handleDocumentUploadOption(false)}
+                      disabled={isAddingVessel}
                     >
-                      <Ship className="h-6 w-6 mb-2" />
+                      {isAddingVessel ? (
+                        <Loader2 className="h-6 w-6 animate-spin mb-2" />
+                      ) : (
+                        <Ship className="h-6 w-6 mb-2" />
+                      )}
                       <span>Add Vessel Only</span>
                       <span className="text-xs text-gray-500 mt-1">Upload documents later</span>
                     </Button>
@@ -642,8 +676,13 @@ export default function AddVesselModal({ isOpen, onClose }: AddVesselModalProps)
                     <Button
                       className="flex-1 h-24 flex flex-col items-center justify-center"
                       onClick={() => handleDocumentUploadOption(true)}
+                      disabled={isAddingVessel}
                     >
-                      <Upload className="h-6 w-6 mb-2" />
+                      {isAddingVessel ? (
+                        <Loader2 className="h-6 w-6 animate-spin mb-2" />
+                      ) : (
+                        <Upload className="h-6 w-6 mb-2" />
+                      )}
                       <span>Add & Upload Documents</span>
                       <span className="text-xs text-gray-400 mt-1">Recommended</span>
                     </Button>
@@ -723,28 +762,21 @@ export default function AddVesselModal({ isOpen, onClose }: AddVesselModalProps)
   const renderFooter = () => {
     switch (step) {
       case 1:
+        // For step 1, we're now handling the buttons inside the tab content for manual entry
+        // Don't show any footer buttons when in manual entry mode
+        if (isManualEntry) {
+          return null
+        }
         return (
           <>
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            {isManualEntry && (
-              <Button
-                onClick={submitManualVessel}
-                disabled={
-                  !manualVesselData.name || !manualVesselData.imo || !manualVesselData.type || !manualVesselData.flag
-                }
-              >
-                Continue
-              </Button>
-            )}
+         
           </>
         )
 
       case 2:
         return (
           <>
-            <Button variant="outline" onClick={() => setStep(1)}>
+            <Button variant="outline" onClick={() => setStep(1)} disabled={isAddingVessel}>
               Back
             </Button>
           </>
@@ -820,13 +852,6 @@ export default function AddVesselModal({ isOpen, onClose }: AddVesselModalProps)
           <DialogFooter className="flex justify-between mt-6">{renderFooter()}</DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Document Upload Choice Modal */}
-      {/* <DocumentUploadChoiceModal
-        isOpen={isDocumentUploadChoiceModalOpen}
-        onClose={() => setIsDocumentUploadChoiceModalOpen(false)}
-        vesselId={selectedVessel?.id}
-      /> */}
 
       {/* Document Upload Modal */}
       <DocumentUploadModal
