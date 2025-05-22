@@ -15,7 +15,7 @@ const { handleSignIn } = require("./Auth/SignInAuthService")
 const { handleAcceptInvitationRequest } = require("./Team/AcceptInvitation")
 const { handleGetVesselsRequest } = require("./AppFeatures/Vessels/FetchVessels")
 const { handleAddVesselRequest } = require("./AppFeatures/Vessels/AddVessel")
-
+const { processDocumentShareEmails } = require("./Emails/ShareEmail/SendDocumentShareEmail")
 
 // Create Express app
 const app = express()
@@ -295,6 +295,45 @@ app.post("/api/add-vessel", authenticateUser, async (req, res) => {
 })
 
 
+//Share Documents
+
+
+
+app.post("/send-document-share-email", authenticateUser, async (req, res) => {
+  try {
+    const { shareId } = req.body
+
+    // Validate required fields
+    if (!shareId) {
+      return res.status(400).json({ error: "Share ID is required" })
+    }
+
+    // Get user ID from the authenticated user object
+    const userId = req.user.user_id
+
+    // If somehow the user ID is missing, return an error
+    if (!userId) {
+      return res.status(401).json({ error: "User ID not found in authenticated session" })
+    }
+
+    // Process and send the emails
+    const result = await processDocumentShareEmails(shareId, userId)
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.error })
+    }
+
+    // Return success response
+    return res.status(200).json({
+      message: "Document share emails sent",
+      totalSent: result.totalSent,
+      totalFailed: result.totalFailed,
+    })
+  } catch (error) {
+    console.error("Error sending document share emails:", error)
+    return res.status(500).json({ error: "Failed to send document share emails" })
+  }
+})
 
 
 
