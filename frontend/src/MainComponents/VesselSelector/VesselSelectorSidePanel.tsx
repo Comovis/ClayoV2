@@ -1,10 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Plus, Search, Ship, CheckCircle, Clock, AlertCircle, AlertTriangle, Upload, ChevronDown } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { useFetchVessels } from "../../Hooks/useFetchVessels"
 
 interface DocumentStatus {
   valid: number
@@ -67,9 +68,31 @@ interface MyFleetProps {
 export function MyFleet({ activeVessel, onVesselSelect, onUploadClick, className = "" }: MyFleetProps) {
   const [searchQuery, setSearchQuery] = useState("")
 
-  // Mock vessel data - in a real app, this would come from props or an API
-  const vessels = [
+  // Use the useFetchVessels hook to get vessel data
+  const { vessels, isLoading, error, fetchVessels } = useFetchVessels()
+
+  // Fetch vessels when the component mounts or search query changes
+  useEffect(() => {
+    // Create a debounce timer to prevent too many API calls when typing in search
+    const timer = setTimeout(() => {
+      fetchVessels({ searchQuery })
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
+  // Filter vessels based on search query (client-side filtering as backup)
+  const filteredVessels = vessels.filter(
+    (vessel) =>
+      vessel.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      vessel.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      vessel.flag.toLowerCase().includes(searchQuery.toLowerCase()),
+  )
+
+  // Fallback to mock data if there's an error or no vessels are loaded yet
+  const mockVessels = [
     {
+      id: "1",
       name: "Humble Warrior",
       type: "Crude Oil Tanker",
       flag: "Panama",
@@ -81,6 +104,7 @@ export function MyFleet({ activeVessel, onVesselSelect, onUploadClick, className
       },
     },
     {
+      id: "2",
       name: "Pacific Explorer",
       type: "Container Ship",
       flag: "Singapore",
@@ -92,6 +116,7 @@ export function MyFleet({ activeVessel, onVesselSelect, onUploadClick, className
       },
     },
     {
+      id: "3",
       name: "Northern Star",
       type: "Bulk Carrier",
       flag: "Marshall Islands",
@@ -104,13 +129,8 @@ export function MyFleet({ activeVessel, onVesselSelect, onUploadClick, className
     },
   ]
 
-  // Filter vessels based on search query
-  const filteredVessels = vessels.filter(
-    (vessel) =>
-      vessel.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      vessel.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      vessel.flag.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
+  // Use real vessels if available, otherwise use mock data
+  const displayVessels = vessels.length > 0 ? filteredVessels : mockVessels
 
   return (
     <aside className={`w-72 border-r bg-gray-50 p-4 flex flex-col ${className}`}>
@@ -131,10 +151,27 @@ export function MyFleet({ activeVessel, onVesselSelect, onUploadClick, className
         />
       </div>
 
+      {isLoading && (
+        <div className="flex justify-center items-center py-8">
+          <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full mr-2"></div>
+          <p className="text-sm text-gray-500">Loading vessels...</p>
+        </div>
+      )}
+
+      {error && (
+        <div className="text-center py-4 text-red-500">
+          <AlertTriangle className="h-5 w-5 mx-auto mb-2" />
+          <p className="text-sm">Failed to load vessels</p>
+          <Button variant="link" size="sm" onClick={() => fetchVessels()}>
+            Try again
+          </Button>
+        </div>
+      )}
+
       <div className="space-y-2 overflow-auto flex-1">
-        {filteredVessels.map((vessel) => (
+        {displayVessels.map((vessel) => (
           <VesselCard
-            key={vessel.name}
+            key={vessel.id}
             name={vessel.name}
             type={vessel.type}
             flag={vessel.flag}
@@ -143,7 +180,7 @@ export function MyFleet({ activeVessel, onVesselSelect, onUploadClick, className
             documentStatus={vessel.documentStatus}
           />
         ))}
-        {filteredVessels.length === 0 && (
+        {!isLoading && !error && displayVessels.length === 0 && (
           <div className="text-center py-4 text-gray-500">No vessels found matching "{searchQuery}"</div>
         )}
       </div>
