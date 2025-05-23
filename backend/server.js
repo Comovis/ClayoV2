@@ -1,5 +1,6 @@
 const express = require("express")
 const cors = require("cors")
+const multer = require("multer")
 require("dotenv").config()
 const { sendUserConfirmationEmail, resendConfirmationEmail } = require("./Emails/EmailAuthLinkService")
 const { createUserWithCompany } = require("./Auth/SignupAuthService")
@@ -16,9 +17,6 @@ const { handleAcceptInvitationRequest } = require("./Team/AcceptInvitation")
 const { handleGetVesselsRequest } = require("./AppFeatures/Vessels/FetchVessels")
 const { handleAddVesselRequest } = require("./AppFeatures/Vessels/AddVessel")
 const { processDocumentShareEmails } = require("./Emails/ShareEmail/SendDocumentShareEmail")
-
-
-
 const { 
   handleCreateDocumentShare, 
   handleGetShareByToken, 
@@ -26,14 +24,29 @@ const {
   handleRevokeDocumentShare, 
   handleLogDocumentAccess 
 } = require("./AppFeatures/DocumentSharing/DocumentSharingService")
+const { 
+  handleDocumentUpload,
+  handleGetDocument,
+  handleGetVesselDocuments,
+  handleUpdateDocument,
+  handleArchiveDocument,
+  handleDocumentDownload,
+  handleCleanupTempFiles,
+} = require("./AppFeatures/DocumentHub/DocumentUploadsHandler")
+
+const { handleBatchDocumentDownload } = require("./AppFeatures/DocumentHub/BatchDownload")
 
 
-
-// Create Express app
 const app = express()
-
-// Dynamic port configuration
 const port = process.env.PORT || 2807
+
+const storage = multer.memoryStorage()
+const upload = multer({ 
+  storage,
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit
+})
+
+
 
 // Basic middleware
 app.use(express.json())
@@ -391,6 +404,98 @@ app.post("/api/document-access-logs", async (req, res) => {
   } catch (error) {
     console.error("Error logging document access:", error)
     res.status(500).json({ error: "Failed to log document access" })
+  }
+})
+
+
+
+
+
+// Document Hub endpoints 
+
+app.post("/api/documents/upload", authenticateUser, upload.single('file'), async (req, res) => {
+  try {
+    await handleDocumentUpload(req, res)
+  } catch (error) {
+    console.error("Error uploading document:", error)
+    res.status(500).json({ error: "Failed to upload document" })
+  }
+})
+
+// Get a document by ID
+app.get("/api/documents/:id", authenticateUser, async (req, res) => {
+  try {
+    await handleGetDocument(req, res)
+  } catch (error) {
+    console.error("Error retrieving document:", error)
+    res.status(500).json({ error: "Failed to retrieve document" })
+  }
+})
+
+// Get all documents for a vessel
+app.get("/api/documents/vessel/:vesselId", authenticateUser, async (req, res) => {
+  try {
+    await handleGetVesselDocuments(req, res)
+  } catch (error) {
+    console.error("Error retrieving vessel documents:", error)
+    res.status(500).json({ error: "Failed to retrieve vessel documents" })
+  }
+})
+
+// Update a document
+app.put("/api/documents/:id", authenticateUser, async (req, res) => {
+  try {
+    await handleUpdateDocument(req, res)
+  } catch (error) {
+    console.error("Error updating document:", error)
+    res.status(500).json({ error: "Failed to update document" })
+  }
+})
+
+// Archive a document (soft delete)
+app.delete("/api/documents/:id", authenticateUser, async (req, res) => {
+  try {
+    await handleArchiveDocument(req, res)
+  } catch (error) {
+    console.error("Error archiving document:", error)
+    res.status(500).json({ error: "Failed to archive document" })
+  }
+})
+
+
+
+
+// Generate a download URL for a document
+app.get("/api/documents/:id/download", authenticateUser, async (req, res) => {
+  try {
+    await handleDocumentDownload(req, res)
+  } catch (error) {
+    console.error("Error generating document download URL:", error)
+    res.status(500).json({ error: "Failed to generate document download URL" })
+  }
+})
+
+app.post("/api/documents/batch-download", authenticateUser, async (req, res) => {
+  try {
+    await handleBatchDocumentDownload(req, res)
+  } catch (error) {
+    console.error("Error generating batch download URLs:", error)
+    res.status(500).json({ 
+      success: false, 
+      error: "Failed to generate batch download URLs" 
+    })
+  }
+})
+
+
+
+// Cleanup temp files (admin only)
+app.post("/api/admin/cleanup-temp-files", authenticateUser, async (req, res) => {
+  try {
+    await handleCleanupTempFiles(req, res)
+  } catch (error) {
+    console.error("Error cleaning up temp files:", error)
+    res.status(500).json({ error: "Failed to clean up temp files" })
   }
 })
 
