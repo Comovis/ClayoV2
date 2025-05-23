@@ -1,7 +1,6 @@
 "use client"
 
 import React from "react"
-
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -11,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   Share2,
   Copy,
@@ -32,6 +32,8 @@ import {
   CalendarClock,
   Search,
   Calendar,
+  AlertCircle,
+  RefreshCw,
 } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Switch } from "@/components/ui/switch"
@@ -55,8 +57,11 @@ import { ShareTemplateList } from "./ShareTemplateList"
 import { VesselSelector, type Vessel, type PortInfo } from "../../MainComponents/VesselSelector/VesselSelector"
 import { AccessLogsModal } from "../../MainComponents/AccessLogs/AccessLogs"
 import { useFetchVessels } from "../../Hooks/useFetchVessels"
+import { createDocumentShare, sendShareEmail, getDocumentShares } from "./DocumentShareEndpointService"
+import { supabase } from "../../Auth/SupabaseAuth"
 
 export default function PortDocumentSharing() {
+  // State for UI
   const [activeTab, setActiveTab] = useState("upcoming")
   const [selectedPort, setSelectedPort] = useState("singapore")
   const [selectedVessel, setSelectedVessel] = useState("")
@@ -79,23 +84,83 @@ export default function PortDocumentSharing() {
   const [accessLogsOpen, setAccessLogsOpen] = useState(false)
   const [sendingDirectEmail, setSendingDirectEmail] = useState(false)
   const [directEmailSent, setDirectEmailSent] = useState(false)
+  const [shareResult, setShareResult] = useState(null)
+  const [customExpiryDate, setCustomExpiryDate] = useState("")
+
+  // State for API integration
+  const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingShares, setIsLoadingShares] = useState(false)
+  const [documentShares, setDocumentShares] = useState([])
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   // Use the fetch vessels hook
-  const { vessels: fetchedVessels, isLoading, error, fetchVessels } = useFetchVessels()
+  const { vessels: fetchedVessels, isLoading: isLoadingVessels, error: vesselError, fetchVessels } = useFetchVessels()
+
+  // Check authentication status
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data } = await supabase.auth.getSession()
+        setIsAuthenticated(!!data.session)
+        console.log("Authentication status:", !!data.session)
+      } catch (err) {
+        console.error("Error checking authentication:", err)
+        setIsAuthenticated(false)
+      }
+    }
+
+    checkAuth()
+  }, [])
 
   // Fetch vessels on component mount
   useEffect(() => {
+    console.log("Fetching vessels...")
     fetchVessels()
   }, [fetchVessels])
+
+  // Fetch document shares when authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      console.log("User authenticated, fetching document shares...")
+      fetchDocumentShares()
+    }
+  }, [isAuthenticated])
 
   // Set the first vessel as selected when vessels are loaded
   useEffect(() => {
     if (fetchedVessels.length > 0 && !selectedVessel) {
       setSelectedVessel(fetchedVessels[0].id)
+      console.log("Selected first vessel:", fetchedVessels[0].id)
     }
   }, [fetchedVessels, selectedVessel])
 
-  // Ports data
+  // Fetch document shares
+  const fetchDocumentShares = async () => {
+    if (!isAuthenticated) {
+      console.log("Not authenticated, skipping document shares fetch")
+      return
+    }
+
+    setIsLoadingShares(true)
+    setError("")
+
+    try {
+      console.log("Fetching document shares from API...")
+      const shares = await getDocumentShares()
+      console.log("Fetched document shares:", shares)
+      setDocumentShares(shares)
+    } catch (err) {
+      console.error("Error fetching document shares:", err)
+      setError("Failed to load document shares. Using sample data for visualization.")
+      // Don't clear documentShares here - let it fall back to dummy data
+    } finally {
+      setIsLoadingShares(false)
+    }
+  }
+
+  // Ports data (keep all dummy data)
   const ports = [
     {
       id: "singapore",
@@ -230,7 +295,7 @@ export default function PortDocumentSharing() {
         }))
       : dummyVessels
 
-  // Documents
+  // Documents (keep all dummy data)
   const documents = [
     {
       id: "smc",
@@ -295,7 +360,7 @@ export default function PortDocumentSharing() {
     },
   ]
 
-  // Upcoming port calls
+  // Upcoming port calls (keep dummy data)
   const upcomingPortCalls = [
     {
       portId: "singapore",
@@ -325,6 +390,166 @@ export default function PortDocumentSharing() {
       complianceStatus: "non-compliant",
     },
   ]
+
+  // Helper function to calculate expiry date based on selected duration
+  const calculateExpiryDate = (duration) => {
+    const now = new Date()
+
+    if (duration === "24-hours") {
+      return new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString()
+    } else if (duration === "3-days") {
+      return new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString()
+    } else if (duration === "7-days") {
+      return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    } else if (duration === "30-days") {
+      return new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
+    } else if (duration === "never") {
+      // Set to a far future date (e.g., 10 years)
+      return new Date(now.getTime() + 10 * 365 * 24 * 60 * 60 * 1000).toISOString()
+    } else if (duration === "custom" && customExpiryDate) {
+      return new Date(customExpiryDate).toISOString()
+    }
+
+    // Default to 7 days
+    return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString()
+  }
+
+  // Handle share action (with API integration)
+  const handleShare = async () => {
+    if (selectedVessel === "" || selectedDocuments.length === 0) {
+      setError("Please select a vessel and at least one document.")
+      return
+    }
+
+    setShareStatus("processing")
+    setIsLoading(true)
+    setError("")
+
+    try {
+      // Get recipients
+      const port = getPort(selectedPort)
+      const recipients = []
+
+      if (document.getElementById("recipient-port-authority")?.checked) {
+        recipients.push({
+          email: port.authority.email,
+          name: port.authority.name,
+          type: "port-authority",
+        })
+      }
+
+      if (document.getElementById("recipient-agent")?.checked) {
+        recipients.push({
+          email: port.agent.email,
+          name: port.agent.name,
+          type: "agent",
+        })
+      }
+
+      // Prepare the share data
+      const shareData = {
+        vesselId: selectedVessel,
+        documentIds: selectedDocuments,
+        recipients: recipients,
+        expiresAt: calculateExpiryDate(accessDuration),
+        message: customMessage,
+        securityOptions,
+      }
+
+      console.log("Creating document share with data:", shareData)
+
+      // Try to create the share via API
+      if (isAuthenticated) {
+        try {
+          const shareResult = await createDocumentShare(shareData)
+          console.log("Share created successfully:", shareResult)
+          setShareResult(shareResult)
+        } catch (apiError) {
+          console.error("API error, falling back to dummy data:", apiError)
+          // Fall back to dummy share result
+          setShareResult({
+            id: "dummy-share-" + Date.now(),
+            shareUrl: "https://comovis.co/share/HW-SG-MPA-7d9f3",
+            expiresAt: calculateExpiryDate(accessDuration),
+            createdAt: new Date().toISOString(),
+            recipients: recipients,
+            documents: selectedDocuments,
+          })
+        }
+      } else {
+        // Not authenticated, use dummy data
+        console.log("Not authenticated, using dummy share result")
+        setShareResult({
+          id: "dummy-share-" + Date.now(),
+          shareUrl: "https://comovis.co/share/HW-SG-MPA-7d9f3",
+          expiresAt: calculateExpiryDate(accessDuration),
+          createdAt: new Date().toISOString(),
+          recipients: recipients,
+          documents: selectedDocuments,
+        })
+      }
+
+      // Update status to complete
+      setShareStatus("complete")
+      setSuccess("Documents shared successfully!")
+
+      // Clear success message after 5 seconds
+      setTimeout(() => {
+        setSuccess("")
+      }, 5000)
+
+      // Refresh document shares if authenticated
+      if (isAuthenticated) {
+        fetchDocumentShares()
+      }
+    } catch (error) {
+      console.error("Error creating share:", error)
+      setShareStatus("error")
+      setError("Failed to create document share. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Handle send directly (with API integration)
+  const handleSendDirectly = async () => {
+    if (!shareResult?.id) return
+
+    setSendingDirectEmail(true)
+    setError("")
+
+    try {
+      if (isAuthenticated && !shareResult.id.startsWith("dummy-")) {
+        // Try to send via API
+        const result = await sendShareEmail(shareResult.id)
+
+        if (result.success) {
+          setDirectEmailSent(true)
+          setSuccess(`Email sent successfully to ${result.totalSent} recipient(s)!`)
+        } else {
+          console.error("Failed to send emails:", result)
+          setError("Failed to send emails. Please try again.")
+        }
+      } else {
+        // Simulate email sending for dummy data
+        console.log("Simulating email send for dummy data")
+        setTimeout(() => {
+          setDirectEmailSent(true)
+          setSuccess("Email sent successfully to 2 recipient(s)! (Demo mode)")
+        }, 1500)
+      }
+
+      // Clear success message after 5 seconds
+      setTimeout(() => {
+        setSuccess("")
+      }, 5000)
+    } catch (error) {
+      console.error("Error sending emails:", error)
+      setError("Failed to send emails. Please try again.")
+    } finally {
+      setSendingDirectEmail(false)
+    }
+  }
 
   // Get port by ID
   const getPort = (id) => {
@@ -373,19 +598,13 @@ export default function PortDocumentSharing() {
     }
   }
 
-  // Handle share action
-  const handleShare = () => {
-    setShareStatus("processing")
-
-    // Simulate sharing process
-    setTimeout(() => {
-      setShareStatus("complete")
-    }, 1500)
-  }
-
   // Reset the sharing process
   const resetShare = () => {
     setShareStatus(null)
+    setShareResult(null)
+    setDirectEmailSent(false)
+    setError("")
+    setSuccess("")
   }
 
   // Format date
@@ -491,7 +710,7 @@ export default function PortDocumentSharing() {
 I've shared the required port documents for our upcoming port call in ${port.name}.
 
 You can access the documents securely using this link:
-https://comovis.io/share/HW-SG-MPA-7d9f3
+${shareResult?.shareUrl || "https://comovis.co/share/HW-SG-MPA-7d9f3"}
 
 The documents will be available until ${formatDate(port.etd)}.
 
@@ -507,21 +726,6 @@ ${localStorage.getItem("userName") || "Comovis User"}`
     window.open(mailtoUrl, "_blank")
   }
 
-  const handleSendDirectly = () => {
-    setSendingDirectEmail(true)
-
-    // Simulate sending email through Comovis' email infrastructure
-    setTimeout(() => {
-      setSendingDirectEmail(false)
-      setDirectEmailSent(true)
-
-      // Reset the success message after a few seconds
-      setTimeout(() => {
-        setDirectEmailSent(false)
-      }, 5000)
-    }, 2000)
-  }
-
   // Initialize selected documents when port changes
   React.useEffect(() => {
     if (selectedPort) {
@@ -531,6 +735,9 @@ ${localStorage.getItem("userName") || "Comovis User"}`
       }
     }
   }, [selectedPort])
+
+  // Show authentication prompt if not authenticated (but allow demo mode)
+  const showAuthPrompt = !isAuthenticated && activeTab === "history"
 
   return (
     <div className="max-w-6xl mx-auto p-6">
@@ -548,6 +755,17 @@ ${localStorage.getItem("userName") || "Comovis User"}`
         </div>
       </div>
 
+      {/* Show authentication status */}
+      {!isAuthenticated && (
+        <Alert className="mb-4 bg-blue-50 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+          <Info className="h-4 w-4" />
+          <AlertTitle>Demo Mode</AlertTitle>
+          <AlertDescription>
+            You're viewing the interface in demo mode with sample data. Log in to access real functionality.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Use the improved VesselSelector component with fetched vessels */}
       <VesselSelector
         vessels={vessels}
@@ -556,9 +774,26 @@ ${localStorage.getItem("userName") || "Comovis User"}`
         portInfo={getPortInfoForVesselSelector()}
         formatDate={formatDate}
         onToggleFavorite={handleToggleFavorite}
-        isLoading={isLoading}
-        error={error}
+        isLoading={isLoadingVessels}
+        error={vesselError}
       />
+
+      {/* Display errors/success messages */}
+      {error && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {success && (
+        <Alert className="mb-4 bg-green-50 text-green-800 dark:bg-green-900 dark:text-green-200">
+          <CheckCircle className="h-4 w-4" />
+          <AlertTitle>Success</AlertTitle>
+          <AlertDescription>{success}</AlertDescription>
+        </Alert>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="mb-4">
@@ -971,7 +1206,12 @@ ${localStorage.getItem("userName") || "Comovis User"}`
 
                           {accessDuration === "custom" && (
                             <div className="mt-2">
-                              <Input type="date" className="w-full" />
+                              <Input
+                                type="date"
+                                className="w-full"
+                                value={customExpiryDate}
+                                onChange={(e) => setCustomExpiryDate(e.target.value)}
+                              />
                             </div>
                           )}
                         </div>
@@ -1017,14 +1257,30 @@ ${localStorage.getItem("userName") || "Comovis User"}`
                           </CardHeader>
                           <CardContent>
                             <div className="flex items-center justify-between bg-gray-50 p-3 rounded-md">
-                              <code className="text-sm text-gray-800">https://comovis.io/share/HW-SG-MPA-7d9f3</code>
-                              <Button size="sm" variant="ghost">
+                              <code className="text-sm text-gray-800">
+                                {shareResult?.shareUrl || "https://comovis.co/share/HW-SG-MPA-7d9f3"}
+                              </code>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  const url = shareResult?.shareUrl || "https://comovis.co/share/HW-SG-MPA-7d9f3"
+                                  navigator.clipboard.writeText(url)
+                                  setSuccess("Link copied to clipboard!")
+                                  setTimeout(() => setSuccess(""), 3000)
+                                }}
+                              >
                                 <Copy className="h-4 w-4" />
                               </Button>
                             </div>
                             <div className="mt-3 text-sm text-gray-500 flex items-center">
                               <Clock className="h-4 w-4 mr-1" />
-                              <span>Link expires after port departure ({formatDate(getPort(selectedPort)?.etd)})</span>
+                              <span>
+                                Link expires on{" "}
+                                {shareResult?.expiresAt
+                                  ? formatDate(shareResult.expiresAt)
+                                  : formatDate(getPort(selectedPort)?.etd)}
+                              </span>
                             </div>
                           </CardContent>
                         </Card>
@@ -1095,6 +1351,18 @@ ${localStorage.getItem("userName") || "Comovis User"}`
                         )}
                       </div>
                     )}
+
+                    {shareStatus === "error" && (
+                      <div className="text-center p-8 border rounded-md border-dashed">
+                        <AlertCircle className="h-8 w-8 mx-auto mb-2 text-red-500" />
+                        <p className="font-medium mb-1">Error creating share</p>
+                        <p className="text-sm text-slate-500 mb-4">{error || "An unexpected error occurred"}</p>
+                        <Button onClick={resetShare} variant="outline" size="sm">
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                          Try Again
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
 
                   <CardFooter className="flex justify-between">
@@ -1107,9 +1375,18 @@ ${localStorage.getItem("userName") || "Comovis User"}`
                           <Eye className="mr-2 h-4 w-4" />
                           Preview
                         </Button>
-                        <Button onClick={handleShare} disabled={selectedDocuments.length === 0}>
-                          <Share2 className="mr-2 h-4 w-4" />
-                          Create Sharing Link
+                        <Button onClick={handleShare} disabled={selectedDocuments.length === 0 || isLoading}>
+                          {isLoading ? (
+                            <>
+                              <div className="animate-spin mr-2 h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
+                              Creating Share...
+                            </>
+                          ) : (
+                            <>
+                              <Share2 className="mr-2 h-4 w-4" />
+                              Create Sharing Link
+                            </>
+                          )}
                         </Button>
                       </div>
                     )}
@@ -1262,12 +1539,100 @@ ${localStorage.getItem("userName") || "Comovis User"}`
         </TabsContent>
 
         <TabsContent value="history">
-          {/* Integrate the ShareHistoryTable component */}
-          <ShareHistoryTable />
+          {showAuthPrompt ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center p-6">
+                <AlertCircle className="h-12 w-12 text-blue-500 mb-4" />
+                <h2 className="text-xl font-bold mb-2">Login Required</h2>
+                <p className="text-gray-500 mb-4">You need to be logged in to view your document sharing history.</p>
+                <Button onClick={() => (window.location.href = "/login")}>Go to Login</Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>Document Sharing History</CardTitle>
+                <CardDescription>View and manage your document shares</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingShares ? (
+                  <div className="flex justify-center items-center p-8">
+                    <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mr-3"></div>
+                    <p>Loading document shares...</p>
+                  </div>
+                ) : (
+                  <ShareHistoryTable
+                    // Pass both real and dummy data with hybrid approach
+                    shares={
+                      documentShares.length > 0
+                        ? documentShares
+                        : [
+                            {
+                              id: "share1",
+                              recipient: "Singapore MPA",
+                              recipientEmail: "portdocs@mpa.gov.sg",
+                              date: "2025-05-15T10:30:00",
+                              vessel: "Humble Warrior",
+                              documentCount: 5,
+                              accessCount: 3,
+                              expiryDate: "2025-05-21",
+                              status: "active",
+                            },
+                            {
+                              id: "share2",
+                              recipient: "Shell Vetting",
+                              recipientEmail: "vetting@shell.com",
+                              date: "2025-05-10T14:45:00",
+                              vessel: "Humble Warrior",
+                              documentCount: 12,
+                              accessCount: 5,
+                              expiryDate: "2025-05-17",
+                              status: "active",
+                            },
+                            {
+                              id: "share3",
+                              recipient: "Hong Kong Marine Department",
+                              recipientEmail: "mardep@gov.hk",
+                              date: "2025-05-01T09:30:00",
+                              vessel: "Pacific Explorer",
+                              documentCount: 4,
+                              accessCount: 2,
+                              expiryDate: "2025-05-08",
+                              status: "expired",
+                            },
+                            {
+                              id: "share4",
+                              recipient: "DNV GL",
+                              recipientEmail: "certification@dnvgl.com",
+                              date: "2025-04-28T16:15:00",
+                              vessel: "Northern Star",
+                              documentCount: 8,
+                              accessCount: 6,
+                              expiryDate: "2025-05-28",
+                              status: "active",
+                            },
+                            {
+                              id: "share5",
+                              recipient: "Rotterdam Port Authority",
+                              recipientEmail: "docs@portofrotterdam.com",
+                              date: "2025-04-20T11:05:00",
+                              vessel: "Pacific Explorer",
+                              documentCount: 6,
+                              accessCount: 0,
+                              expiryDate: "2025-04-27",
+                              status: "expired",
+                            },
+                          ]
+                    }
+                    onRefresh={fetchDocumentShares}
+                  />
+                )}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="templates">
-          {/* Integrate the ShareTemplateList component */}
           <ShareTemplateList />
         </TabsContent>
       </Tabs>

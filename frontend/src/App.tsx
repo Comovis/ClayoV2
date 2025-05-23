@@ -15,14 +15,14 @@ import PortPreparation from "./MainPages/PortPrep/PortPrep"
 import DocumentSharing from "./MainPages/DocumentSharing/DocumentSharing"
 import PricingPage from "./MainPages/Pricing/PricingPage"
 import NotificationsPage from "./MainPages/Notifications/Notifications"
-import TeamPage from "./MainPages/TeamManagement/TeamManagement" // Import the TeamPage component
+import TeamPage from "./MainPages/TeamManagement/TeamManagement"
 import OnboardingPage from "./Auth/Onboarding/OnboardingPage"
 import LandingPage from "./MainPages/LandingPage/LandingPage"
-import DocumentSharingRecipientView from "./MainPages/SharePage/DocumentSharingRecipientView"
+import DocumentSharingRecipientView from "./MainPages/DocumentSharing/RecipientSharePage/DocumentSharingRecipientView"
+import ExpiredShareView from "./MainPages/DocumentSharing/RecipientSharePage/ExpiredShareView"
 import SignupPage from "./Auth/Signup/SignupPage"
 import LoginPage from "./Auth/Login/LoginPage"
 import EmailVerificationPage from "./Auth/Signup/ConfirmEmail"
-
 import InvitationAccept from "./Auth/Signup/InvitationAccept"
 import UnauthorizedMessage from "./Auth/UnauthorisedMsg"
 import { UserProvider } from "./Auth/Contexts/UserContext"
@@ -53,6 +53,9 @@ function AppContent() {
     location.pathname === "/email-confirmed" ||
     location.pathname === "/accept-invite"
 
+  // Check if it's a share page (public document sharing)
+  const isSharePage = location.pathname.startsWith("/share/")
+
   // Define all known paths in the application
   const knownPaths = useMemo(
     () => [
@@ -69,15 +72,14 @@ function AppContent() {
       "/port-preparation",
       "/document-sharing",
       "/pricing",
-      "/team", // Add team path to known paths
+      "/team",
       "/notifications",
-      "/share",
     ],
     [],
   )
 
-  // Check if current path is a known path
-  const isKnownPath = knownPaths.includes(location.pathname)
+  // Check if current path is a known path or a share path
+  const isKnownPath = knownPaths.includes(location.pathname) || isSharePage
 
   // If path is unknown, we should hide navbar, sidebar, and footer
   const isUnknownPath = !isKnownPath
@@ -97,14 +99,14 @@ function AppContent() {
 
   return (
     <div className="flex h-screen">
-      {/* Only show sidebar on known paths that are not landing pages or auth pages */}
-      {!isLandingPage && !isAuthPage && !isUnknownPath && <Sidebar />}
+      {/* Only show sidebar on known paths that are not landing pages, auth pages, or share pages */}
+      {!isLandingPage && !isAuthPage && !isUnknownPath && !isSharePage && <Sidebar />}
 
       <div className="flex flex-col flex-1">
         {/* Conditionally render the appropriate header */}
         {isLandingPage ? (
           <LandingHeader user={user} logout={handleLogout} />
-        ) : isAuthPage || isUnknownPath ? // No header on auth pages or unknown paths
+        ) : isAuthPage || isUnknownPath || isSharePage ? // No header on auth pages, unknown paths, or share pages
         null : (
           <AppHeader
             activeTab={activeTab}
@@ -123,6 +125,10 @@ function AppContent() {
           <Routes>
             {/* Public routes */}
             <Route path="/" element={<LandingPage />} />
+
+            {/* Public document sharing routes - no authentication required */}
+            <Route path="/share/:token" element={<DocumentSharingRecipientView />} />
+            <Route path="/share/expired/:token" element={<ExpiredShareView />} />
 
             {/* Auth pages with redirect for authenticated users */}
             <Route
@@ -203,7 +209,6 @@ function AppContent() {
                 </ProtectedRoute>
               }
             />
-            {/* Add Team Management route */}
             <Route
               path="/team"
               element={
@@ -220,20 +225,14 @@ function AppContent() {
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/share"
-              element={
-                <ProtectedRoute>
-                  <DocumentSharingRecipientView />
-                </ProtectedRoute>
-              }
-            />
+
             {/* Catch-all route for unauthorized access */}
             <Route path="*" element={<UnauthorizedMessage />} />
           </Routes>
         </div>
-        {/* Only show footer on known paths that are not auth pages */}
-        {!isAuthPage && !isUnknownPath && <Footer />}
+
+        {/* Only show footer on known paths that are not auth pages or share pages */}
+        {!isAuthPage && !isUnknownPath && !isSharePage && <Footer />}
       </div>
     </div>
   )

@@ -17,6 +17,18 @@ const { handleGetVesselsRequest } = require("./AppFeatures/Vessels/FetchVessels"
 const { handleAddVesselRequest } = require("./AppFeatures/Vessels/AddVessel")
 const { processDocumentShareEmails } = require("./Emails/ShareEmail/SendDocumentShareEmail")
 
+
+
+const { 
+  handleCreateDocumentShare, 
+  handleGetShareByToken, 
+  handleGetDocumentShares, 
+  handleRevokeDocumentShare, 
+  handleLogDocumentAccess 
+} = require("./AppFeatures/DocumentSharing/DocumentSharingService")
+
+
+
 // Create Express app
 const app = express()
 
@@ -336,9 +348,51 @@ app.post("/send-document-share-email", authenticateUser, async (req, res) => {
 })
 
 
+// Document Sharing Endpoints
+app.post("/api/document-shares", authenticateUser, async (req, res) => {
+  try {
+    await handleCreateDocumentShare(req, res)
+  } catch (error) {
+    console.error("Error creating document share:", error)
+    res.status(500).json({ error: "Failed to create document share" })
+  }
+})
 
+app.get("/api/document-shares/:token", async (req, res) => {
+  try {
+    await handleGetShareByToken(req, res)
+  } catch (error) {
+    console.error("Error fetching document share:", error)
+    res.status(500).json({ error: "Failed to fetch document share" })
+  }
+})
 
+app.get("/api/document-shares", authenticateUser, async (req, res) => {
+  try {
+    await handleGetDocumentShares(req, res)
+  } catch (error) {
+    console.error("Error fetching document shares:", error)
+    res.status(500).json({ error: "Failed to fetch document shares" })
+  }
+})
 
+app.post("/api/document-shares/:id/revoke", authenticateUser, async (req, res) => {
+  try {
+    await handleRevokeDocumentShare(req, res)
+  } catch (error) {
+    console.error("Error revoking document share:", error)
+    res.status(500).json({ error: "Failed to revoke document share" })
+  }
+})
+
+app.post("/api/document-access-logs", async (req, res) => {
+  try {
+    await handleLogDocumentAccess(req, res)
+  } catch (error) {
+    console.error("Error logging document access:", error)
+    res.status(500).json({ error: "Failed to log document access" })
+  }
+})
 
 
 

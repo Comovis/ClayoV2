@@ -2,9 +2,10 @@ const { render } = require("@react-email/render")
 const React = require("react")
 const DocumentShareEmail = require("./DocumentShareEmail")
 const { Resend } = require("resend")
-const { supabase } = require("../lib/supabaseClient")
+const { supabase } = require("../../SupabaseClient")
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+// Hardcoded Resend API key (same as in SendInviteEmail.js)
+const resend = new Resend("re_fZygLEii_AHipNeWqXfWbtejMrVFLW7yG")
 
 /**
  * Sends a document share email to a recipient

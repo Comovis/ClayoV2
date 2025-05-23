@@ -1,6 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import type React from "react"
+
+import { useState, useEffect } from "react"
+import { useParams } from "react-router-dom"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -14,136 +17,97 @@ import {
   Clock,
   Info,
   Shield,
-  ExternalLink,
   ChevronLeft,
   ChevronRight,
   Printer,
   Search,
   CheckCircle,
   Mail,
+  Loader2,
+  AlertTriangle,
 } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { fetchShareByToken, logDocumentAccess } from "../DocumentShareEndpointService"
+import ExpiredShareView from "./ExpiredShareView"
 
 export default function DocumentSharingRecipientView() {
+  const { token } = useParams<{ token: string }>()
   const [currentDocumentIndex, setCurrentDocumentIndex] = useState(0)
   const [searchQuery, setSearchQuery] = useState("")
   const [emailInput, setEmailInput] = useState("")
-  const [isEmailVerificationRequired, setIsEmailVerificationRequired] = useState(true)
+  const [isEmailVerificationRequired, setIsEmailVerificationRequired] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [activeTab, setActiveTab] = useState("documents")
   const [fullScreenPreview, setFullScreenPreview] = useState(false)
   const [emailError, setEmailError] = useState("")
+  const [shareInfo, setShareInfo] = useState<any>(null)
+  const [documents, setDocuments] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [isExpired, setIsExpired] = useState(false)
 
-  // Mock data for the shared documents
-  const shareInfo = {
-    id: "HW-SG-MPA-7d9f3",
-    vessel: {
-      name: "Humble Warrior",
-      type: "Crude Oil Tanker",
-      flag: "Panama",
-      imo: "9123456",
-      callsign: "3FVR8",
-    },
-    port: {
-      name: "Singapore",
-      country: "Singapore",
-      eta: "2025-05-20T08:00:00",
-      etd: "2025-05-22T16:00:00",
-    },
-    sender: {
-      name: "Maria Rodriguez",
-      company: "Global Shipping Inc.",
-      role: "Operations Manager",
-      email: "m.rodriguez@globalshipping.com",
-    },
-    recipients: [
-      { email: "portdocs@mpa.gov.sg", name: "Singapore MPA" },
-      { email: "ops@sgmaritime.com", name: "Singapore Maritime Services" },
-    ],
-    sharedAt: "2025-05-17T14:30:00",
-    expiresAt: "2025-05-24T14:30:00",
-    message:
-      "Here are the required documents for our upcoming port call in Singapore. Please let me know if you need any additional information.",
-    security: {
-      watermarked: true,
-      preventDownloads: false,
-      accessTracking: true,
-      emailVerification: true,
-    },
-  }
+  // Fetch share data on component mount
+  useEffect(() => {
+    async function fetchShareData() {
+      if (!token) {
+        setError("No share token provided")
+        setIsLoading(false)
+        return
+      }
 
-  const documents = [
-    {
-      id: "smc-1",
-      name: "Safety Management Certificate",
-      issuer: "Panama Maritime Authority",
-      issueDate: "2023-01-15",
-      expiryDate: "2023-11-15",
-      status: "valid",
-      pages: 4,
-      fileType: "pdf",
-      fileSize: "1.2 MB",
-    },
-    {
-      id: "iopp-1",
-      name: "International Oil Pollution Prevention Certificate",
-      issuer: "DNV GL",
-      issueDate: "2023-02-10",
-      expiryDate: "2023-12-10",
-      status: "valid",
-      pages: 6,
-      fileType: "pdf",
-      fileSize: "1.8 MB",
-    },
-    {
-      id: "registry-1",
-      name: "Certificate of Registry",
-      issuer: "Panama Maritime Authority",
-      issueDate: "2022-05-20",
-      expiryDate: "2024-05-20",
-      status: "valid",
-      pages: 2,
-      fileType: "pdf",
-      fileSize: "0.9 MB",
-    },
-    {
-      id: "crew-list-1",
-      name: "Crew List",
-      issuer: "Global Shipping Inc.",
-      issueDate: "2023-05-10",
-      expiryDate: "N/A",
-      status: "valid",
-      pages: 3,
-      fileType: "pdf",
-      fileSize: "0.7 MB",
-    },
-    {
-      id: "loadline-1",
-      name: "International Load Line Certificate",
-      issuer: "DNV GL",
-      issueDate: "2022-06-15",
-      expiryDate: "2024-06-15",
-      status: "valid",
-      pages: 5,
-      fileType: "pdf",
-      fileSize: "1.5 MB",
-    },
-  ]
+      try {
+        setIsLoading(true)
+        const data = await fetchShareByToken(token)
+
+        if (data.notFound) {
+          setError("Share not found")
+          return
+        }
+
+        if (data.expired) {
+          setIsExpired(true)
+          setShareInfo(data.shareInfo)
+          return
+        }
+
+        setShareInfo(data)
+        setDocuments(data.documents || [])
+        setIsEmailVerificationRequired(data.security?.emailVerification || false)
+
+        // If email verification is not required, mark as authenticated
+        if (!data.security?.emailVerification) {
+          setIsAuthenticated(true)
+        }
+
+        // Log access
+        if (data.id) {
+          logDocumentAccess(data.id, null, "view_share")
+        }
+      } catch (err) {
+        console.error("Error fetching share data:", err)
+        setError("Failed to load share data")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchShareData()
+  }, [token])
 
   // Filter documents based on search query
   const filteredDocuments = documents.filter(
     (doc) =>
-      doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.issuer.toLowerCase().includes(searchQuery.toLowerCase()),
+      doc.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      doc.issuer?.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
   const currentDocument = filteredDocuments[currentDocumentIndex]
 
   // Format date
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleDateString("en-US", {
       year: "numeric",
@@ -153,7 +117,7 @@ export default function DocumentSharingRecipientView() {
   }
 
   // Calculate days until expiration
-  const calculateDaysUntil = (dateString) => {
+  const calculateDaysUntil = (dateString: string) => {
     const targetDate = new Date(dateString)
     const today = new Date()
     const diffTime = targetDate.getTime() - today.getTime()
@@ -162,13 +126,11 @@ export default function DocumentSharingRecipientView() {
   }
 
   // Handle email verification submission
-  const handleEmailVerification = (e) => {
+  const handleEmailVerification = (e: React.FormEvent) => {
     e.preventDefault()
-    // Clear any previous errors
     setEmailError("")
 
-    // In a real app, you would validate the email against the list of intended recipients
-    if (shareInfo.recipients.some((recipient) => recipient.email.toLowerCase() === emailInput.toLowerCase())) {
+    if (shareInfo?.recipients?.some((recipient: any) => recipient.email.toLowerCase() === emailInput.toLowerCase())) {
       setIsAuthenticated(true)
     } else {
       setEmailError("Email not recognized. Please enter an email address that was authorized to view these documents.")
@@ -185,7 +147,57 @@ export default function DocumentSharingRecipientView() {
     setCurrentDocumentIndex((prev) => (prev === filteredDocuments.length - 1 ? 0 : prev + 1))
   }
 
-  // If email verification is required and not authenticated, show email verification screen
+  // Track document view
+  const trackDocumentView = (documentId: string) => {
+    if (!shareInfo?.id || !documentId) return
+    logDocumentAccess(shareInfo.id, documentId, "view_document", emailInput)
+  }
+
+  // Track document download
+  const trackDocumentDownload = (documentId: string) => {
+    if (!shareInfo?.id || !documentId) return
+    logDocumentAccess(shareInfo.id, documentId, "download", emailInput)
+  }
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex flex-col items-center">
+          <Loader2 className="h-12 w-12 text-blue-500 animate-spin mb-4" />
+          <h2 className="text-xl font-semibold">Loading secure documents...</h2>
+          <p className="text-gray-500 mt-2">Please wait while we verify your access.</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4 w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+              <AlertTriangle className="h-8 w-8 text-red-600" />
+            </div>
+            <CardTitle>Document Share Not Found</CardTitle>
+            <CardDescription>The secure link you're trying to access is invalid or has been removed.</CardDescription>
+          </CardHeader>
+          <CardFooter className="flex justify-center">
+            <Button onClick={() => (window.location.href = "https://comovis.co")}>Go to Comovis</Button>
+          </CardFooter>
+        </Card>
+      </div>
+    )
+  }
+
+  // Expired state
+  if (isExpired) {
+    return <ExpiredShareView shareInfo={shareInfo} />
+  }
+
+  // Email verification screen
   if (isEmailVerificationRequired && !isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -207,12 +219,12 @@ export default function DocumentSharingRecipientView() {
                     <div>
                       <p className="text-sm font-medium">Shared by:</p>
                       <p className="text-sm text-gray-500">
-                        {shareInfo.sender.name} ({shareInfo.sender.company})
+                        {shareInfo?.sender?.name} ({shareInfo?.sender?.company})
                       </p>
                     </div>
                     <div>
                       <p className="text-sm font-medium">Vessel:</p>
-                      <p className="text-sm text-gray-500">{shareInfo.vessel.name}</p>
+                      <p className="text-sm text-gray-500">{shareInfo?.vessel?.name}</p>
                     </div>
                   </div>
                 </div>
@@ -246,7 +258,8 @@ export default function DocumentSharingRecipientView() {
           </CardContent>
           <CardFooter className="flex flex-col items-center text-center">
             <p className="text-xs text-gray-500 mt-2">
-              If you're having trouble accessing these documents, please contact the sender at {shareInfo.sender.email}
+              If you're having trouble accessing these documents, please contact the sender at{" "}
+              {shareInfo?.sender?.email}
             </p>
           </CardFooter>
         </Card>
@@ -258,18 +271,18 @@ export default function DocumentSharingRecipientView() {
     <div className="min-h-screen bg-gray-50">
       {/* Main Content */}
       <main className="max-w-6xl mx-auto p-6">
-        {/* Top Action Bar - Moved from header */}
+        {/* Top Action Bar */}
         <div className="flex justify-between items-center mb-6 bg-white p-4 rounded-lg shadow-sm">
           <div className="flex items-center">
             <Badge variant="outline" className="mr-2">
               Secure Document Share
             </Badge>
             <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-              Expires in {calculateDaysUntil(shareInfo.expiresAt)} days
+              Expires in {calculateDaysUntil(shareInfo?.expiresAt)} days
             </Badge>
           </div>
           <div className="flex items-center space-x-2">
-            {!shareInfo.security.preventDownloads && (
+            {!shareInfo?.security?.preventDownloads && (
               <Button variant="outline" size="sm">
                 <Download className="mr-2 h-4 w-4" />
                 Download All
@@ -293,26 +306,26 @@ export default function DocumentSharingRecipientView() {
                   <div className="flex items-center mb-3">
                     <Avatar className="h-10 w-10 mr-3">
                       <AvatarFallback className="bg-blue-100 text-blue-600">
-                        {shareInfo.vessel.name.charAt(0)}
+                        {shareInfo?.vessel?.name?.charAt(0) || "V"}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <h4 className="font-medium">{shareInfo.vessel.name}</h4>
-                      <p className="text-sm text-gray-500">{shareInfo.vessel.type}</p>
+                      <h4 className="font-medium">{shareInfo?.vessel?.name || "Unknown Vessel"}</h4>
+                      <p className="text-sm text-gray-500">{shareInfo?.vessel?.type || "Unknown Type"}</p>
                     </div>
                   </div>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-500">IMO Number:</span>
-                      <span>{shareInfo.vessel.imo}</span>
+                      <span>{shareInfo?.vessel?.imo || "N/A"}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">Flag:</span>
-                      <span>{shareInfo.vessel.flag}</span>
+                      <span>{shareInfo?.vessel?.flag || "N/A"}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">Call Sign:</span>
-                      <span>{shareInfo.vessel.callsign}</span>
+                      <span>{shareInfo?.vessel?.callsign || "N/A"}</span>
                     </div>
                   </div>
                 </div>
@@ -324,29 +337,28 @@ export default function DocumentSharingRecipientView() {
                 <div className="bg-gray-50 p-4 rounded-md">
                   <div className="flex items-center mb-3">
                     <div className="h-10 w-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mr-3">
-                      {shareInfo.port.name.charAt(0)}
+                      {shareInfo?.port?.name?.charAt(0) || "P"}
                     </div>
                     <div>
-                      <h4 className="font-medium">{shareInfo.port.name}</h4>
-                      <p className="text-sm text-gray-500">{shareInfo.port.country}</p>
+                      <h4 className="font-medium">{shareInfo?.port?.name || "Unknown Port"}</h4>
+                      <p className="text-sm text-gray-500">{shareInfo?.port?.country || "Unknown Country"}</p>
                     </div>
                   </div>
                   <div className="space-y-2 text-sm">
-                    <div className="flex items-center">
-                      <Calendar className="h-4 w-4 text-gray-500 mr-2" />
-                      <span className="text-gray-500 mr-1">ETA:</span>
-                      <span>{formatDate(shareInfo.port.eta)}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Calendar className="h-4 w-4 text-gray-500 mr-2" />
-                      <span className="text-gray-500 mr-1">ETD:</span>
-                      <span>{formatDate(shareInfo.port.etd)}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Clock className="h-4 w-4 text-gray-500 mr-2" />
-                      <span className="text-gray-500 mr-1">Port Stay:</span>
-                      <span>2 days</span>
-                    </div>
+                    {shareInfo?.port?.eta && (
+                      <div className="flex items-center">
+                        <Calendar className="h-4 w-4 text-gray-500 mr-2" />
+                        <span className="text-gray-500 mr-1">ETA:</span>
+                        <span>{formatDate(shareInfo.port.eta)}</span>
+                      </div>
+                    )}
+                    {shareInfo?.port?.etd && (
+                      <div className="flex items-center">
+                        <Calendar className="h-4 w-4 text-gray-500 mr-2" />
+                        <span className="text-gray-500 mr-1">ETD:</span>
+                        <span>{formatDate(shareInfo.port.etd)}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -358,35 +370,35 @@ export default function DocumentSharingRecipientView() {
                   <div className="flex items-center mb-3">
                     <Avatar className="h-10 w-10 mr-3">
                       <AvatarFallback className="bg-green-100 text-green-600">
-                        {shareInfo.sender.name.charAt(0)}
+                        {shareInfo?.sender?.name?.charAt(0) || "S"}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <h4 className="font-medium">{shareInfo.sender.name}</h4>
-                      <p className="text-sm text-gray-500">{shareInfo.sender.company}</p>
+                      <h4 className="font-medium">{shareInfo?.sender?.name || "Unknown Sender"}</h4>
+                      <p className="text-sm text-gray-500">{shareInfo?.sender?.company || "Unknown Company"}</p>
                     </div>
                   </div>
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center">
                       <Clock className="h-4 w-4 text-gray-500 mr-2" />
                       <span className="text-gray-500 mr-1">Shared:</span>
-                      <span>{formatDate(shareInfo.sharedAt)}</span>
+                      <span>{formatDate(shareInfo?.sharedAt)}</span>
                     </div>
                     <div className="flex items-center">
                       <Clock className="h-4 w-4 text-gray-500 mr-2" />
                       <span className="text-gray-500 mr-1">Expires:</span>
-                      <span>{formatDate(shareInfo.expiresAt)}</span>
+                      <span>{formatDate(shareInfo?.expiresAt)}</span>
                     </div>
                     <div className="flex items-center">
                       <Shield className="h-4 w-4 text-gray-500 mr-2" />
                       <span className="text-gray-500 mr-1">Security:</span>
                       <div className="flex space-x-1">
-                        {shareInfo.security.watermarked && (
+                        {shareInfo?.security?.watermarked && (
                           <Badge variant="outline" className="text-xs">
                             Watermarked
                           </Badge>
                         )}
-                        {shareInfo.security.preventDownloads && (
+                        {shareInfo?.security?.preventDownloads && (
                           <Badge variant="outline" className="text-xs">
                             View Only
                           </Badge>
@@ -399,7 +411,7 @@ export default function DocumentSharingRecipientView() {
             </div>
 
             {/* Custom Message */}
-            {shareInfo.message && (
+            {shareInfo?.message && (
               <div className="mt-6">
                 <h3 className="text-sm font-medium text-gray-500 mb-2">Message from Sender</h3>
                 <div className="bg-blue-50 border border-blue-100 rounded-md p-4 text-sm">
@@ -418,7 +430,7 @@ export default function DocumentSharingRecipientView() {
               <CardHeader>
                 <CardTitle className="text-lg">Shared Documents</CardTitle>
                 <CardDescription>
-                  {documents.length} documents shared for {shareInfo.port.name} port call
+                  {documents.length} documents shared for {shareInfo?.port?.name || "port call"}
                 </CardDescription>
                 <div className="relative mt-2">
                   <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
@@ -439,7 +451,10 @@ export default function DocumentSharingRecipientView() {
                         className={`flex items-center justify-between p-3 cursor-pointer hover:bg-gray-50 ${
                           index === currentDocumentIndex ? "bg-blue-50 border-l-4 border-l-blue-500" : ""
                         }`}
-                        onClick={() => setCurrentDocumentIndex(index)}
+                        onClick={() => {
+                          setCurrentDocumentIndex(index)
+                          trackDocumentView(doc.id)
+                        }}
                       >
                         <div className="flex items-center">
                           <FileText
@@ -452,7 +467,7 @@ export default function DocumentSharingRecipientView() {
                         </div>
                         <div className="flex items-center">
                           <Badge variant="outline" className="text-xs">
-                            {doc.fileType.toUpperCase()}
+                            {doc.fileType?.toUpperCase() || "PDF"}
                           </Badge>
                         </div>
                       </div>
@@ -469,16 +484,17 @@ export default function DocumentSharingRecipientView() {
               <CardHeader className="pb-2 flex-shrink-0">
                 <div className="flex justify-between items-center">
                   <div>
-                    <CardTitle>{currentDocument?.name}</CardTitle>
+                    <CardTitle>{currentDocument?.name || "Select a document"}</CardTitle>
                     <CardDescription>
-                      {currentDocument?.issuer} • {currentDocument?.pages} pages • {currentDocument?.fileSize}
+                      {currentDocument?.issuer} • {currentDocument?.pages || 1} pages •{" "}
+                      {currentDocument?.fileSize || "Unknown size"}
                     </CardDescription>
                   </div>
                   <div className="flex space-x-2">
-                    <Button variant="outline" size="sm" onClick={prevDocument}>
+                    <Button variant="outline" size="sm" onClick={prevDocument} disabled={filteredDocuments.length <= 1}>
                       <ChevronLeft className="h-4 w-4" />
                     </Button>
-                    <Button variant="outline" size="sm" onClick={nextDocument}>
+                    <Button variant="outline" size="sm" onClick={nextDocument} disabled={filteredDocuments.length <= 1}>
                       <ChevronRight className="h-4 w-4" />
                     </Button>
                   </div>
@@ -497,9 +513,9 @@ export default function DocumentSharingRecipientView() {
                     <TabsContent value="preview" className="flex-grow m-0 p-4">
                       <div className="bg-gray-100 rounded-md h-full flex flex-col items-center justify-center relative">
                         {/* Document Watermark */}
-                        {shareInfo.security.watermarked && (
+                        {shareInfo?.security?.watermarked && (
                           <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none rotate-[-30deg] text-gray-500 text-2xl font-bold">
-                            CONFIDENTIAL - {shareInfo.vessel.name} - {new Date().toLocaleDateString()}
+                            CONFIDENTIAL - {shareInfo?.vessel?.name} - {new Date().toLocaleDateString()}
                           </div>
                         )}
 
@@ -510,14 +526,14 @@ export default function DocumentSharingRecipientView() {
                           </div>
                           <div className="flex-grow p-6 flex flex-col items-center justify-center">
                             <img
-                              src="/placeholder-hcf21.png"
+                              src="/placeholder.svg?height=400&width=300&text=Document+Preview"
                               alt="Document preview"
                               className="max-h-full object-contain"
                             />
                           </div>
                           <div className="bg-gray-50 p-2 border-t flex justify-between items-center text-xs text-gray-500">
-                            <span>Page 1 of {currentDocument?.pages}</span>
-                            <span>Valid until: {currentDocument?.expiryDate}</span>
+                            <span>Page 1 of {currentDocument?.pages || 1}</span>
+                            <span>Valid until: {currentDocument?.expiryDate || "N/A"}</span>
                           </div>
                         </div>
 
@@ -526,8 +542,15 @@ export default function DocumentSharingRecipientView() {
                             <Eye className="mr-2 h-4 w-4" />
                             Full Screen
                           </Button>
-                          {!shareInfo.security.preventDownloads && (
-                            <Button size="sm">
+                          {!shareInfo?.security?.preventDownloads && (
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                if (currentDocument?.id) {
+                                  trackDocumentDownload(currentDocument.id)
+                                }
+                              }}
+                            >
                               <Download className="mr-2 h-4 w-4" />
                               Download
                             </Button>
@@ -551,7 +574,7 @@ export default function DocumentSharingRecipientView() {
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                               <div className="text-sm text-gray-500">Issue Date:</div>
-                              <div className="text-sm">{currentDocument?.issueDate}</div>
+                              <div className="text-sm">{currentDocument?.issueDate || "N/A"}</div>
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                               <div className="text-sm text-gray-500">Expiry Date:</div>
@@ -560,7 +583,7 @@ export default function DocumentSharingRecipientView() {
                                   "Not Applicable"
                                 ) : (
                                   <div className="flex items-center">
-                                    {currentDocument?.expiryDate}
+                                    {currentDocument?.expiryDate || "N/A"}
                                     {currentDocument?.status === "valid" && (
                                       <CheckCircle className="h-3.5 w-3.5 ml-1 text-green-500" />
                                     )}
@@ -570,11 +593,11 @@ export default function DocumentSharingRecipientView() {
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                               <div className="text-sm text-gray-500">File Type:</div>
-                              <div className="text-sm">{currentDocument?.fileType.toUpperCase()}</div>
+                              <div className="text-sm">{currentDocument?.fileType?.toUpperCase() || "PDF"}</div>
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                               <div className="text-sm text-gray-500">File Size:</div>
-                              <div className="text-sm">{currentDocument?.fileSize}</div>
+                              <div className="text-sm">{currentDocument?.fileSize || "Unknown"}</div>
                             </div>
                           </div>
                         </div>
@@ -595,23 +618,23 @@ export default function DocumentSharingRecipientView() {
                           <div className="bg-gray-50 rounded-md p-4 space-y-3">
                             <div className="grid grid-cols-2 gap-2">
                               <div className="text-sm text-gray-500">Shared By:</div>
-                              <div className="text-sm">{shareInfo.sender.name}</div>
+                              <div className="text-sm">{shareInfo?.sender?.name}</div>
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                               <div className="text-sm text-gray-500">Company:</div>
-                              <div className="text-sm">{shareInfo.sender.company}</div>
+                              <div className="text-sm">{shareInfo?.sender?.company}</div>
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                               <div className="text-sm text-gray-500">Shared On:</div>
-                              <div className="text-sm">{formatDate(shareInfo.sharedAt)}</div>
+                              <div className="text-sm">{formatDate(shareInfo?.sharedAt)}</div>
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                               <div className="text-sm text-gray-500">Access Expires:</div>
                               <div className="text-sm">
                                 <div className="flex items-center">
-                                  {formatDate(shareInfo.expiresAt)}
+                                  {formatDate(shareInfo?.expiresAt)}
                                   <span className="ml-1 text-yellow-600">
-                                    ({calculateDaysUntil(shareInfo.expiresAt)} days)
+                                    ({calculateDaysUntil(shareInfo?.expiresAt)} days)
                                   </span>
                                 </div>
                               </div>
@@ -626,17 +649,32 @@ export default function DocumentSharingRecipientView() {
               <CardFooter className="border-t flex justify-between items-center">
                 <div className="flex items-center text-sm text-gray-500">
                   <Info className="h-4 w-4 mr-1" />
-                  {shareInfo.security.watermarked && "This document contains a digital watermark."}
-                  {shareInfo.security.accessTracking && "Document access is being tracked."}
+                  {shareInfo?.security?.watermarked && "This document contains a digital watermark. "}
+                  {shareInfo?.security?.accessTracking && "Document access is being tracked."}
                 </div>
                 <div className="flex space-x-2">
-                  {!shareInfo.security.preventDownloads && (
-                    <Button size="sm" variant="outline">
+                  {!shareInfo?.security?.preventDownloads && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        if (currentDocument?.id) {
+                          trackDocumentDownload(currentDocument.id)
+                        }
+                      }}
+                    >
                       <Download className="mr-2 h-4 w-4" />
                       Download
                     </Button>
                   )}
-                  <Button size="sm">
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      if (currentDocument?.id) {
+                        trackDocumentView(currentDocument.id)
+                      }
+                    }}
+                  >
                     <Eye className="mr-2 h-4 w-4" />
                     View
                   </Button>
@@ -652,8 +690,8 @@ export default function DocumentSharingRecipientView() {
             <Clock className="h-4 w-4 text-yellow-500" />
             <AlertTitle className="text-yellow-700">Access Expiration Notice</AlertTitle>
             <AlertDescription className="text-yellow-600">
-              Your access to these documents will expire on {formatDate(shareInfo.expiresAt)} (
-              {calculateDaysUntil(shareInfo.expiresAt)} days from now).
+              Your access to these documents will expire on {formatDate(shareInfo?.expiresAt)} (
+              {calculateDaysUntil(shareInfo?.expiresAt)} days from now).
             </AlertDescription>
           </Alert>
         </div>
@@ -672,8 +710,7 @@ export default function DocumentSharingRecipientView() {
                 Security Information
               </Button>
               <Button variant="link" size="sm" className="text-gray-500">
-                <ExternalLink className="mr-1 h-4 w-4" />
-                About
+                About Comovis
               </Button>
             </div>
           </div>
@@ -693,8 +730,16 @@ export default function DocumentSharingRecipientView() {
                 <Button variant="outline" size="sm" onClick={nextDocument}>
                   <ChevronRight className="h-4 w-4" />
                 </Button>
-                {!shareInfo.security.preventDownloads && (
-                  <Button size="sm" variant="outline">
+                {!shareInfo?.security?.preventDownloads && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      if (currentDocument?.id) {
+                        trackDocumentDownload(currentDocument.id)
+                      }
+                    }}
+                  >
                     <Download className="mr-2 h-4 w-4" />
                     Download
                   </Button>
@@ -708,9 +753,9 @@ export default function DocumentSharingRecipientView() {
             <div className="flex-grow overflow-auto p-4 bg-gray-100">
               <div className="bg-white shadow-md rounded-md max-w-4xl mx-auto p-8 min-h-[800px] relative">
                 {/* Document Watermark */}
-                {shareInfo.security.watermarked && (
+                {shareInfo?.security?.watermarked && (
                   <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none rotate-[-30deg] text-gray-500 text-4xl font-bold">
-                    CONFIDENTIAL - {shareInfo.vessel.name} - {new Date().toLocaleDateString()}
+                    CONFIDENTIAL - {shareInfo?.vessel?.name} - {new Date().toLocaleDateString()}
                   </div>
                 )}
 
@@ -725,7 +770,11 @@ export default function DocumentSharingRecipientView() {
                     </div>
                   </div>
 
-                  <img src="/placeholder-1nd7l.png" alt="Document preview" className="max-h-full object-contain mb-8" />
+                  <img
+                    src="/placeholder.svg?height=600&width=800&text=Full+Document+Preview"
+                    alt="Document preview"
+                    className="max-h-full object-contain mb-8"
+                  />
 
                   <div className="w-full max-w-md">
                     <div className="border-t pt-4 mt-4">
@@ -736,7 +785,7 @@ export default function DocumentSharingRecipientView() {
                         </div>
                         <div>
                           <p className="text-sm text-gray-500">Vessel IMO:</p>
-                          <p className="font-medium">{shareInfo.vessel.imo}</p>
+                          <p className="font-medium">{shareInfo?.vessel?.imo}</p>
                         </div>
                       </div>
                     </div>
@@ -745,7 +794,7 @@ export default function DocumentSharingRecipientView() {
               </div>
             </div>
             <div className="p-2 border-t bg-gray-50 flex justify-between items-center">
-              <div className="text-sm text-gray-500">Page 1 of {currentDocument?.pages}</div>
+              <div className="text-sm text-gray-500">Page 1 of {currentDocument?.pages || 1}</div>
               <div className="flex items-center space-x-2">
                 <Button variant="outline" size="sm" disabled>
                   <ChevronLeft className="h-4 w-4 mr-1" />
