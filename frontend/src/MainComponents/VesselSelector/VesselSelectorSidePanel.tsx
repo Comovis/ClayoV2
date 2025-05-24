@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, Search, Ship, CheckCircle, Clock, AlertCircle, AlertTriangle, Upload, ChevronDown } from "lucide-react"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Plus, Search, Ship, CheckCircle, Clock, AlertCircle, AlertTriangle } from "lucide-react"
+import AddVesselModal from "../AddVesselModal/AddNewVessel"
 import { useFetchVessels } from "../../Hooks/useFetchVessels"
 
 interface DocumentStatus {
@@ -61,12 +61,12 @@ function VesselCard({ name, type, flag, active, onClick, documentStatus }: Vesse
 interface MyFleetProps {
   activeVessel: string
   onVesselSelect: (vesselName: string) => void
-  onUploadClick: (type: "single" | "batch") => void
   className?: string
 }
 
-export function MyFleet({ activeVessel, onVesselSelect, onUploadClick, className = "" }: MyFleetProps) {
+export function MyFleet({ activeVessel, onVesselSelect, className = "" }: MyFleetProps) {
   const [searchQuery, setSearchQuery] = useState("")
+  const [isAddVesselModalOpen, setIsAddVesselModalOpen] = useState(false)
 
   // Use the useFetchVessels hook to get vessel data
   const { vessels, isLoading, error, fetchVessels } = useFetchVessels()
@@ -89,122 +89,107 @@ export function MyFleet({ activeVessel, onVesselSelect, onUploadClick, className
       vessel.flag.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
-  // Fallback to mock data if there's an error or no vessels are loaded yet
-  const mockVessels = [
-    {
-      id: "1",
-      name: "Humble Warrior",
-      type: "Crude Oil Tanker",
-      flag: "Panama",
-      documentStatus: {
-        valid: 12,
-        expiringSoon: 3,
-        expired: 0,
-        missing: 1,
-      },
-    },
-    {
-      id: "2",
-      name: "Pacific Explorer",
-      type: "Container Ship",
-      flag: "Singapore",
-      documentStatus: {
-        valid: 14,
-        expiringSoon: 1,
-        expired: 0,
-        missing: 0,
-      },
-    },
-    {
-      id: "3",
-      name: "Northern Star",
-      type: "Bulk Carrier",
-      flag: "Marshall Islands",
-      documentStatus: {
-        valid: 10,
-        expiringSoon: 2,
-        expired: 1,
-        missing: 2,
-      },
-    },
-  ]
+  const displayVessels = filteredVessels
 
-  // Use real vessels if available, otherwise use mock data
-  const displayVessels = vessels.length > 0 ? filteredVessels : mockVessels
+  // Handle vessel added - refresh the vessels list
+  const handleVesselAdded = () => {
+    fetchVessels({ searchQuery })
+    setIsAddVesselModalOpen(false)
+  }
 
   return (
-    <aside className={`w-72 border-r bg-gray-50 p-4 flex flex-col ${className}`}>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold">My Fleet</h2>
-        <Button size="sm" variant="ghost">
-          <Plus className="h-4 w-4" />
-        </Button>
-      </div>
-
-      <div className="relative mb-4">
-        <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
-        <Input
-          placeholder="Search vessels..."
-          className="pl-8"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-      </div>
-
-      {isLoading && (
-        <div className="flex justify-center items-center py-8">
-          <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full mr-2"></div>
-          <p className="text-sm text-gray-500">Loading vessels...</p>
-        </div>
-      )}
-
-      {error && (
-        <div className="text-center py-4 text-red-500">
-          <AlertTriangle className="h-5 w-5 mx-auto mb-2" />
-          <p className="text-sm">Failed to load vessels</p>
-          <Button variant="link" size="sm" onClick={() => fetchVessels()}>
-            Try again
+    <>
+      <aside className={`w-72 border-r bg-gray-50 p-4 flex flex-col ${className}`}>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold">My Fleet</h2>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setIsAddVesselModalOpen(true)}
+            className="hover:bg-blue-50 hover:text-blue-600"
+          >
+            <Plus className="h-4 w-4" />
           </Button>
         </div>
-      )}
 
-      <div className="space-y-2 overflow-auto flex-1">
-        {displayVessels.map((vessel) => (
-          <VesselCard
-            key={vessel.id}
-            name={vessel.name}
-            type={vessel.type}
-            flag={vessel.flag}
-            active={activeVessel === vessel.name}
-            onClick={() => onVesselSelect(vessel.name)}
-            documentStatus={vessel.documentStatus}
+        <div className="relative mb-4">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Search vessels..."
+            className="pl-8"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
           />
-        ))}
-        {!isLoading && !error && displayVessels.length === 0 && (
-          <div className="text-center py-4 text-gray-500">No vessels found matching "{searchQuery}"</div>
-        )}
-      </div>
-
-      <div className="mt-4">
-        {/* Split Button in Sidebar */}
-        <div className="flex w-full">
-          <Button className="rounded-r-none flex-1" variant="outline" onClick={() => onUploadClick("single")}>
-            <Upload className="mr-2 h-4 w-4" />
-            Upload Document
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="rounded-l-none border-l-0 px-2">
-                <ChevronDown className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onUploadClick("single")}>Single Document Upload</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onUploadClick("batch")}>Batch Upload</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
-      </div>
-    </aside>
+
+        {isLoading && (
+          <div className="flex justify-center items-center py-8">
+            <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full mr-2"></div>
+            <p className="text-sm text-gray-500">Loading vessels...</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="text-center py-4 text-red-500">
+            <AlertTriangle className="h-5 w-5 mx-auto mb-2" />
+            <p className="text-sm">Failed to load vessels</p>
+            <Button variant="link" size="sm" onClick={() => fetchVessels()}>
+              Try again
+            </Button>
+          </div>
+        )}
+
+        <div className="space-y-2 overflow-auto flex-1">
+          {displayVessels.map((vessel) => (
+            <VesselCard
+              key={vessel.id}
+              name={vessel.name}
+              type={vessel.type}
+              flag={vessel.flag}
+              active={activeVessel === vessel.name}
+              onClick={() => onVesselSelect(vessel.name)}
+              documentStatus={vessel.documentStatus}
+            />
+          ))}
+
+          {!isLoading && !error && vessels.length === 0 && searchQuery === "" && (
+            <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+              <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4">
+                <Ship className="h-8 w-8 text-blue-500" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No vessels in your fleet</h3>
+              <p className="text-sm text-gray-500 mb-6 max-w-xs">
+                Start managing your maritime compliance by adding your first vessel to the platform.
+              </p>
+              <Button size="sm" className="mb-2" onClick={() => setIsAddVesselModalOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Your First Vessel
+              </Button>
+              <p className="text-xs text-gray-400">Build your fleet and track compliance</p>
+            </div>
+          )}
+
+          {!isLoading && !error && vessels.length > 0 && filteredVessels.length === 0 && searchQuery !== "" && (
+            <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+              <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-3">
+                <Search className="h-6 w-6 text-gray-400" />
+              </div>
+              <h3 className="text-sm font-medium text-gray-900 mb-1">No vessels found</h3>
+              <p className="text-xs text-gray-500 mb-4">No vessels match "{searchQuery}"</p>
+              <Button variant="link" size="sm" onClick={() => setSearchQuery("")}>
+                Clear search
+              </Button>
+            </div>
+          )}
+        </div>
+      </aside>
+
+      {/* Add Vessel Modal */}
+      <AddVesselModal
+        isOpen={isAddVesselModalOpen}
+        onClose={() => setIsAddVesselModalOpen(false)}
+        onVesselAdded={handleVesselAdded}
+      />
+    </>
   )
 }

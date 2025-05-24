@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Label } from "@/components/ui/label"
 import {
   Search,
   Upload,
@@ -27,6 +28,14 @@ import {
   ExternalLink,
   RefreshCw,
   Loader2,
+  Scale,
+  Building2,
+  Users,
+  Briefcase,
+  SearchIcon,
+  CalendarDays,
+  ShieldAlert,
+  ClipboardList,
 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetClose } from "@/components/ui/sheet"
@@ -42,6 +51,7 @@ import { MyFleet } from "../../MainComponents/VesselSelector/VesselSelectorSideP
 import { useFetchVessels } from "../../Hooks/useFetchVessels"
 import { useDocuments } from "../../Hooks/useDocuments"
 import { useDocumentPreview } from "../../Hooks/useDocumentPreview"
+import PDFViewer from "../../MainComponents/UploadModal/PDFViewer"
 
 // Define a vessel interface to track the selected vessel
 interface SelectedVessel {
@@ -80,6 +90,18 @@ export default function DocumentHub() {
   const [viewMode, setViewMode] = useState<"table" | "card">("table")
   const [isDocumentSheetOpen, setIsDocumentSheetOpen] = useState(false)
   const [isPreviewLoading, setIsPreviewLoading] = useState(false)
+
+  // Filter state
+  const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [activeFilters, setActiveFilters] = useState({
+    status: [],
+    documentType: [],
+    issuer: [],
+    dateRange: null,
+    expiryRange: null,
+    category: [],
+    permanent: null,
+  })
 
   // Fetch vessels when the component mounts
   useEffect(() => {
@@ -239,6 +261,84 @@ export default function DocumentHub() {
     }
   }
 
+  // Filter functions
+  const clearAllFilters = () => {
+    setActiveFilters({
+      status: [],
+      documentType: [],
+      issuer: [],
+      dateRange: null,
+      expiryRange: null,
+      category: [],
+      permanent: null,
+    })
+  }
+
+  const getFilteredDocuments = () => {
+    return documents.filter((doc) => {
+      // Search query filter
+      const matchesSearch =
+        !searchQuery ||
+        doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        doc.document_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        doc.issuer?.toLowerCase().includes(searchQuery.toLowerCase())
+
+      // Status filter
+      const matchesStatus = activeFilters.status.length === 0 || activeFilters.status.includes(doc.status)
+
+      // Document type filter
+      const matchesDocType =
+        activeFilters.documentType.length === 0 || activeFilters.documentType.includes(doc.document_type)
+
+      // Issuer filter
+      const matchesIssuer = activeFilters.issuer.length === 0 || activeFilters.issuer.includes(doc.issuer)
+
+      // Category filter (based on tabs)
+      const matchesCategory = activeFilters.category.length === 0 || activeFilters.category.includes(doc.category)
+
+      // Permanent filter
+      const matchesPermanent = activeFilters.permanent === null || doc.is_permanent === activeFilters.permanent
+
+      // Date range filters
+      const matchesIssueDate =
+        !activeFilters.dateRange ||
+        (new Date(doc.issue_date) >= activeFilters.dateRange.from &&
+          new Date(doc.issue_date) <= activeFilters.dateRange.to)
+
+      const matchesExpiryDate =
+        !activeFilters.expiryRange ||
+        doc.is_permanent ||
+        (new Date(doc.expiry_date) >= activeFilters.expiryRange.from &&
+          new Date(doc.expiry_date) <= activeFilters.expiryRange.to)
+
+      return (
+        matchesSearch &&
+        matchesStatus &&
+        matchesDocType &&
+        matchesIssuer &&
+        matchesCategory &&
+        matchesPermanent &&
+        matchesIssueDate &&
+        matchesExpiryDate
+      )
+    })
+  }
+
+  // Get unique values for filter options
+  const getUniqueDocumentTypes = () => [...new Set(documents.map((doc) => doc.document_type).filter(Boolean))]
+  const getUniqueIssuers = () => [...new Set(documents.map((doc) => doc.issuer).filter(Boolean))]
+  const getActiveFilterCount = () => {
+    return (
+      activeFilters.status.length +
+      activeFilters.documentType.length +
+      activeFilters.issuer.length +
+      activeFilters.category.length +
+      (activeFilters.dateRange ? 1 : 0) +
+      (activeFilters.expiryRange ? 1 : 0) +
+      (activeFilters.permanent !== null ? 1 : 0)
+    )
+  }
+
   // Calculate document status counts
   const documentCounts = {
     valid: documents.filter((doc) => doc.status === "valid").length,
@@ -344,10 +444,308 @@ export default function DocumentHub() {
               <p className="text-xs text-gray-400 mt-1">Vessel ID: {selectedVessel.id}</p>
             </div>
             <div className="flex space-x-2">
-              <Button variant="outline" size="sm">
-                <Filter className="mr-2 h-4 w-4" />
-                Filter
-              </Button>
+              <DropdownMenu open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="relative">
+                    <Filter className="mr-2 h-4 w-4" />
+                    Filter
+                    {getActiveFilterCount() > 0 && (
+                      <Badge
+                        variant="secondary"
+                        className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs bg-blue-500 text-white"
+                      >
+                        {getActiveFilterCount()}
+                      </Badge>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-80 p-0">
+                  <div className="p-4 border-b">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-sm">Filter Documents</h3>
+                      {getActiveFilterCount() > 0 && (
+                        <Button variant="ghost" size="sm" onClick={clearAllFilters}>
+                          Clear All
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="p-4 space-y-4 max-h-96 overflow-y-auto">
+                    {/* Status Filter */}
+                    <div>
+                      <Label className="text-sm font-medium mb-2 block">Status</Label>
+                      <div className="space-y-2">
+                        {[
+                          { value: "valid", label: "Valid", color: "text-green-600" },
+                          { value: "expiring_soon", label: "Expiring Soon", color: "text-yellow-600" },
+                          { value: "expired", label: "Expired", color: "text-red-600" },
+                          { value: "missing", label: "Missing", color: "text-gray-600" },
+                        ].map((status) => (
+                          <div key={status.value} className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id={`status-${status.value}`}
+                              checked={activeFilters.status.includes(status.value)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setActiveFilters((prev) => ({
+                                    ...prev,
+                                    status: [...prev.status, status.value],
+                                  }))
+                                } else {
+                                  setActiveFilters((prev) => ({
+                                    ...prev,
+                                    status: prev.status.filter((s) => s !== status.value),
+                                  }))
+                                }
+                              }}
+                              className="rounded border-gray-300"
+                            />
+                            <label htmlFor={`status-${status.value}`} className={`text-sm ${status.color}`}>
+                              {status.label}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Document Type Filter */}
+                    <div>
+                      <Label className="text-sm font-medium mb-2 block">Document Type</Label>
+                      <div className="space-y-2 max-h-32 overflow-y-auto">
+                        {getUniqueDocumentTypes().map((type) => (
+                          <div key={type} className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id={`type-${type}`}
+                              checked={activeFilters.documentType.includes(type)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setActiveFilters((prev) => ({
+                                    ...prev,
+                                    documentType: [...prev.documentType, type],
+                                  }))
+                                } else {
+                                  setActiveFilters((prev) => ({
+                                    ...prev,
+                                    documentType: prev.documentType.filter((t) => t !== type),
+                                  }))
+                                }
+                              }}
+                              className="rounded border-gray-300"
+                            />
+                            <label htmlFor={`type-${type}`} className="text-sm text-gray-700 truncate">
+                              {type}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Category Filter */}
+                    <div>
+                      <Label className="text-sm font-medium mb-2 block">Category</Label>
+                      <div className="space-y-2">
+                        {[
+                          { value: "statutory", label: "Statutory", icon: Scale },
+                          { value: "class", label: "Classification", icon: Building2 },
+                          { value: "crew", label: "Crew", icon: Users },
+                          { value: "commercial", label: "Commercial", icon: Briefcase },
+                          { value: "inspection", label: "Inspection", icon: SearchIcon },
+                        ].map((category) => {
+                          const IconComponent = category.icon
+                          return (
+                            <div key={category.value} className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                id={`category-${category.value}`}
+                                checked={activeFilters.category.includes(category.value)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setActiveFilters((prev) => ({
+                                      ...prev,
+                                      category: [...prev.category, category.value],
+                                    }))
+                                  } else {
+                                    setActiveFilters((prev) => ({
+                                      ...prev,
+                                      category: prev.category.filter((c) => c !== category.value),
+                                    }))
+                                  }
+                                }}
+                                className="rounded border-gray-300"
+                              />
+                              <label
+                                htmlFor={`category-${category.value}`}
+                                className="text-sm text-gray-700 flex items-center"
+                              >
+                                <IconComponent className="h-4 w-4 mr-2 text-gray-500" />
+                                {category.label}
+                              </label>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Issuing Authority Filter */}
+                    <div>
+                      <Label className="text-sm font-medium mb-2 block">Issuing Authority</Label>
+                      <div className="space-y-2 max-h-32 overflow-y-auto">
+                        {getUniqueIssuers()
+                          .slice(0, 10)
+                          .map((issuer) => (
+                            <div key={issuer} className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                id={`issuer-${issuer}`}
+                                checked={activeFilters.issuer.includes(issuer)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setActiveFilters((prev) => ({
+                                      ...prev,
+                                      issuer: [...prev.issuer, issuer],
+                                    }))
+                                  } else {
+                                    setActiveFilters((prev) => ({
+                                      ...prev,
+                                      issuer: prev.issuer.filter((i) => i !== issuer),
+                                    }))
+                                  }
+                                }}
+                                className="rounded border-gray-300"
+                              />
+                              <label htmlFor={`issuer-${issuer}`} className="text-sm text-gray-700 truncate">
+                                {issuer}
+                              </label>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+
+                    {/* Expiry Type Filter */}
+                    <div>
+                      <Label className="text-sm font-medium mb-2 block">Expiry Type</Label>
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="radio"
+                            id="permanent-all"
+                            name="permanent"
+                            checked={activeFilters.permanent === null}
+                            onChange={() => setActiveFilters((prev) => ({ ...prev, permanent: null }))}
+                            className="rounded border-gray-300"
+                          />
+                          <label htmlFor="permanent-all" className="text-sm text-gray-700">
+                            All Documents
+                          </label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="radio"
+                            id="permanent-yes"
+                            name="permanent"
+                            checked={activeFilters.permanent === true}
+                            onChange={() => setActiveFilters((prev) => ({ ...prev, permanent: true }))}
+                            className="rounded border-gray-300"
+                          />
+                          <label htmlFor="permanent-yes" className="text-sm text-gray-700">
+                            Permanent Only
+                          </label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="radio"
+                            id="permanent-no"
+                            name="permanent"
+                            checked={activeFilters.permanent === false}
+                            onChange={() => setActiveFilters((prev) => ({ ...prev, permanent: false }))}
+                            className="rounded border-gray-300"
+                          />
+                          <label htmlFor="permanent-no" className="text-sm text-gray-700">
+                            With Expiry Date
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Quick Date Filters */}
+                    <div>
+                      <Label className="text-sm font-medium mb-2 block">Quick Filters</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const thirtyDaysFromNow = new Date()
+                            thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30)
+                            setActiveFilters((prev) => ({
+                              ...prev,
+                              status: ["expiring_soon"],
+                              expiryRange: {
+                                from: new Date(),
+                                to: thirtyDaysFromNow,
+                              },
+                            }))
+                          }}
+                          className="text-xs"
+                        >
+                          <CalendarDays className="h-3 w-3 mr-1" />
+                          Expiring Soon
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setActiveFilters((prev) => ({
+                              ...prev,
+                              status: ["expired"],
+                            }))
+                          }}
+                          className="text-xs"
+                        >
+                          <ShieldAlert className="h-3 w-3 mr-1" />
+                          Expired
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const lastMonth = new Date()
+                            lastMonth.setMonth(lastMonth.getMonth() - 1)
+                            setActiveFilters((prev) => ({
+                              ...prev,
+                              dateRange: {
+                                from: lastMonth,
+                                to: new Date(),
+                              },
+                            }))
+                          }}
+                          className="text-xs"
+                        >
+                          <ClipboardList className="h-3 w-3 mr-1" />
+                          Recent
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setActiveFilters((prev) => ({
+                              ...prev,
+                              category: ["statutory"],
+                            }))
+                          }}
+                          className="text-xs"
+                        >
+                          <Scale className="h-3 w-3 mr-1" />
+                          Statutory
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
               <Button
                 variant="outline"
@@ -511,28 +909,20 @@ export default function DocumentHub() {
               ) : viewMode === "card" ? (
                 // Card View
                 <div className="space-y-4">
-                  {documents
-                    .filter(
-                      (doc) =>
-                        !searchQuery ||
-                        doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        doc.document_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        doc.issuer?.toLowerCase().includes(searchQuery.toLowerCase()),
-                    )
-                    .map((document) => (
-                      <DocumentCard
-                        key={document.id}
-                        title={document.title}
-                        issuer={document.issuer}
-                        issueDate={document.issue_date}
-                        expiryDate={document.expiry_date}
-                        status={document.status}
-                        permanent={document.is_permanent}
-                        onClick={() => handleDocumentSelect(document)}
-                        onDownload={() => handleDocumentDownload(document.id)}
-                        onArchive={() => handleDocumentArchive(document.id)}
-                      />
-                    ))}
+                  {getFilteredDocuments().map((document) => (
+                    <DocumentCard
+                      key={document.id}
+                      title={document.title}
+                      issuer={document.issuer}
+                      issueDate={document.issue_date}
+                      expiryDate={document.expiry_date}
+                      status={document.status}
+                      permanent={document.is_permanent}
+                      onClick={() => handleDocumentSelect(document)}
+                      onDownload={() => handleDocumentDownload(document.id)}
+                      onArchive={() => handleDocumentArchive(document.id)}
+                    />
+                  ))}
                 </div>
               ) : (
                 // Table View
@@ -549,75 +939,65 @@ export default function DocumentHub() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {documents
-                        .filter(
-                          (doc) =>
-                            !searchQuery ||
-                            doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            doc.document_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            doc.issuer?.toLowerCase().includes(searchQuery.toLowerCase()),
-                        )
-                        .map((document) => (
-                          <TableRow
-                            key={document.id}
-                            className="cursor-pointer hover:bg-gray-50"
-                            onClick={() => handleDocumentSelect(document)}
-                          >
-                            <TableCell className="font-medium">
-                              <div className="flex items-center">
-                                <FileText className="h-4 w-4 mr-2 text-gray-400" />
-                                {document.title}
-                              </div>
-                            </TableCell>
-                            <TableCell>{document.issuer}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center">
-                                <Calendar className="h-4 w-4 mr-1 text-gray-400" />
-                                {new Date(document.issue_date).toLocaleDateString()}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {document.is_permanent
-                                ? "Permanent"
-                                : new Date(document.expiry_date).toLocaleDateString()}
-                            </TableCell>
-                            <TableCell>{getStatusBadge(document.status, undefined, document.is_permanent)}</TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end space-x-1">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleDocumentSelect(document)
-                                  }}
-                                >
-                                  <Eye className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleDocumentDownload(document.id)
-                                  }}
-                                >
-                                  <Download className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    openUploadModal("single")
-                                  }}
-                                >
-                                  <Upload className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                      {getFilteredDocuments().map((document) => (
+                        <TableRow
+                          key={document.id}
+                          className="cursor-pointer hover:bg-gray-50"
+                          onClick={() => handleDocumentSelect(document)}
+                        >
+                          <TableCell className="font-medium">
+                            <div className="flex items-center">
+                              <FileText className="h-4 w-4 mr-2 text-gray-400" />
+                              {document.title}
+                            </div>
+                          </TableCell>
+                          <TableCell>{document.issuer}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center">
+                              <Calendar className="h-4 w-4 mr-1 text-gray-400" />
+                              {new Date(document.issue_date).toLocaleDateString()}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {document.is_permanent ? "Permanent" : new Date(document.expiry_date).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>{getStatusBadge(document.status, undefined, document.is_permanent)}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end space-x-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleDocumentSelect(document)
+                                }}
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleDocumentDownload(document.id)
+                                }}
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  openUploadModal("single")
+                                }}
+                              >
+                                <Upload className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
                     </TableBody>
                   </Table>
                 </Card>
@@ -697,20 +1077,35 @@ export default function DocumentHub() {
                       </div>
                     </div>
                   ) : previewUrl ? (
-                    <img
-                      src={previewUrl || "/placeholder.svg"}
-                      alt="Document Preview"
-                      className="w-full object-contain rounded-md border"
-                      onError={(e) => {
-                        // Fallback to placeholder if image fails to load
-                        e.currentTarget.src = "/placeholder.svg?height=400&width=300&text=Document+Preview"
-                      }}
-                    />
+                    // Check if the document is a PDF based on file extension or MIME type
+                    selectedDocument?.file_path?.toLowerCase().endsWith(".pdf") ||
+                    selectedDocument?.mime_type === "application/pdf" ? (
+                      <PDFViewer
+                        fileUrl={previewUrl}
+                        fileName={selectedDocument?.title || "document.pdf"}
+                        className="w-full"
+                      />
+                    ) : (
+                      <img
+                        src={previewUrl || "/placeholder.svg"}
+                        alt="Document Preview"
+                        className="w-full object-contain rounded-md border max-h-96"
+                        onError={(e) => {
+                          // Fallback to placeholder if image fails to load
+                          e.currentTarget.src = "/placeholder.svg?height=400&width=300&text=Document+Preview"
+                        }}
+                      />
+                    )
                   ) : (
                     <div className="w-full h-64 bg-gray-100 rounded-md border flex items-center justify-center">
                       <div className="text-center">
                         <FileText className="h-12 w-12 mx-auto mb-2 text-gray-400" />
                         <p className="text-gray-500">Document Preview</p>
+                        <p className="text-gray-400 text-sm mt-1">
+                          {selectedDocument?.file_path?.toLowerCase().endsWith(".pdf")
+                            ? "PDF document ready for viewing"
+                            : "Click to load preview"}
+                        </p>
                       </div>
                     </div>
                   )}

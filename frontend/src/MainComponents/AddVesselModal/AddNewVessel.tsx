@@ -767,11 +767,7 @@ export default function AddVesselModal({ isOpen, onClose, onVesselAdded }: AddVe
         if (isManualEntry) {
           return null
         }
-        return (
-          <>
-         
-          </>
-        )
+        return <></>
 
       case 2:
         return (
