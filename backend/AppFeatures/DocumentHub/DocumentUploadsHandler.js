@@ -1,4 +1,3 @@
-
 const { supabaseAdmin } = require("../../SupabaseClient")
 const { classifyDocument } = require("./DocumentClassifierAlgo")
 const { processPDFDocument } = require("./ExtractTextFromImageAlgo") 
@@ -69,6 +68,7 @@ async function extractDocumentText(fileBuffer, mimeType, documentType = null) {
 
 /**
  * Upload a document file to storage and create document record
+ * Enhanced to handle AI extraction and update document with extracted data
  * 
  * @param {Object} fileData - The file data object
  * @param {Buffer} fileData.buffer - The file buffer
@@ -98,8 +98,8 @@ async function uploadDocument(fileData, documentData) {
     console.log("supabaseAdmin.from exists:", typeof supabaseAdmin?.from === "function")
     console.log("documentData:", JSON.stringify(documentData, null, 2))
     
-    // Validate inputs
-    const validationResult = validateDocumentData(documentData)
+    // Validate inputs (with lenient validation for initial upload)
+    const validationResult = validateDocumentData(documentData, true)
     if (!validationResult.success) {
       return validationResult
     }
@@ -183,12 +183,12 @@ async function uploadDocument(fileData, documentData) {
       return storageResult
     }
 
-    // Step 5: Create document record in database
+    // Step 5: Prepare document record with AI-extracted data taking precedence
     const documentRecord = {
       id: uuidv4(),
       vessel_id: documentData.vesselId,
-      title: documentData.title || (documentMetadata?.documentTitle || null),
-      document_type: documentData.documentType || (documentMetadata?.documentType || null),
+      title: documentMetadata?.documentTitle || documentData.title,
+      document_type: classification?.specificDocumentType || documentMetadata?.documentType || documentData.documentType,
       document_category: documentCategory,
       document_subcategory: classification?.secondaryCategory || null,
       classification_confidence: classification?.confidence || null,
@@ -196,9 +196,9 @@ async function uploadDocument(fileData, documentData) {
       issuer: documentMetadata?.issuer || documentData.issuer,
       certificate_number: documentMetadata?.documentNumber || documentData.certificateNumber,
       issue_date: documentMetadata?.issueDate || documentData.issueDate,
-      expiry_date: documentData.isPermanent ? null : (documentMetadata?.expiryDate || documentData.expiryDate),
-      is_permanent: documentData.isPermanent || false,
-      status: 'valid', // Default status
+      expiry_date: null, // Will be set below based on extracted data
+      is_permanent: false, // Will be determined based on extracted data
+      status: 'valid',
       file_path: storageResult.filePath,
       file_type: fileData.mimetype,
       file_size: fileData.size,
@@ -207,6 +207,34 @@ async function uploadDocument(fileData, documentData) {
       updated_at: new Date().toISOString(),
       is_archived: false,
     }
+
+    // Handle expiry date logic with AI-extracted data
+    if (documentMetadata?.expiryDate) {
+      // AI found an expiry date, use it
+      documentRecord.expiry_date = documentMetadata.expiryDate
+      documentRecord.is_permanent = false
+    } else if (documentData.isPermanent) {
+      // User specified permanent or no expiry found
+      documentRecord.expiry_date = null
+      documentRecord.is_permanent = true
+    } else if (documentData.expiryDate) {
+      // User provided expiry date
+      documentRecord.expiry_date = documentData.expiryDate
+      documentRecord.is_permanent = false
+    } else {
+      // Default to permanent if no expiry information available
+      documentRecord.expiry_date = null
+      documentRecord.is_permanent = true
+    }
+
+    console.log("Final document record before insert:", {
+      title: documentRecord.title,
+      document_type: documentRecord.document_type,
+      issuer: documentRecord.issuer,
+      issue_date: documentRecord.issue_date,
+      expiry_date: documentRecord.expiry_date,
+      is_permanent: documentRecord.is_permanent
+    })
 
     // Insert document record into database
     const { data: document, error: dbError } = await supabaseAdmin
@@ -261,9 +289,10 @@ async function uploadDocument(fileData, documentData) {
 /**
  * Validate document data
  * @param {Object} documentData - Document metadata
+ * @param {Boolean} isInitialUpload - Whether this is the initial upload (before AI processing)
  * @returns {Object} Validation result
  */
-function validateDocumentData(documentData) {
+function validateDocumentData(documentData, isInitialUpload = false) {
   const requiredFields = ['vesselId', 'title', 'documentType', 'userId']
   
   for (const field of requiredFields) {
@@ -275,11 +304,15 @@ function validateDocumentData(documentData) {
     }
   }
 
-  // If not permanent, expiry date is required
-  if (!documentData.isPermanent && !documentData.expiryDate) {
-    return {
-      success: false,
-      error: 'Expiry date is required for non-permanent documents'
+  // During initial upload, we're more lenient with expiry date validation
+  // since AI will extract this information
+  if (!isInitialUpload) {
+    // If not permanent, expiry date is required (only for final updates)
+    if (!documentData.isPermanent && !documentData.expiryDate) {
+      return {
+        success: false,
+        error: 'Expiry date is required for non-permanent documents'
+      }
     }
   }
 

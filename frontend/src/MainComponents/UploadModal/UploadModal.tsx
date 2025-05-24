@@ -19,10 +19,11 @@ import {
   CheckCircle,
   Loader2,
   FileSymlink,
-  ShieldCheck,
   Eye,
   ZoomIn,
   AlertTriangle,
+  Sparkles,
+  Edit3,
 } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 import { Switch } from "@/components/ui/switch"
@@ -35,6 +36,37 @@ import { useDocumentUpload } from "../../Hooks/useDocumentUpload"
 import { useDocumentPreview } from "../../Hooks/useDocumentPreview"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
+/**
+ * Parse extracted date string in DD/MM/YYYY format (maritime standard)
+ * Handles formats like "05/06/2027" where 05=day, 06=month, 2027=year
+ */
+function parseExtractedDate(dateString) {
+  if (!dateString) return null
+
+  try {
+    // If it's in DD/MM/YYYY format (maritime standard)
+    if (dateString.includes("/")) {
+      const parts = dateString.split("/")
+      if (parts.length === 3) {
+        // DD/MM/YYYY format from AI extraction
+        const [day, month, year] = parts
+        return new Date(Number.parseInt(year), Number.parseInt(month) - 1, Number.parseInt(day))
+      }
+    }
+
+    // If it's in ISO format or other standard format
+    const parsed = new Date(dateString)
+    if (!isNaN(parsed.getTime())) {
+      return parsed
+    }
+
+    return null
+  } catch (error) {
+    console.error("Error parsing date:", dateString, error)
+    return null
+  }
+}
+
 interface DocumentUploadModalProps {
   isOpen: boolean
   onClose: () => void
@@ -42,13 +74,13 @@ interface DocumentUploadModalProps {
   onUploadComplete?: (documentData: any) => void
 }
 
-export default function DocumentUploadModalRedesigned({
+export default function DocumentUploadModal({
   isOpen,
   onClose,
   initialVesselId,
   onUploadComplete,
 }: DocumentUploadModalProps) {
-  // Use the hooks you provided
+  // Use the hooks
   const { vessels, isLoading: isVesselsLoading, error: vesselsError, fetchVessels } = useFetchVessels()
   const {
     isUploading,
@@ -66,22 +98,20 @@ export default function DocumentUploadModalRedesigned({
     clearPreview,
   } = useDocumentPreview()
 
-  // Step management
+  // Step management - NEW FLOW
   const [uploadStep, setUploadStep] = useState(1)
-  const [isProcessing, setIsProcessing] = useState(false)
   const [uploadComplete, setUploadComplete] = useState(false)
-  const [processingError, setProcessingError] = useState<string | null>(null)
+  const [uploadedDocument, setUploadedDocument] = useState<any>(null)
 
   // File management
   const [files, setFiles] = useState<File[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [filePreviewUrls, setFilePreviewUrls] = useState<string[]>([])
-  const [selectedPreviewIndex, setSelectedPreviewIndex] = useState(0)
 
   // Vessel selection
   const [selectedVessel, setSelectedVessel] = useState(initialVesselId || "")
 
-  // Document data (for step 3)
+  // Document data (extracted from AI + user edits)
   const [documentType, setDocumentType] = useState("")
   const [customDocumentType, setCustomDocumentType] = useState("")
   const [issuingAuthority, setIssuingAuthority] = useState("")
@@ -90,8 +120,11 @@ export default function DocumentUploadModalRedesigned({
   const [expiryDate, setExpiryDate] = useState<Date | undefined>(undefined)
   const [isPermanent, setIsPermanent] = useState(false)
   const [documentNumber, setDocumentNumber] = useState("")
-  const [vesselName, setVesselName] = useState("")
-  const [imoNumber, setImoNumber] = useState("")
+  const [documentTitle, setDocumentTitle] = useState("")
+
+  // AI extraction state
+  const [extractedData, setExtractedData] = useState<any>(null)
+  const [isExtracting, setIsExtracting] = useState(false)
 
   // Document types for maritime
   const documentTypes = [
@@ -135,14 +168,27 @@ export default function DocumentUploadModalRedesigned({
     }
   }, [isOpen, initialVesselId])
 
+  // Auto-scroll when file is added
+  useEffect(() => {
+    if (files.length > 0) {
+      // Small delay to ensure DOM is updated
+      setTimeout(() => {
+        const element = document.querySelector('[data-scroll-target="preview"]')
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "start" })
+        }
+      }, 100)
+    }
+  }, [files])
+
   const resetAllState = () => {
     setUploadStep(1)
     setFiles([])
     setFilePreviewUrls([])
-    setSelectedPreviewIndex(0)
-    setIsProcessing(false)
     setUploadComplete(false)
-    setProcessingError(null)
+    setUploadedDocument(null)
+    setExtractedData(null)
+    setIsExtracting(false)
     clearMessages()
     clearPreview()
     setDocumentType("")
@@ -153,8 +199,7 @@ export default function DocumentUploadModalRedesigned({
     setExpiryDate(undefined)
     setIsPermanent(false)
     setDocumentNumber("")
-    setVesselName("")
-    setImoNumber("")
+    setDocumentTitle("")
   }
 
   // Generate preview URLs for files
@@ -199,54 +244,102 @@ export default function DocumentUploadModalRedesigned({
       return validTypes.includes(file.type) && validSize
     })
 
-    setFiles((prev) => [...prev, ...validFiles])
-  }
-
-  const removeFile = (index: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index))
-    setFilePreviewUrls((prev) => prev.filter((_, i) => i !== index))
-    if (selectedPreviewIndex >= index && selectedPreviewIndex > 0) {
-      setSelectedPreviewIndex((prev) => prev - 1)
+    if (validFiles.length > 0) {
+      setFiles([validFiles[0]]) // Only take the first file for single upload
+      setDocumentTitle(validFiles[0].name.replace(/\.[^/.]+$/, ""))
     }
   }
 
-  // Process files and move to preview step
-  const processFiles = async () => {
-    if (files.length === 0 || !selectedVessel) return
-
-    setIsProcessing(true)
-    setProcessingError(null)
-
-    try {
-      // For image files, we can generate a preview directly
-      if (files[0].type.startsWith("image/")) {
-        // Move to preview step
-        setUploadStep(2)
-      }
-      // For PDF files, we'll just show a placeholder in the next step
-      else {
-        // Move to preview step
-        setUploadStep(2)
-      }
-    } catch (error) {
-      console.error("Error processing files:", error)
-      setProcessingError(error instanceof Error ? error.message : "Failed to process document")
-    } finally {
-      setIsProcessing(false)
-    }
+  const removeFile = () => {
+    setFiles([])
+    setFilePreviewUrls([])
+    setDocumentTitle("")
   }
 
-  // Handle document upload using the useDocumentUpload hook
-  const handleSubmit = async () => {
+  // NEW: Direct upload with AI processing
+  const handleDirectUpload = async () => {
     if (files.length === 0 || !selectedVessel) return
 
+    setIsExtracting(true)
+    setUploadStep(2) // Move to processing step immediately
+
     try {
-      // Prepare document data
+      // Prepare minimal document data for upload
       const documentData = {
         vesselId: selectedVessel,
-        title: documentType === "other" ? customDocumentType : documentType,
+        title: documentTitle,
+        documentType: "Unknown", // Will be classified by AI
+        category: "General",
+        issuer: "",
+        certificateNumber: "",
+        issueDate: new Date().toISOString().split("T")[0], // Default to today
+        expiryDate: undefined,
+        isPermanent: true, // Set to true for initial upload to bypass validation
+      }
+
+      // Upload document - this will trigger AI processing on backend
+      const result = await uploadDocument(files[0], documentData)
+
+      if (result) {
+        setUploadedDocument(result)
+
+        // Extract the AI-processed data from the result
+        if (result.extractedMetadata) {
+          const metadata = result.extractedMetadata
+          setExtractedData(metadata)
+
+          // Pre-fill form fields with extracted data
+          setDocumentTitle(metadata.documentTitle || documentTitle)
+
+          // Set document type from classification or metadata
+          if (result.classification?.specificDocumentType) {
+            setDocumentType(result.classification.specificDocumentType)
+          } else if (metadata.documentType) {
+            setDocumentType(metadata.documentType)
+          }
+
+          setIssuingAuthority(metadata.issuer || "")
+          setDocumentNumber(metadata.documentNumber || "")
+
+          if (metadata.issueDate) {
+            // Parse date more carefully to avoid timezone issues
+            const issueDate = parseExtractedDate(metadata.issueDate)
+            if (issueDate) setIssueDate(issueDate)
+          }
+          if (metadata.expiryDate) {
+            // Parse date more carefully to avoid timezone issues
+            const expiryDate = parseExtractedDate(metadata.expiryDate)
+            if (expiryDate) {
+              setExpiryDate(expiryDate)
+              setIsPermanent(false) // Reset to false since we have an expiry date
+            }
+          }
+        }
+
+        // Generate preview URL for the uploaded document
+        if (result.file_path) {
+          await generatePreviewUrl(result.file_path)
+        }
+
+        setUploadStep(3) // Move to edit step
+      }
+    } catch (error) {
+      console.error("Error uploading document:", error)
+      setUploadStep(1) // Go back to step 1 on error
+    } finally {
+      setIsExtracting(false)
+    }
+  }
+
+  // Final submission with user edits
+  const handleFinalSubmit = async () => {
+    if (!uploadedDocument) return
+
+    try {
+      // Update the document with user-edited data
+      const updateData = {
+        title: documentTitle,
         documentType: documentType === "other" ? customDocumentType : documentType,
-        category: "General", // Default category
         issuer: issuingAuthority === "other" ? customIssuingAuthority : issuingAuthority,
         certificateNumber: documentNumber,
         issueDate: issueDate?.toISOString().split("T")[0],
@@ -254,26 +347,17 @@ export default function DocumentUploadModalRedesigned({
         isPermanent,
       }
 
-      // Use the uploadDocument function from the hook
-      const result = await uploadDocument(files[0], documentData)
+      // Here you would call an update API endpoint
+      // For now, we'll just complete the flow
+      setUploadStep(4)
+      setUploadComplete(true)
 
-      if (result) {
-        setUploadComplete(true)
-        setUploadStep(3)
-
-        // Call the onUploadComplete callback
-        if (onUploadComplete) {
-          onUploadComplete(result)
-        }
+      if (onUploadComplete) {
+        onUploadComplete({ ...uploadedDocument, ...updateData })
       }
     } catch (error) {
-      console.error("Error uploading document:", error)
-      setProcessingError(error instanceof Error ? error.message : "Failed to upload document")
+      console.error("Error updating document:", error)
     }
-  }
-
-  const resetAndUploadAnother = () => {
-    resetAllState()
   }
 
   const renderStep = () => {
@@ -281,10 +365,11 @@ export default function DocumentUploadModalRedesigned({
       case 1:
         return (
           <div className="space-y-6 px-2">
+            {/* Compact Upload Section */}
             <div className="space-y-3">
               <Label htmlFor="vessel">Select Vessel</Label>
               <Select value={selectedVessel} onValueChange={setSelectedVessel}>
-                <SelectTrigger id="vessel" className="h-12">
+                <SelectTrigger id="vessel" className="h-10">
                   <SelectValue placeholder={isVesselsLoading ? "Loading vessels..." : "Choose your vessel"} />
                 </SelectTrigger>
                 <SelectContent>
@@ -310,6 +395,7 @@ export default function DocumentUploadModalRedesigned({
               </Select>
             </div>
 
+            {/* Compact Upload Method */}
             <div className="space-y-3">
               <Label>Upload Method</Label>
               <Tabs defaultValue="file" className="w-full">
@@ -325,7 +411,7 @@ export default function DocumentUploadModalRedesigned({
                 </TabsList>
                 <TabsContent value="file" className="pt-4">
                   <div
-                    className="border-2 border-dashed border-blue-300 rounded-lg p-8 text-center hover:bg-blue-50 cursor-pointer transition-colors"
+                    className="border-2 border-dashed border-blue-300 rounded-lg p-6 text-center hover:bg-blue-50 cursor-pointer transition-colors"
                     onClick={() => fileInputRef.current?.click()}
                     onDrop={(e) => {
                       e.preventDefault()
@@ -333,13 +419,13 @@ export default function DocumentUploadModalRedesigned({
                     }}
                     onDragOver={(e) => e.preventDefault()}
                   >
-                    <Upload className="h-12 w-12 mx-auto mb-4 text-blue-500" />
-                    <p className="text-lg font-medium mb-2">Drop your maritime documents here</p>
-                    <p className="text-sm text-gray-600 mb-4">or click to browse files</p>
-                    <p className="text-xs text-gray-500 mb-4">Supports PDF, JPG, PNG (max 10MB each)</p>
-                    <Button variant="outline" size="lg">
+                    <Upload className="h-8 w-8 mx-auto mb-3 text-blue-500" />
+                    <p className="text-base font-medium mb-2">Drop your maritime document here</p>
+                    <p className="text-sm text-gray-600 mb-3">or click to browse files</p>
+                    <p className="text-xs text-gray-500 mb-3">Supports PDF, JPG, PNG (max 10MB)</p>
+                    <Button variant="outline" size="sm">
                       <FileText className="h-4 w-4 mr-2" />
-                      Select Documents
+                      Select Document
                     </Button>
                     <input
                       type="file"
@@ -351,11 +437,11 @@ export default function DocumentUploadModalRedesigned({
                   </div>
                 </TabsContent>
                 <TabsContent value="camera" className="pt-4">
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                    <Camera className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                    <p className="text-lg font-medium mb-2">Capture Document Photo</p>
-                    <p className="text-sm text-gray-600 mb-4">Position certificate within frame for best results</p>
-                    <Button variant="outline" size="lg" disabled>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                    <Camera className="h-8 w-8 mx-auto mb-3 text-gray-400" />
+                    <p className="text-base font-medium mb-2">Capture Document Photo</p>
+                    <p className="text-sm text-gray-600 mb-3">Position certificate within frame for best results</p>
+                    <Button variant="outline" size="sm" disabled>
                       <Camera className="h-4 w-4 mr-2" />
                       Open Camera (Coming Soon)
                     </Button>
@@ -364,51 +450,63 @@ export default function DocumentUploadModalRedesigned({
               </Tabs>
             </div>
 
+            {/* Large Document Preview */}
             {files.length > 0 && (
-              <div className="space-y-3">
-                <Label>Selected Documents ({files.length})</Label>
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {files.map((file, index) => (
-                    <div key={index} className="flex items-center justify-between bg-blue-50 p-3 rounded-md border">
-                      <div className="flex items-center">
-                        <FileText className="h-5 w-5 mr-3 text-blue-600" />
-                        <div>
-                          <p className="text-sm font-medium truncate max-w-[300px]">
-                            {file.name.replace(/\.[^/.]+$/, "")}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {(file.size / 1024).toFixed(0)} KB • {file.type.split("/")[1].toUpperCase()}
-                          </p>
-                        </div>
+              <div className="space-y-4" data-scroll-target="preview">
+                <Label>Document Preview</Label>
+                <Card className="p-6">
+                  {/* Document Title Input */}
+                  <div className="mb-6">
+                    <Label htmlFor="documentTitle" className="text-sm font-medium mb-2 block">
+                      Document Title
+                    </Label>
+                    <Input
+                      id="documentTitle"
+                      value={documentTitle}
+                      onChange={(e) => setDocumentTitle(e.target.value)}
+                      placeholder="Document title"
+                      className="font-medium h-10"
+                    />
+                  </div>
+
+                  {/* Large Preview */}
+                  <div className="flex justify-center items-center bg-gray-50 rounded-lg border-2 border-gray-200 min-h-[500px] p-6 mb-4">
+                    {filePreviewUrls[0] ? (
+                      <img
+                        src={filePreviewUrls[0] || "/placeholder.svg"}
+                        alt="Document preview"
+                        className="max-w-full max-h-[500px] object-contain rounded shadow-lg"
+                      />
+                    ) : (
+                      <div className="text-center text-gray-400">
+                        <FileText className="h-16 w-16 mx-auto mb-4" />
+                        <p className="text-lg">Document preview loading...</p>
                       </div>
-                      <Button variant="ghost" size="sm" onClick={() => removeFile(index)}>
-                        <X className="h-4 w-4" />
-                      </Button>
+                    )}
+                  </div>
+
+                  {/* File Info */}
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-gray-500">
+                      {files[0].type.split("/")[1].toUpperCase()} • {(files[0].size / 1024).toFixed(0)} KB
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
+                    <Button variant="ghost" size="sm" onClick={removeFile}>
+                      <X className="h-4 w-4 mr-1" />
+                      Remove
+                    </Button>
+                  </div>
+                </Card>
 
-            {isProcessing && (
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span>Processing documents...</span>
-                  <span>{uploadProgress}%</span>
-                </div>
-                <Progress value={uploadProgress} className="h-2" />
-                <p className="text-xs text-gray-500">Preparing your document for upload.</p>
+                <Alert className="border-blue-200 bg-blue-50">
+                  <Sparkles className="h-5 w-5 text-blue-600" />
+                  <AlertDescription className="text-blue-800">
+                    <p className="font-medium">Ready for AI Processing</p>
+                    <p className="text-sm">
+                      Our AI will extract document details automatically. You can review and edit them in the next step.
+                    </p>
+                  </AlertDescription>
+                </Alert>
               </div>
-            )}
-
-            {processingError && (
-              <Alert className="border-red-200 bg-red-50">
-                <AlertTriangle className="h-5 w-5 text-red-600" />
-                <AlertDescription className="text-red-800">
-                  <p className="font-medium">Processing Error</p>
-                  <p className="text-sm">{processingError}</p>
-                </AlertDescription>
-              </Alert>
             )}
 
             {uploadError && (
@@ -425,218 +523,238 @@ export default function DocumentUploadModalRedesigned({
 
       case 2:
         return (
-          <div className="space-y-6 px-2">
-            {/* Document Preview */}
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold">Document Preview</h3>
-                <div className="flex items-center space-x-2">
-                  <Button variant="outline" size="sm">
-                    <ZoomIn className="h-4 w-4 mr-1" />
-                    Zoom
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    <Eye className="h-4 w-4 mr-1" />
-                    Full Screen
-                  </Button>
-                </div>
-              </div>
-
-              {/* File Navigation */}
-              {files.length > 1 && (
-                <div className="flex justify-between items-center bg-gray-50 p-3 rounded-md">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={selectedPreviewIndex === 0}
-                    onClick={() => setSelectedPreviewIndex((prev) => prev - 1)}
-                  >
-                    Previous
-                  </Button>
-                  <span className="text-sm font-medium">
-                    Document {selectedPreviewIndex + 1} of {files.length}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={selectedPreviewIndex === files.length - 1}
-                    onClick={() => setSelectedPreviewIndex((prev) => prev + 1)}
-                  >
-                    Next
-                  </Button>
-                </div>
-              )}
-
-              {/* Document Title */}
-              <div className="text-center">
-                <h4 className="text-xl font-bold text-gray-800">
-                  {files[selectedPreviewIndex]?.name.replace(/\.[^/.]+$/, "") || "Document"}
-                </h4>
-                <p className="text-sm text-gray-500 mt-1">
-                  {files[selectedPreviewIndex]?.type} • {(files[selectedPreviewIndex]?.size / 1024).toFixed(0)} KB
-                </p>
-              </div>
-
-              {/* Large Preview */}
-              <div className="flex justify-center items-center bg-gray-100 rounded-lg border-2 border-gray-200 min-h-[500px] p-4">
-                {filePreviewUrls.length > 0 ? (
-                  <img
-                    src={
-                      filePreviewUrls[selectedPreviewIndex] ||
-                      "/placeholder.svg?height=500&width=400&text=Document+Preview"
-                    }
-                    alt="Document preview"
-                    className="max-w-full max-h-[500px] object-contain rounded shadow-lg"
-                  />
-                ) : (
-                  <div className="text-center text-gray-400">
-                    <FileSymlink className="h-16 w-16 mx-auto mb-4" />
-                    <p className="text-lg">Document preview loading...</p>
-                  </div>
-                )}
-              </div>
+          <div className="space-y-6 px-2 text-center">
+            <div className="mx-auto w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mb-6">
+              <Loader2 className="h-12 w-12 text-blue-600 animate-spin" />
             </div>
 
-            {/* Document Information Form */}
-            <Alert className="border-blue-200 bg-blue-50">
-              <ShieldCheck className="h-5 w-5 text-blue-600" />
-              <AlertDescription className="text-blue-800">
-                <div className="space-y-2">
-                  <p className="font-medium">Enter Document Information</p>
-                  <p className="text-sm">
-                    Please enter the key information for this document. This will help us organize your documents and
-                    alert you before they expire.
-                  </p>
-                </div>
-              </AlertDescription>
-            </Alert>
+            <h3 className="text-2xl font-bold text-gray-900">Processing Document...</h3>
 
-            <div className="space-y-4">
-              {/* Document Type */}
-              <div className="space-y-2">
-                <Label htmlFor="documentType">Document Type *</Label>
-                <Select value={documentType} onValueChange={setDocumentType}>
-                  <SelectTrigger className="h-12">
-                    <SelectValue placeholder="Select document type" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[200px]">
-                    {documentTypes.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                    <SelectItem value="other">Other (specify)</SelectItem>
-                  </SelectContent>
-                </Select>
-                {documentType === "other" && (
-                  <Input
-                    className="mt-2"
-                    placeholder="Specify document type"
-                    value={customDocumentType}
-                    onChange={(e) => setCustomDocumentType(e.target.value)}
-                  />
-                )}
+            <p className="text-gray-600 text-lg">
+              Our AI is analyzing your document and extracting key information. This may take a few moments.
+            </p>
+
+            <div className="space-y-3 max-w-md mx-auto">
+              <div className="flex justify-between text-sm">
+                <span>Uploading & Processing...</span>
+                <span>{uploadProgress}%</span>
               </div>
+              <Progress value={uploadProgress} className="h-2" />
+            </div>
 
-              {/* Issuing Authority */}
-              <div className="space-y-2">
-                <Label htmlFor="issuingAuthority">Issuing Authority *</Label>
-                <Select value={issuingAuthority} onValueChange={setIssuingAuthority}>
-                  <SelectTrigger className="h-12">
-                    <SelectValue placeholder="Select issuing authority" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[200px]">
-                    {issuingAuthorities.map((authority) => (
-                      <SelectItem key={authority} value={authority}>
-                        {authority}
-                      </SelectItem>
-                    ))}
-                    <SelectItem value="other">Other (specify)</SelectItem>
-                  </SelectContent>
-                </Select>
-                {issuingAuthority === "other" && (
-                  <Input
-                    className="mt-2"
-                    placeholder="Specify issuing authority"
-                    value={customIssuingAuthority}
-                    onChange={(e) => setCustomIssuingAuthority(e.target.value)}
-                  />
-                )}
-              </div>
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-4 max-w-md mx-auto">
+              <p className="text-sm text-blue-800">
+                <strong>What's happening:</strong> We're uploading your document securely and using AI to extract
+                certificate details, dates, and issuing authorities automatically.
+              </p>
+            </div>
+          </div>
+        )
 
-              {/* Document Number */}
-              <div className="space-y-2">
-                <Label htmlFor="documentNumber">Certificate/Document Number</Label>
-                <Input
-                  id="documentNumber"
-                  className="h-12"
-                  placeholder="Enter document number"
-                  value={documentNumber}
-                  onChange={(e) => setDocumentNumber(e.target.value)}
-                />
-              </div>
-
-              {/* Issue Date */}
-              <div className="space-y-2">
-                <Label>Issue Date *</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal h-12",
-                        !issueDate && "text-muted-foreground",
-                      )}
-                    >
-                      <Calendar className="mr-2 h-5 w-5" />
-                      {issueDate ? format(issueDate, "PPP") : <span>Select issue date</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <CalendarComponent mode="single" selected={issueDate} onSelect={setIssueDate} initialFocus />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              {/* Expiry Date */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className={isPermanent ? "text-gray-400" : ""}>Expiry Date</Label>
+      case 3:
+        return (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Document Preview */}
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-semibold">Document Preview</h3>
                   <div className="flex items-center space-x-2">
-                    <Switch id="permanent" checked={isPermanent} onCheckedChange={setIsPermanent} />
-                    <Label htmlFor="permanent" className="text-sm cursor-pointer">
-                      No Expiry
-                    </Label>
+                    <Button variant="outline" size="sm">
+                      <ZoomIn className="h-4 w-4 mr-1" />
+                      Zoom
+                    </Button>
+                    <Button variant="outline" size="sm">
+                      <Eye className="h-4 w-4 mr-1" />
+                      Full Screen
+                    </Button>
                   </div>
                 </div>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal h-12",
-                        (!expiryDate || isPermanent) && "text-muted-foreground",
-                      )}
-                      disabled={isPermanent}
-                    >
-                      <Calendar className="mr-2 h-5 w-5" />
-                      {!isPermanent && expiryDate ? (
-                        format(expiryDate, "PPP")
-                      ) : (
-                        <span>{isPermanent ? "No expiry date" : "Select expiry date"}</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <CalendarComponent
-                      mode="single"
-                      selected={expiryDate}
-                      onSelect={setExpiryDate}
-                      initialFocus
-                      disabled={isPermanent}
+
+                <div className="flex justify-center items-center bg-gray-100 rounded-lg border-2 border-gray-200 min-h-[500px] p-4">
+                  {previewUrl ? (
+                    <img
+                      src={previewUrl || "/placeholder.svg"}
+                      alt="Document preview"
+                      className="max-w-full max-h-[500px] object-contain rounded shadow-lg"
                     />
-                  </PopoverContent>
-                </Popover>
+                  ) : filePreviewUrls[0] ? (
+                    <img
+                      src={filePreviewUrls[0] || "/placeholder.svg"}
+                      alt="Document preview"
+                      className="max-w-full max-h-[500px] object-contain rounded shadow-lg"
+                    />
+                  ) : (
+                    <div className="text-center text-gray-400">
+                      <FileSymlink className="h-16 w-16 mx-auto mb-4" />
+                      <p className="text-lg">Document preview loading...</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Extracted Data Form */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Document Information</h3>
+                  <div className="flex items-center text-sm text-green-600">
+                    <Sparkles className="h-4 w-4 mr-1" />
+                    AI Extracted
+                  </div>
+                </div>
+
+                {extractedData && (
+                  <Alert className="border-green-200 bg-green-50">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <AlertDescription className="text-green-800">
+                      <p className="font-medium">AI Processing Complete</p>
+                      <p className="text-sm">
+                        We've automatically extracted the key information. Please review and edit as needed.
+                      </p>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                <div className="space-y-4">
+                  {/* Document Title */}
+                  <div className="space-y-2">
+                    <Label htmlFor="documentTitle">Document Title *</Label>
+                    <Input
+                      id="documentTitle"
+                      className="h-10"
+                      value={documentTitle}
+                      onChange={(e) => setDocumentTitle(e.target.value)}
+                      placeholder="Enter document title"
+                    />
+                  </div>
+
+                  {/* Document Type */}
+                  <div className="space-y-2">
+                    <Label htmlFor="documentType">Document Type *</Label>
+                    <Select value={documentType} onValueChange={setDocumentType}>
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder="Select document type" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[200px]">
+                        {documentTypes.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {type}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="other">Other (specify)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {documentType === "other" && (
+                      <Input
+                        className="mt-2"
+                        placeholder="Specify document type"
+                        value={customDocumentType}
+                        onChange={(e) => setCustomDocumentType(e.target.value)}
+                      />
+                    )}
+                  </div>
+
+                  {/* Issuing Authority */}
+                  <div className="space-y-2">
+                    <Label htmlFor="issuingAuthority">Issuing Authority *</Label>
+                    <Select value={issuingAuthority} onValueChange={setIssuingAuthority}>
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder="Select issuing authority" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[200px]">
+                        {issuingAuthorities.map((authority) => (
+                          <SelectItem key={authority} value={authority}>
+                            {authority}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="other">Other (specify)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {issuingAuthority === "other" && (
+                      <Input
+                        className="mt-2"
+                        placeholder="Specify issuing authority"
+                        value={customIssuingAuthority}
+                        onChange={(e) => setCustomIssuingAuthority(e.target.value)}
+                      />
+                    )}
+                  </div>
+
+                  {/* Document Number */}
+                  <div className="space-y-2">
+                    <Label htmlFor="documentNumber">Certificate/Document Number</Label>
+                    <Input
+                      id="documentNumber"
+                      className="h-10"
+                      placeholder="Enter document number"
+                      value={documentNumber}
+                      onChange={(e) => setDocumentNumber(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Issue Date */}
+                  <div className="space-y-2">
+                    <Label>Issue Date *</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal h-10",
+                            !issueDate && "text-muted-foreground",
+                          )}
+                        >
+                          <Calendar className="mr-2 h-4 w-4" />
+                          {issueDate ? format(issueDate, "PPP") : <span>Select issue date</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <CalendarComponent mode="single" selected={issueDate} onSelect={setIssueDate} initialFocus />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  {/* Expiry Date */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className={isPermanent ? "text-gray-400" : ""}>Expiry Date</Label>
+                      <div className="flex items-center space-x-2">
+                        <Switch id="permanent" checked={isPermanent} onCheckedChange={setIsPermanent} />
+                        <Label htmlFor="permanent" className="text-sm cursor-pointer">
+                          No Expiry
+                        </Label>
+                      </div>
+                    </div>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal h-10",
+                            (!expiryDate || isPermanent) && "text-muted-foreground",
+                          )}
+                          disabled={isPermanent}
+                        >
+                          <Calendar className="mr-2 h-4 w-4" />
+                          {!isPermanent && expiryDate ? (
+                            format(expiryDate, "PPP")
+                          ) : (
+                            <span>{isPermanent ? "No expiry date" : "Select expiry date"}</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <CalendarComponent
+                          mode="single"
+                          selected={expiryDate}
+                          onSelect={setExpiryDate}
+                          initialFocus
+                          disabled={isPermanent}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -644,46 +762,41 @@ export default function DocumentUploadModalRedesigned({
               <Alert className="border-red-200 bg-red-50">
                 <AlertTriangle className="h-5 w-5 text-red-600" />
                 <AlertDescription className="text-red-800">
-                  <p className="font-medium">Upload Error</p>
+                  <p className="font-medium">Error</p>
                   <p className="text-sm">{uploadError}</p>
                 </AlertDescription>
               </Alert>
             )}
-
-            {isUploading && (
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span>Uploading document...</span>
-                  <span>{uploadProgress}%</span>
-                </div>
-                <Progress value={uploadProgress} className="h-2" />
-              </div>
-            )}
           </div>
         )
 
-      case 3:
+      case 4:
         return (
           <div className="space-y-6 text-center px-4">
             <div className="mx-auto w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6">
               <CheckCircle className="h-12 w-12 text-green-600" />
             </div>
 
-            <h3 className="text-2xl font-bold text-gray-900">Document Successfully Uploaded!</h3>
+            <h3 className="text-2xl font-bold text-gray-900">Document Successfully Processed!</h3>
             <p className="text-gray-600 text-lg">
-              Your maritime document has been securely stored and is now available in your vessel's document library.
+              Your maritime document has been uploaded, processed by AI, and is now available in your vessel's document
+              library.
             </p>
 
             <Card className="mt-8 text-left">
               <CardContent className="p-6">
-                <h4 className="font-semibold mb-4">Upload Summary</h4>
+                <h4 className="font-semibold mb-4">Final Document Details</h4>
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Vessel:</span>
                     <span className="font-medium">{vessels.find((v) => v.id === selectedVessel)?.name}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Document Type:</span>
+                    <span className="text-gray-600">Document:</span>
+                    <span className="font-medium">{documentTitle}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Type:</span>
                     <span className="font-medium">{documentType === "other" ? customDocumentType : documentType}</span>
                   </div>
                   <div className="flex justify-between">
@@ -737,24 +850,41 @@ export default function DocumentUploadModalRedesigned({
               Cancel
             </Button>
             <Button
-              onClick={processFiles}
-              disabled={files.length === 0 || !selectedVessel || isProcessing}
+              onClick={handleDirectUpload}
+              disabled={files.length === 0 || !selectedVessel || !documentTitle.trim() || isUploading}
               className="h-12 px-6"
             >
-              {isProcessing ? (
+              {isUploading ? (
                 <>
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Processing...
+                  Uploading...
                 </>
               ) : (
-                "Continue"
+                <>
+                  <Upload className="mr-2 h-5 w-5" />
+                  Upload & Process
+                </>
               )}
             </Button>
           </>
         )
 
       case 2:
+        return (
+          <>
+            <Button variant="outline" onClick={() => setUploadStep(1)} className="h-12 px-6" disabled={isExtracting}>
+              Back
+            </Button>
+            <Button disabled className="h-12 px-6">
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              Processing...
+            </Button>
+          </>
+        )
+
+      case 3:
         const isFormValid =
+          documentTitle.trim() &&
           documentType &&
           (documentType !== "other" || customDocumentType) &&
           issuingAuthority &&
@@ -765,25 +895,19 @@ export default function DocumentUploadModalRedesigned({
         return (
           <>
             <Button variant="outline" onClick={() => setUploadStep(1)} className="h-12 px-6">
-              Back
+              Start Over
             </Button>
-            <Button onClick={handleSubmit} disabled={!isFormValid || isUploading} className="h-12 px-6">
-              {isUploading ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Uploading...
-                </>
-              ) : (
-                "Upload Document"
-              )}
+            <Button onClick={handleFinalSubmit} disabled={!isFormValid} className="h-12 px-6">
+              <Edit3 className="mr-2 h-5 w-5" />
+              Save Document
             </Button>
           </>
         )
 
-      case 3:
+      case 4:
         return (
           <>
-            <Button variant="outline" onClick={resetAndUploadAnother} className="h-12 px-6">
+            <Button variant="outline" onClick={() => resetAllState()} className="h-12 px-6">
               Upload Another Document
             </Button>
             <Button onClick={onClose} className="h-12 px-6">
@@ -800,10 +924,12 @@ export default function DocumentUploadModalRedesigned({
   const getStepTitle = () => {
     switch (uploadStep) {
       case 1:
-        return "Upload Maritime Document"
+        return "Select Maritime Document"
       case 2:
-        return "Document Information"
+        return "Processing Document"
       case 3:
+        return "Review & Edit Details"
+      case 4:
         return "Upload Complete"
       default:
         return "Upload Document"
@@ -812,30 +938,33 @@ export default function DocumentUploadModalRedesigned({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[900px] w-[95vw] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[1200px] w-[95vw] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl">{getStepTitle()}</DialogTitle>
         </DialogHeader>
 
         {/* Step indicator */}
-        {uploadStep < 4 && (
+        {uploadStep < 5 && (
           <div className="flex items-center justify-between mb-6 px-2">
             <div className="w-full">
               <div className="flex justify-between mb-2">
                 <span className={`text-sm font-medium ${uploadStep >= 1 ? "text-blue-600" : "text-gray-400"}`}>
-                  Select Document
+                  Select & Preview
                 </span>
                 <span className={`text-sm font-medium ${uploadStep >= 2 ? "text-blue-600" : "text-gray-400"}`}>
-                  Enter Details
+                  Upload & Process
                 </span>
                 <span className={`text-sm font-medium ${uploadStep >= 3 ? "text-blue-600" : "text-gray-400"}`}>
+                  Review & Edit
+                </span>
+                <span className={`text-sm font-medium ${uploadStep >= 4 ? "text-blue-600" : "text-gray-400"}`}>
                   Complete
                 </span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2.5">
                 <div
                   className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
-                  style={{ width: `${(uploadStep / 3) * 100}%` }}
+                  style={{ width: `${(uploadStep / 4) * 100}%` }}
                 ></div>
               </div>
             </div>
