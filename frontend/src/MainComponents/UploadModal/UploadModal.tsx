@@ -204,18 +204,6 @@ export default function DocumentUploadModal({
     "International Ship Security Certificate (ISSC)",
   ]
 
-  const issuingAuthorities = [
-    "Panama Maritime Authority",
-    "Marshall Islands Maritime Administrator",
-    "Liberia Maritime Authority",
-    "Singapore Maritime and Port Authority",
-    "DNV GL",
-    "Lloyd's Register",
-    "American Bureau of Shipping (ABS)",
-    "Bureau Veritas (BV)",
-    "ClassNK",
-  ]
-
   // Fetch vessels when the modal opens
   useEffect(() => {
     if (isOpen) {
@@ -362,6 +350,7 @@ export default function DocumentUploadModal({
             setDocumentType(metadata.documentType)
           }
 
+          // Simply set the extracted issuer directly - no dropdown matching needed
           setIssuingAuthority(metadata.issuer || "")
           setDocumentNumber(metadata.documentNumber || "")
 
@@ -404,7 +393,7 @@ export default function DocumentUploadModal({
       const updateData = {
         title: documentTitle,
         documentType: documentType === "other" ? customDocumentType : documentType,
-        issuer: issuingAuthority === "other" ? customIssuingAuthority : issuingAuthority,
+        issuer: issuingAuthority, // Use the text input value directly
         certificateNumber: documentNumber,
         issueDate: issueDate?.toISOString().split("T")[0],
         expiryDate: isPermanent ? undefined : expiryDate?.toISOString().split("T")[0],
@@ -692,29 +681,25 @@ export default function DocumentUploadModal({
                     )}
                   </div>
 
-                  {/* Issuing Authority */}
+                  {/* Issuing Authority - UPDATED TO TEXT INPUT */}
                   <div className="space-y-2">
-                    <Label htmlFor="issuingAuthority">Issuing Authority *</Label>
-                    <Select value={issuingAuthority} onValueChange={setIssuingAuthority}>
-                      <SelectTrigger className="h-10">
-                        <SelectValue placeholder="Select issuing authority" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[200px]">
-                        {issuingAuthorities.map((authority) => (
-                          <SelectItem key={authority} value={authority}>
-                            {authority}
-                          </SelectItem>
-                        ))}
-                        <SelectItem value="other">Other (specify)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {issuingAuthority === "other" && (
-                      <Input
-                        className="mt-2"
-                        placeholder="Specify issuing authority"
-                        value={customIssuingAuthority}
-                        onChange={(e) => setCustomIssuingAuthority(e.target.value)}
-                      />
+                    <Label htmlFor="issuingAuthority">
+                      Issuing Authority *
+                      {extractedData?.issuer && (
+                        <span className="ml-2 text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                          ✨ AI Extracted
+                        </span>
+                      )}
+                    </Label>
+                    <Input
+                      id="issuingAuthority"
+                      className="h-10"
+                      value={issuingAuthority}
+                      onChange={(e) => setIssuingAuthority(e.target.value)}
+                      placeholder="Enter issuing authority (e.g., Bahamas Maritime Authority)"
+                    />
+                    {extractedData?.issuer && (
+                      <p className="text-gray-500 text-sm">AI extracted: "{extractedData.issuer}" - Edit if needed</p>
                     )}
                   </div>
 
@@ -839,9 +824,7 @@ export default function DocumentUploadModal({
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Issuing Authority:</span>
-                    <span className="font-medium">
-                      {issuingAuthority === "other" ? customIssuingAuthority : issuingAuthority}
-                    </span>
+                    <span className="font-medium">{issuingAuthority}</span>
                   </div>
                   {documentNumber && (
                     <div className="flex justify-between">
@@ -926,7 +909,6 @@ export default function DocumentUploadModal({
           documentType &&
           (documentType !== "other" || customDocumentType) &&
           issuingAuthority &&
-          (issuingAuthority !== "other" || customIssuingAuthority) &&
           issueDate &&
           (isPermanent || expiryDate)
 
