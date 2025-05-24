@@ -1,6 +1,6 @@
 const { supabaseAdmin } = require("../../SupabaseClient")
 const { classifyDocument } = require("./DocumentClassifierAlgo")
-const { processPDFDocument } = require("./ExtractTextFromImageAlgo") 
+const { processPDFDocument } = require("./EnhancedPDFAlgo") 
 const { extractTextFromImageBase64 } = require("./ExtractTextFromImageAlgo")
 const { 
   uploadToTempStorage, 

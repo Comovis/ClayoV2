@@ -1,29 +1,62 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { AlertTriangle, CheckCircle, AlertCircle, Ship, Calendar, FileText, Clock, MapPin, Eye, Share2, Upload, Shield } from 'lucide-react'
+import {
+  AlertTriangle,
+  CheckCircle,
+  AlertCircle,
+  Ship,
+  Calendar,
+  FileText,
+  Clock,
+  MapPin,
+  Eye,
+  Share2,
+  Upload,
+  Shield,
+} from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 import DocumentUploadModal from "../../MainComponents/UploadModal/UploadModal"
 import { useUser } from "../../Auth/Contexts/UserContext"
+import SystemInitializationLoading from "../../Auth/Login/LoadingWelcomePage"
 
 export default function Dashboard({ hideSidebar = false }) {
-  // Add this near the top of your component
   const { isAuthenticated, isLoading, user, company } = useUser()
+  const [showInitialLoading, setShowInitialLoading] = useState(false)
 
   console.log("Dashboard rendering with auth state:", { isAuthenticated, isLoading, user, company })
 
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
   const [selectedVesselForUpload, setSelectedVesselForUpload] = useState<string | undefined>(undefined)
 
+  // Check for loading screen flag
+  useEffect(() => {
+    const shouldShowLoading = localStorage.getItem("comovis_showing_loading")
+    if (shouldShowLoading === "true" && isAuthenticated) {
+      console.log("🎬 Dashboard detected loading flag, showing loading screen...")
+      setShowInitialLoading(true)
+    }
+  }, [isAuthenticated])
+
+  const handleLoadingComplete = () => {
+    console.log("🚢 Dashboard loading complete, clearing flag...")
+    localStorage.removeItem("comovis_showing_loading")
+    setShowInitialLoading(false)
+  }
+
   // Handle upload completion
   const handleUploadComplete = (documentData: any) => {
     console.log("Document uploaded:", documentData)
-    // You would update your documents state/cache here
     setUploadModalOpen(false)
-    // Optionally show a success notification
+  }
+
+  // Show loading screen if flag is set
+  if (showInitialLoading) {
+    console.log("🎬 Dashboard rendering loading screen")
+    return <SystemInitializationLoading onComplete={handleLoadingComplete} />
   }
 
   // Add conditional rendering based on loading state
@@ -39,7 +72,6 @@ export default function Dashboard({ hideSidebar = false }) {
   }
 
   // If not authenticated and not loading, this should be handled by ProtectedRoute
-  // But we can add an extra check here for safety
   if (!isAuthenticated && !isLoading) {
     console.log("Dashboard: User not authenticated but somehow reached this component")
     return (
@@ -47,10 +79,7 @@ export default function Dashboard({ hideSidebar = false }) {
         <div className="text-center">
           <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <p className="text-gray-600">You need to be logged in to view this page.</p>
-          <Button 
-            className="mt-4" 
-            onClick={() => window.location.href = "/login"}
-          >
+          <Button className="mt-4" onClick={() => (window.location.href = "/login")}>
             Go to Login
           </Button>
         </div>
@@ -99,7 +128,7 @@ export default function Dashboard({ hideSidebar = false }) {
             <CardContent className="p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-medium">Document Status</h3>
-                <Button variant="outline" size="sm" onClick={() => window.location.href = "/document-hub"}>
+                <Button variant="outline" size="sm" onClick={() => (window.location.href = "/document-hub")}>
                   <Eye className="h-4 w-4 mr-1" />
                   View All
                 </Button>
@@ -149,15 +178,15 @@ export default function Dashboard({ hideSidebar = false }) {
             <CardContent className="p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-medium">Upcoming Port Calls</h3>
-                <Button variant="outline" size="sm" onClick={() => window.location.href = "/port-preparation"}>
+                <Button variant="outline" size="sm" onClick={() => (window.location.href = "/port-preparation")}>
                   <Calendar className="h-4 w-4 mr-1" />
                   View All
                 </Button>
               </div>
               <div className="space-y-3">
-                <div 
+                <div
                   className="flex items-center p-2 bg-blue-50 border border-blue-100 rounded-md cursor-pointer"
-                  onClick={() => window.location.href = "/port-preparation"}
+                  onClick={() => (window.location.href = "/port-preparation")}
                 >
                   <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-3">
                     <MapPin className="h-5 w-5 text-blue-600" />
@@ -245,7 +274,7 @@ export default function Dashboard({ hideSidebar = false }) {
                         Required for Singapore (Nov 15)
                       </div>
                       <div>
-                        <Button 
+                        <Button
                           size="sm"
                           onClick={() => {
                             setSelectedVesselForUpload("Humble Warrior")
@@ -283,11 +312,7 @@ export default function Dashboard({ hideSidebar = false }) {
                         Expires Nov 20, 2023
                       </div>
                       <div>
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => window.location.href = "/document-hub"}
-                        >
+                        <Button size="sm" variant="outline" onClick={() => (window.location.href = "/document-hub")}>
                           Start Renewal Process
                         </Button>
                       </div>
@@ -319,11 +344,7 @@ export default function Dashboard({ hideSidebar = false }) {
                         Singapore arrival Nov 15, 2023
                       </div>
                       <div>
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => window.location.href = "/compliance"}
-                        >
+                        <Button size="sm" variant="outline" onClick={() => (window.location.href = "/compliance")}>
                           Prepare for Inspection
                         </Button>
                       </div>
@@ -483,7 +504,7 @@ export default function Dashboard({ hideSidebar = false }) {
       </main>
 
       {/* Document Upload Modal */}
-      <DocumentUploadModal 
+      <DocumentUploadModal
         isOpen={uploadModalOpen}
         onClose={() => setUploadModalOpen(false)}
         initialVesselId={selectedVesselForUpload}
@@ -523,11 +544,7 @@ function VesselOverviewItem({ name, type, flag, complianceScore, documentStatus 
             <div className="w-8 h-8 rounded-full flex items-center justify-center bg-gray-100 mr-2">
               <span className="text-sm font-medium">{complianceScore}</span>
             </div>
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={() => window.location.href = "/document-hub"}
-            >
+            <Button variant="ghost" size="sm" onClick={() => (window.location.href = "/document-hub")}>
               <Eye className="h-4 w-4" />
             </Button>
           </div>
@@ -602,10 +619,7 @@ interface QuickAccessCardProps {
 
 function QuickAccessCard({ icon: Icon, title, description, link, color }: QuickAccessCardProps) {
   return (
-    <div 
-      className="cursor-pointer"
-      onClick={() => window.location.href = link}
-    >
+    <div className="cursor-pointer" onClick={() => (window.location.href = link)}>
       <Card className="hover:shadow-md transition-shadow h-full">
         <CardContent className="p-6">
           <div className={`w-12 h-12 rounded-lg ${color} text-white flex items-center justify-center mb-4`}>

@@ -18,7 +18,6 @@ import {
   Calendar,
   CheckCircle,
   Loader2,
-  FileSymlink,
   Eye,
   ZoomIn,
   AlertTriangle,
@@ -35,12 +34,13 @@ import { useFetchVessels } from "../../Hooks/useFetchVessels"
 import { useDocumentUpload } from "../../Hooks/useDocumentUpload"
 import { useDocumentPreview } from "../../Hooks/useDocumentPreview"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import PDFViewer from "./PDFViewer"
 
 /**
  * Parse extracted date string in DD/MM/YYYY format (maritime standard)
  * Handles formats like "05/06/2027" where 05=day, 06=month, 2027=year
  */
-function parseExtractedDate(dateString) {
+function parseExtractedDate(dateString: string | null | undefined): Date | null {
   if (!dateString) return null
 
   try {
@@ -72,6 +72,70 @@ interface DocumentUploadModalProps {
   onClose: () => void
   initialVesselId?: string
   onUploadComplete?: (documentData: any) => void
+}
+
+// Enhanced Document Preview Component
+function DocumentPreview({
+  file,
+  previewUrl,
+  className = "",
+}: {
+  file?: File
+  previewUrl?: string
+  className?: string
+}) {
+  const isPDF = file?.type === "application/pdf"
+  const isImage = file?.type.startsWith("image/")
+
+  if (isPDF && file) {
+    const fileUrl = URL.createObjectURL(file)
+    return (
+      <div className={className}>
+        <PDFViewer fileUrl={fileUrl} />
+      </div>
+    )
+  }
+
+  if (isImage && file) {
+    const imageUrl = URL.createObjectURL(file)
+    return (
+      <div
+        className={`flex justify-center items-center bg-gray-50 rounded-lg border-2 border-gray-200 p-6 ${className}`}
+      >
+        <img
+          src={imageUrl || "/placeholder.svg"}
+          alt="Document preview"
+          className="max-w-full max-h-[500px] object-contain rounded shadow-lg"
+          onLoad={() => URL.revokeObjectURL(imageUrl)}
+        />
+      </div>
+    )
+  }
+
+  if (previewUrl) {
+    return (
+      <div
+        className={`flex justify-center items-center bg-gray-50 rounded-lg border-2 border-gray-200 p-6 ${className}`}
+      >
+        <img
+          src={previewUrl || "/placeholder.svg"}
+          alt="Document preview"
+          className="max-w-full max-h-[500px] object-contain rounded shadow-lg"
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className={`flex justify-center items-center bg-gray-100 rounded-lg border-2 border-gray-200 p-8 ${className}`}
+    >
+      <div className="text-center text-gray-400">
+        <FileText className="h-16 w-16 mx-auto mb-4" />
+        <p className="text-lg">Document preview loading...</p>
+      </div>
+    </div>
+  )
 }
 
 export default function DocumentUploadModal({
@@ -212,7 +276,7 @@ export default function DocumentUploadModal({
 
     const newPreviewUrls = files.map((file) => {
       if (file.type === "application/pdf") {
-        return "/placeholder.svg?height=600&width=400&text=PDF+Document"
+        return "" // PDFViewer will handle this directly
       } else {
         return URL.createObjectURL(file)
       }
@@ -450,7 +514,7 @@ export default function DocumentUploadModal({
               </Tabs>
             </div>
 
-            {/* Large Document Preview */}
+            {/* Enhanced Document Preview */}
             {files.length > 0 && (
               <div className="space-y-4" data-scroll-target="preview">
                 <Label>Document Preview</Label>
@@ -469,26 +533,19 @@ export default function DocumentUploadModal({
                     />
                   </div>
 
-                  {/* Large Preview */}
-                  <div className="flex justify-center items-center bg-gray-50 rounded-lg border-2 border-gray-200 min-h-[500px] p-6 mb-4">
-                    {filePreviewUrls[0] ? (
-                      <img
-                        src={filePreviewUrls[0] || "/placeholder.svg"}
-                        alt="Document preview"
-                        className="max-w-full max-h-[500px] object-contain rounded shadow-lg"
-                      />
-                    ) : (
-                      <div className="text-center text-gray-400">
-                        <FileText className="h-16 w-16 mx-auto mb-4" />
-                        <p className="text-lg">Document preview loading...</p>
-                      </div>
-                    )}
-                  </div>
+                  {/* Enhanced Preview with PDF Support */}
+                  <DocumentPreview file={files[0]} className="min-h-[500px] mb-4" />
 
                   {/* File Info */}
                   <div className="flex items-center justify-between">
                     <div className="text-sm text-gray-500">
                       {files[0].type.split("/")[1].toUpperCase()} • {(files[0].size / 1024).toFixed(0)} KB
+                      {files[0].type === "application/pdf" && (
+                        <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                          <FileText className="h-3 w-3 mr-1" />
+                          PDF Document
+                        </span>
+                      )}
                     </div>
                     <Button variant="ghost" size="sm" onClick={removeFile}>
                       <X className="h-4 w-4 mr-1" />
@@ -571,26 +628,7 @@ export default function DocumentUploadModal({
                   </div>
                 </div>
 
-                <div className="flex justify-center items-center bg-gray-100 rounded-lg border-2 border-gray-200 min-h-[500px] p-4">
-                  {previewUrl ? (
-                    <img
-                      src={previewUrl || "/placeholder.svg"}
-                      alt="Document preview"
-                      className="max-w-full max-h-[500px] object-contain rounded shadow-lg"
-                    />
-                  ) : filePreviewUrls[0] ? (
-                    <img
-                      src={filePreviewUrls[0] || "/placeholder.svg"}
-                      alt="Document preview"
-                      className="max-w-full max-h-[500px] object-contain rounded shadow-lg"
-                    />
-                  ) : (
-                    <div className="text-center text-gray-400">
-                      <FileSymlink className="h-16 w-16 mx-auto mb-4" />
-                      <p className="text-lg">Document preview loading...</p>
-                    </div>
-                  )}
-                </div>
+                <DocumentPreview file={files[0]} previewUrl={previewUrl} className="min-h-[500px]" />
               </div>
 
               {/* Extracted Data Form */}

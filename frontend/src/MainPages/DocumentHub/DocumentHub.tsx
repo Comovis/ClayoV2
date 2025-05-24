@@ -26,6 +26,7 @@ import {
   Calendar,
   ExternalLink,
   RefreshCw,
+  Loader2,
 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetClose } from "@/components/ui/sheet"
@@ -78,6 +79,7 @@ export default function DocumentHub() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(undefined)
   const [viewMode, setViewMode] = useState<"table" | "card">("table")
   const [isDocumentSheetOpen, setIsDocumentSheetOpen] = useState(false)
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false)
 
   // Fetch vessels when the component mounts
   useEffect(() => {
@@ -164,10 +166,19 @@ export default function DocumentHub() {
   const handleDocumentSelect = async (document: any) => {
     setSelectedDocument(document)
     setIsDocumentSheetOpen(true)
+    setIsPreviewLoading(true)
 
     // Generate preview URL if document has a file path
     if (document.file_path) {
-      await generatePreviewUrl(document.file_path)
+      try {
+        await generatePreviewUrl(document.file_path)
+      } catch (error) {
+        console.error("Error generating preview:", error)
+      } finally {
+        setIsPreviewLoading(false)
+      }
+    } else {
+      setIsPreviewLoading(false)
     }
   }
 
@@ -656,6 +667,7 @@ export default function DocumentHub() {
           if (!open) {
             clearPreview()
             setSelectedDocument(null)
+            setIsPreviewLoading(false)
           }
         }}
       >
@@ -677,7 +689,14 @@ export default function DocumentHub() {
                 </div>
 
                 <div className="mb-6">
-                  {previewUrl ? (
+                  {isPreviewLoading ? (
+                    <div className="w-full h-64 bg-gray-100 rounded-md border flex items-center justify-center">
+                      <div className="text-center">
+                        <Loader2 className="h-8 w-8 mx-auto mb-2 text-blue-500 animate-spin" />
+                        <p className="text-gray-500 text-sm">Loading document preview...</p>
+                      </div>
+                    </div>
+                  ) : previewUrl ? (
                     <img
                       src={previewUrl || "/placeholder.svg"}
                       alt="Document Preview"

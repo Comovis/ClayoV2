@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom"
 import { Footer } from "./MainComponents/Footer/Footer"
 import Dashboard from "./MainPages/Dashboard/MainDashboard"
@@ -41,6 +41,23 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState("aiChat")
   const [showSidePanel, setShowSidePanel] = useState(true)
   const [showRightPanel, setShowRightPanel] = useState(false)
+  const [isShowingLoadingScreen, setIsShowingLoadingScreen] = useState(false)
+
+  // Add this useEffect to monitor the loading flag
+  useEffect(() => {
+    const checkLoadingFlag = () => {
+      const loadingFlag = localStorage.getItem("comovis_showing_loading")
+      setIsShowingLoadingScreen(loadingFlag === "true")
+    }
+
+    // Check initially
+    checkLoadingFlag()
+
+    // Set up an interval to check periodically (since localStorage can change)
+    const interval = setInterval(checkLoadingFlag, 100)
+
+    return () => clearInterval(interval)
+  }, [])
 
   // Use location to determine which header to show
   const location = useLocation()
@@ -100,14 +117,13 @@ function AppContent() {
   return (
     <div className="flex h-screen">
       {/* Only show sidebar on known paths that are not landing pages, auth pages, or share pages */}
-      {!isLandingPage && !isAuthPage && !isUnknownPath && !isSharePage && <Sidebar />}
+      {!isLandingPage && !isAuthPage && !isUnknownPath && !isSharePage && !isShowingLoadingScreen && <Sidebar />}
 
       <div className="flex flex-col flex-1">
         {/* Conditionally render the appropriate header */}
-        {isLandingPage ? (
+        {isShowingLoadingScreen ? null : isLandingPage ? (
           <LandingHeader user={user} logout={handleLogout} />
-        ) : isAuthPage || isUnknownPath || isSharePage ? // No header on auth pages, unknown paths, or share pages
-        null : (
+        ) : isAuthPage || isUnknownPath || isSharePage ? null : (
           <AppHeader
             activeTab={activeTab}
             setActiveTab={setActiveTab}
@@ -232,7 +248,7 @@ function AppContent() {
         </div>
 
         {/* Only show footer on known paths that are not auth pages or share pages */}
-        {!isAuthPage && !isUnknownPath && !isSharePage && <Footer />}
+        {!isAuthPage && !isUnknownPath && !isSharePage && !isShowingLoadingScreen && <Footer />}
       </div>
     </div>
   )

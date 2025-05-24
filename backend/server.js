@@ -1,7 +1,11 @@
 const express = require("express")
 const cors = require("cors")
 const multer = require("multer")
+const helmet = require("helmet")
+const rateLimit = require("express-rate-limit")
 require("dotenv").config()
+
+// Import your existing handlers
 const { sendUserConfirmationEmail, resendConfirmationEmail } = require("./Emails/EmailAuthLinkService")
 const { createUserWithCompany } = require("./Auth/SignupAuthService")
 const { authenticateUser } = require("./Auth/AuthenticateUser")
@@ -17,14 +21,14 @@ const { handleAcceptInvitationRequest } = require("./Team/AcceptInvitation")
 const { handleGetVesselsRequest } = require("./AppFeatures/Vessels/FetchVessels")
 const { handleAddVesselRequest } = require("./AppFeatures/Vessels/AddVessel")
 const { processDocumentShareEmails } = require("./Emails/ShareEmail/SendDocumentShareEmail")
-const { 
-  handleCreateDocumentShare, 
-  handleGetShareByToken, 
-  handleGetDocumentShares, 
-  handleRevokeDocumentShare, 
-  handleLogDocumentAccess 
+const {
+  handleCreateDocumentShare,
+  handleGetShareByToken,
+  handleGetDocumentShares,
+  handleRevokeDocumentShare,
+  handleLogDocumentAccess,
 } = require("./AppFeatures/DocumentSharing/DocumentSharingService")
-const { 
+const {
   handleDocumentUpload,
   handleGetDocument,
   handleGetVesselDocuments,
@@ -33,32 +37,87 @@ const {
   handleDocumentDownload,
   handleCleanupTempFiles,
 } = require("./AppFeatures/DocumentHub/DocumentUploadsHandler")
-
 const { handleBatchDocumentDownload } = require("./AppFeatures/DocumentHub/BatchDownload")
-
 
 const app = express()
 const port = process.env.PORT || 2807
 
-const storage = multer.memoryStorage()
-const upload = multer({ 
-  storage,
-  limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit
+// ===== SECURITY MIDDLEWARE =====
+
+// 1. HTTPS Enforcement (Force secure connections)
+app.use((req, res, next) => {
+  if (process.env.NODE_ENV === "production" && !req.secure && req.get("x-forwarded-proto") !== "https") {
+    return res.redirect(301, `https://${req.get("host")}${req.url}`)
+  }
+  next()
 })
 
+// 2. Security Headers (Maritime-grade protection)
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'"],
+        imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: ["'self'", "https://*.supabase.co"],
+        fontSrc: ["'self'", "https:", "data:"],
+      },
+    },
+    hsts: {
+      maxAge: 31536000, // 1 year
+      includeSubDomains: true,
+      preload: true,
+    },
+    crossOriginEmbedderPolicy: false, // Allow document previews
+  }),
+)
 
+// 3. Rate Limiting (Anti-brute force protection for auth only)
 
-// Basic middleware
-app.use(express.json())
+// Strict rate limiting for authentication endpoints only
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 attempts per window per IP
+  message: {
+    error: "Too many authentication attempts from this IP. Please try again in 15 minutes.",
+    type: "RATE_LIMIT_AUTH",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Skip rate limiting for successful requests
+  skipSuccessfulRequests: true,
+})
+
+// ===== FILE UPLOAD SECURITY =====
+
+const storage = multer.memoryStorage()
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB limit
+    files: 1, // Only one file at a time
+  },
+  // Removed file type restrictions as requested
+})
+
+// ===== BASIC MIDDLEWARE =====
+app.use(express.json({ limit: "10mb" }))
 app.use(cors())
 
+// ===== ENHANCED DOCUMENT SECURITY =====
+app.use("/api/documents", (req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff")
+  res.setHeader("X-Frame-Options", "DENY")
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private")
+  res.setHeader("Pragma", "no-cache")
+  next()
+})
 
+// ===== AUTH & USER SETUP ROUTES =====
 
-
-
-//----Auth & User Setup -----//
-
-app.post("/api/send-confirmation-email", async (req, res) => {
+app.post("/api/send-confirmation-email", authLimiter, async (req, res) => {
   try {
     const { email } = req.body
 
@@ -79,7 +138,7 @@ app.post("/api/send-confirmation-email", async (req, res) => {
   }
 })
 
-app.post("/api/resend-confirmation-email", async (req, res) => {
+app.post("/api/resend-confirmation-email", authLimiter, async (req, res) => {
   try {
     const { email } = req.body
 
@@ -100,24 +159,20 @@ app.post("/api/resend-confirmation-email", async (req, res) => {
   }
 })
 
-
-app.post("/api/signin", async (req, res) => {
+app.post("/api/signin", authLimiter, async (req, res) => {
   try {
-    // The handleSignIn handler will manage the authentication process
     await handleSignIn(req, res)
   } catch (error) {
     console.error("Error during sign in:", error)
-    res.status(500).json({ 
-      success: false, 
-      error: "Authentication failed", 
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined 
+    res.status(500).json({
+      success: false,
+      error: "Authentication failed",
+      details: process.env.NODE_ENV === "development" ? error.message : undefined,
     })
   }
 })
 
-
-
-app.post("/api/signup", async (req, res) => {
+app.post("/api/signup", authLimiter, async (req, res) => {
   try {
     const { email, password, fullName, companyName } = req.body
 
@@ -164,9 +219,8 @@ app.post("/api/signup", async (req, res) => {
   }
 })
 
-
 // Add this to your existing routes in server.js
-app.post("/api/invite-signup", async (req, res) => {
+app.post("/api/invite-signup", authLimiter, async (req, res) => {
   try {
     await handleInviteSignup(req, res)
   } catch (error) {
@@ -174,8 +228,6 @@ app.post("/api/invite-signup", async (req, res) => {
     res.status(500).json({ error: "Failed to process invitation signup" })
   }
 })
-
-
 
 app.post("/api/send-team-invitation", authenticateUser, async (req, res) => {
   try {
@@ -209,7 +261,6 @@ app.post("/api/send-team-invitation", authenticateUser, async (req, res) => {
   }
 })
 
-
 app.post("/api/accept-invitation", async (req, res) => {
   try {
     await handleAcceptInvitationRequest(req, res)
@@ -221,7 +272,6 @@ app.post("/api/accept-invitation", async (req, res) => {
     })
   }
 })
-
 
 app.post("/api/validate-invitation", async (req, res) => {
   try {
@@ -244,8 +294,7 @@ app.post("/api/cancel-team-invitation", authenticateUser, async (req, res) => {
     console.error("Error cancelling team invitation:", error)
     res.status(500).json({ error: "Failed to cancel team invitation" })
   }
-}) 
-
+})
 
 app.get("/api/team-members", authenticateUser, async (req, res) => {
   try {
@@ -258,17 +307,14 @@ app.get("/api/team-members", authenticateUser, async (req, res) => {
   }
 })
 
-
 app.get("/api/get-users", authenticateUser, async (req, res) => {
   try {
-   
     await handleGetUserData(req, res)
   } catch (error) {
     console.error("Error retrieving user data:", error)
     res.status(500).json({ error: "Failed to retrieve user data" })
   }
 })
-
 
 app.get("/api/auth/current-user", authenticateUser, async (req, res) => {
   try {
@@ -278,7 +324,7 @@ app.get("/api/auth/current-user", authenticateUser, async (req, res) => {
     if (!userId) {
       return res.status(401).json({
         success: false,
-        error: "User ID not found"
+        error: "User ID not found",
       })
     }
 
@@ -291,13 +337,12 @@ app.get("/api/auth/current-user", authenticateUser, async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: "Failed to fetch user data"
+      error: "Failed to fetch user data",
     })
   }
 })
 
-
-//---- Features Main App API Endpoints -----//
+// ===== FEATURES MAIN APP API ENDPOINTS =====
 
 // GET endpoint for fetching vessels with query parameters
 app.get("/api/get-vessels", authenticateUser, async (req, res) => {
@@ -309,7 +354,6 @@ app.get("/api/get-vessels", authenticateUser, async (req, res) => {
   }
 })
 
-
 app.post("/api/add-vessel", authenticateUser, async (req, res) => {
   try {
     await handleAddVesselRequest(req, res)
@@ -319,11 +363,7 @@ app.post("/api/add-vessel", authenticateUser, async (req, res) => {
   }
 })
 
-
-//Share Documents
-
-
-
+// Share Documents
 app.post("/send-document-share-email", authenticateUser, async (req, res) => {
   try {
     const { shareId } = req.body
@@ -359,7 +399,6 @@ app.post("/send-document-share-email", authenticateUser, async (req, res) => {
     return res.status(500).json({ error: "Failed to send document share emails" })
   }
 })
-
 
 // Document Sharing Endpoints
 app.post("/api/document-shares", authenticateUser, async (req, res) => {
@@ -407,13 +446,8 @@ app.post("/api/document-access-logs", async (req, res) => {
   }
 })
 
-
-
-
-
-// Document Hub endpoints 
-
-app.post("/api/documents/upload", authenticateUser, upload.single('file'), async (req, res) => {
+// Document Hub endpoints
+app.post("/api/documents/upload", authenticateUser, upload.single("file"), async (req, res) => {
   try {
     await handleDocumentUpload(req, res)
   } catch (error) {
@@ -462,9 +496,6 @@ app.delete("/api/documents/:id", authenticateUser, async (req, res) => {
   }
 })
 
-
-
-
 // Generate a download URL for a document
 app.get("/api/documents/:id/download", authenticateUser, async (req, res) => {
   try {
@@ -480,14 +511,12 @@ app.post("/api/documents/batch-download", authenticateUser, async (req, res) => 
     await handleBatchDocumentDownload(req, res)
   } catch (error) {
     console.error("Error generating batch download URLs:", error)
-    res.status(500).json({ 
-      success: false, 
-      error: "Failed to generate batch download URLs" 
+    res.status(500).json({
+      success: false,
+      error: "Failed to generate batch download URLs",
     })
   }
 })
-
-
 
 // Cleanup temp files (admin only)
 app.post("/api/admin/cleanup-temp-files", authenticateUser, async (req, res) => {
@@ -499,9 +528,8 @@ app.post("/api/admin/cleanup-temp-files", authenticateUser, async (req, res) => 
   }
 })
 
-
-
 // Start server
 app.listen(port, "0.0.0.0", () => {
-  console.log(`Comovis V2 backend is running on port ${port}`)
+  console.log(`🚢 Comovis V2 backend is running securely on port ${port}`)
+  console.log(`🔒 Security features enabled: HTTPS enforcement, rate limiting for auth`)
 })

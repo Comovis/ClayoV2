@@ -1,11 +1,11 @@
 "use client"
 
 import type React from "react"
-
-import { useState, useEffect } from "react" // Added useEffect import
+import { useState, useEffect } from "react"
 import { Mail, Lock, Loader2, AlertCircle } from "lucide-react"
 import { Link, useNavigate } from "react-router-dom"
-import { useUser } from "../../Auth/Contexts/UserContext" // Import the useUser hook
+import { useUser } from "../../Auth/Contexts/UserContext"
+import SystemInitializationLoading from "./LoadingWelcomePage"
 
 // Simple image import for logo
 import LogoBlack from "../../ReusableAssets/Logos/LogoBlack.svg"
@@ -16,6 +16,7 @@ const apiBaseUrl =
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
+  const [showLoadingScreen, setShowLoadingScreen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -37,10 +38,24 @@ export default function LoginPage() {
     }
   }, [])
 
+  const handleLoadingComplete = async () => {
+    console.log("🚢 Loading complete, clearing loading flag and navigating...")
+
+    // Clear the loading flag
+    localStorage.removeItem("comovis_showing_loading")
+
+    // Refresh user data and navigate
+    await refreshUserData()
+    navigate("/dashboard")
+  }
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError(null)
     setIsLoading(true)
+    setShowLoadingScreen(false)
+
+    console.log("🔐 Starting authentication process...")
 
     try {
       // Validate inputs
@@ -51,15 +66,21 @@ export default function LoginPage() {
       // Sanitize email
       const sanitizedEmail = email.toLowerCase().trim()
 
-      console.log(`Attempting to sign in user: ${sanitizedEmail}`)
+      console.log(`🔍 Attempting to sign in user: ${sanitizedEmail}`)
+
+      // Set loading flag BEFORE authentication
+      localStorage.setItem("comovis_showing_loading", "true")
 
       // First, use the context's login function to authenticate with Supabase
       const loginResult = await login(sanitizedEmail, password)
 
       if (!loginResult.success) {
-        // Show a user-friendly error message for authentication failures
+        console.log("❌ Supabase authentication failed")
+        localStorage.removeItem("comovis_showing_loading")
         throw new Error("Your email or password does not match our records")
       }
+
+      console.log("✅ Supabase authentication successful")
 
       // Now call our custom API endpoint to get additional user data
       const response = await fetch(`${apiBaseUrl}/api/signin`, {
@@ -74,7 +95,8 @@ export default function LoginPage() {
       })
 
       if (!response.ok) {
-        // Handle API errors with user-friendly messages
+        console.log(`❌ API response not ok: ${response.status}`)
+        localStorage.removeItem("comovis_showing_loading")
         if (response.status === 401 || response.status === 403) {
           throw new Error("Your email or password does not match our records")
         } else {
@@ -83,13 +105,27 @@ export default function LoginPage() {
       }
 
       const data = await response.json()
+      console.log("📊 API response data:", data)
+
+      // Handle rate limiting specifically
+      if (data.type === "RATE_LIMIT_AUTH") {
+        localStorage.removeItem("comovis_showing_loading")
+        throw new Error("Too many login attempts. Please wait 15 minutes before trying again.")
+      }
 
       if (!data.success) {
-        // Handle unsuccessful login with user-friendly message
+        console.log("❌ API response indicates failure")
+        localStorage.removeItem("comovis_showing_loading")
         throw new Error("Your email or password does not match our records")
       }
 
-      console.log("User authenticated successfully:", data.user.email)
+      console.log("✅ User authenticated successfully:", data.user.email)
+
+      // Extract first name from user data - try multiple fields
+      // const firstName =
+      //   data.user.first_name || data.user.full_name?.split(" ")[0] || data.user.name?.split(" ")[0] || "Captain"
+      // console.log("👤 User first name:", firstName)
+      // setUserFirstName(firstName)
 
       // Store user data in localStorage if remember me is checked
       if (rememberMe) {
@@ -104,16 +140,18 @@ export default function LoginPage() {
       localStorage.setItem("refreshToken", data.user.session.refresh_token)
       localStorage.setItem("tokenExpiry", data.user.session.expires_at)
 
-      // Refresh user data to ensure the context is updated
-      await refreshUserData()
-
-      // Use navigate instead of window.location for a smoother transition
-      navigate("/dashboard")
+      // Show loading screen
+      console.log("🎬 Showing loading screen...")
+      setIsLoading(false)
+      setShowLoadingScreen(true)
     } catch (error) {
-      console.error("Login error:", error)
+      console.error("❌ Login error:", error)
+      localStorage.removeItem("comovis_showing_loading")
 
-      // Display user-friendly error message
-      if (
+      // Display user-friendly error message with rate limiting priority
+      if (error.message.includes("Too many login attempts")) {
+        setError("Too many login attempts. Please wait 15 minutes before trying again.")
+      } else if (
         error.message.includes("auth/invalid-email") ||
         error.message.includes("auth/user-not-found") ||
         error.message.includes("auth/wrong-password") ||
@@ -123,9 +161,15 @@ export default function LoginPage() {
       } else {
         setError(error.message || "Failed to sign in. Please try again later.")
       }
-    } finally {
       setIsLoading(false)
+      setShowLoadingScreen(false)
     }
+  }
+
+  // Show loading screen if authentication was successful
+  if (showLoadingScreen) {
+    console.log("🎬 Rendering loading screen")
+    return <SystemInitializationLoading onComplete={handleLoadingComplete} />
   }
 
   return (
@@ -236,7 +280,6 @@ export default function LoginPage() {
 
       {/* Maritime Media Section - RIGHT */}
       <div className="hidden lg:block lg:w-1/2 relative bg-blue-900">
-        {/* Maritime-themed sidebar content remains the same */}
         <div className="absolute inset-0 z-10 bg-gradient-to-b from-blue-900/70 to-blue-900/40" />
         <img
           src="/container-ship-at-sea.png"
