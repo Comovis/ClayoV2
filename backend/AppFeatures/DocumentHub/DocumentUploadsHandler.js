@@ -14,6 +14,24 @@ const { v4: uuidv4 } = require("uuid")
 const path = require("path")
 
 /**
+ * Convert DD/MM/YYYY date format to ISO YYYY-MM-DD format for PostgreSQL
+ * @param {String} dateString - Date string in DD/MM/YYYY format
+ * @returns {String|null} Date string in YYYY-MM-DD format or null
+ */
+function convertDDMMYYYYtoISO(dateString) {
+  if (!dateString) return null;
+  
+  // Handle DD/MM/YYYY format
+  const match = dateString.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (match) {
+    const [, day, month, year] = match;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+  
+  return dateString; // Return as-is if not DD/MM/YYYY format
+}
+
+/**
  * Extract text content from document for classification
  * Enhanced with specialized PDF processing and OCR for images
  * 
@@ -195,7 +213,7 @@ async function uploadDocument(fileData, documentData) {
       classification_explanation: classification?.explanation || null,
       issuer: documentMetadata?.issuer || documentData.issuer,
       certificate_number: documentMetadata?.documentNumber || documentData.certificateNumber,
-      issue_date: documentMetadata?.issueDate || documentData.issueDate,
+      issue_date: convertDDMMYYYYtoISO(documentMetadata?.issueDate) || convertDDMMYYYYtoISO(documentData.issueDate),
       expiry_date: null, // Will be set below based on extracted data
       is_permanent: false, // Will be determined based on extracted data
       status: 'valid',
@@ -210,21 +228,21 @@ async function uploadDocument(fileData, documentData) {
 
     // Handle expiry date logic with AI-extracted data
     if (documentMetadata?.expiryDate) {
-      // AI found an expiry date, use it
-      documentRecord.expiry_date = documentMetadata.expiryDate
-      documentRecord.is_permanent = false
+      // AI found an expiry date, convert it to ISO format
+      documentRecord.expiry_date = convertDDMMYYYYtoISO(documentMetadata.expiryDate);
+      documentRecord.is_permanent = false;
     } else if (documentData.isPermanent) {
       // User specified permanent or no expiry found
-      documentRecord.expiry_date = null
-      documentRecord.is_permanent = true
+      documentRecord.expiry_date = null;
+      documentRecord.is_permanent = true;
     } else if (documentData.expiryDate) {
-      // User provided expiry date
-      documentRecord.expiry_date = documentData.expiryDate
-      documentRecord.is_permanent = false
+      // User provided expiry date, convert to ISO
+      documentRecord.expiry_date = convertDDMMYYYYtoISO(documentData.expiryDate);
+      documentRecord.is_permanent = false;
     } else {
       // Default to permanent if no expiry information available
-      documentRecord.expiry_date = null
-      documentRecord.is_permanent = true
+      documentRecord.expiry_date = null;
+      documentRecord.is_permanent = true;
     }
 
     console.log("Final document record before insert:", {

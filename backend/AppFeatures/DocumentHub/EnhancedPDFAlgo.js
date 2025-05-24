@@ -82,6 +82,10 @@ async function extractMetadataFromText(text, documentType = null) {
        - Issuing authorities
     3. Format all dates in DD/MM/YYYY format
     4. Identify key-value pairs present in the document
+    5. Always return dates in YYYY-MM-DD format (e.g., 2025-06-01, not 01/06/2025)
+    6. DATE FORMAT RULES:
+    - Always return dates in DD/MM/YYYY format (e.g., 15/01/2023)
+    - If you see dates in other formats, convert them to DD/MM/YYYY
     
     ${documentType ? getDocumentSpecificInstructions(documentType) : ""}
     
