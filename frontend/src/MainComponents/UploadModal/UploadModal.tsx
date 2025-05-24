@@ -91,7 +91,7 @@ function DocumentPreview({
     const fileUrl = URL.createObjectURL(file)
     return (
       <div className={className}>
-        <PDFViewer fileUrl={fileUrl} />
+        <PDFViewer fileUrl={fileUrl} fileName={file.name} className="w-full" />
       </div>
     )
   }
@@ -484,7 +484,7 @@ export default function DocumentUploadModal({
                       type="file"
                       ref={fileInputRef}
                       className="hidden"
-                      accept=".pdf,.jpg,.jpeg,.png"
+                      accept="application/pdf,image/jpeg,image/jpg,image/png"
                       onChange={handleFileChange}
                     />
                   </div>
