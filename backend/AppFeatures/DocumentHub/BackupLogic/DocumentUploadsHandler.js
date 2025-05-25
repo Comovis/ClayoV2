@@ -1,4 +1,5 @@
 const { supabaseAdmin } = require("../../SupabaseClient")
+const { classifyDocument } = require("./DocumentClassifierAlgo")
 const { processPDFDocument } = require("./EnhancedPDFAlgo") 
 const { extractTextFromImageBase64 } = require("./ExtractTextFromImageAlgo")
 const { 
@@ -31,41 +32,38 @@ function convertDDMMYYYYtoISO(dateString) {
 }
 
 /**
- * Extract text content from document with integrated classification
+ * Extract text content from document for classification
  * Enhanced with specialized PDF processing and OCR for images
- * NOW INCLUDES CLASSIFICATION - no separate step needed
  * 
  * @param {Buffer} fileBuffer - File buffer
  * @param {String} mimeType - File MIME type
  * @param {String} documentType - Optional document type hint for better extraction
- * @returns {Object} Extracted text content, metadata, AND classification
+ * @returns {Object} Extracted text content and metadata
  */
 async function extractDocumentText(fileBuffer, mimeType, documentType = null) {
   try {
     // Use specialized PDF processing for PDF files
     if (mimeType === 'application/pdf') {
-      console.log("Processing PDF document with enhanced processor and classification...");
-      // Process PDF using the enhanced module that now returns text, metadata AND classification
+      console.log("Processing PDF document with enhanced processor...");
+      // Process PDF using the enhanced module that returns both text and metadata
       const pdfResult = await processPDFDocument(fileBuffer, documentType);
       
-      // Return text, metadata AND classification all in one
+      // Return both the full text and metadata
       return {
         text: pdfResult.fullText.substring(0, 4000),
         metadata: pdfResult.metadata,
-        classification: pdfResult.classification, // NEW: classification is now included
         keyValuePairs: pdfResult.keyValuePairs
       };
     } else if (mimeType.startsWith('image/')) {
       // Use OCR for image files
-      console.log("Processing image document with OCR and classification...");
+      console.log("Processing image document with OCR...");
       const base64Image = fileBuffer.toString('base64');
       const ocrResult = await extractTextFromImageBase64(base64Image, documentType);
       
-      // Return text, metadata AND classification all in one
+      // Return both the full text and metadata
       return {
         text: ocrResult.fullText.substring(0, 4000),
         metadata: ocrResult.metadata,
-        classification: ocrResult.classification, // NEW: classification is now included
         keyValuePairs: ocrResult.keyValuePairs || []
       };
     } else {
@@ -73,13 +71,6 @@ async function extractDocumentText(fileBuffer, mimeType, documentType = null) {
       return {
         text: fileBuffer.toString('utf8').substring(0, 4000),
         metadata: null,
-        classification: {
-          classification: 'General',
-          secondaryCategory: null,
-          specificDocumentType: documentType || 'Text Document',
-          confidence: 'Medium',
-          explanation: 'Text document - basic processing applied'
-        },
         keyValuePairs: []
       };
     }
@@ -88,13 +79,6 @@ async function extractDocumentText(fileBuffer, mimeType, documentType = null) {
     return {
       text: "Text extraction failed",
       metadata: null,
-      classification: {
-        classification: 'General',
-        secondaryCategory: null,
-        specificDocumentType: null,
-        confidence: 'Low',
-        explanation: 'Text extraction failed - manual review required'
-      },
       keyValuePairs: []
     };
   }
@@ -103,7 +87,6 @@ async function extractDocumentText(fileBuffer, mimeType, documentType = null) {
 /**
  * Upload a document file to storage and create document record
  * Enhanced to handle AI extraction and update document with extracted data
- * UPDATED: Now uses integrated classification from extractors - no separate classification step
  * 
  * @param {Object} fileData - The file data object
  * @param {Buffer} fileData.buffer - The file buffer
@@ -164,14 +147,13 @@ async function uploadDocument(fileData, documentData) {
 
     console.log(`File uploaded to temp storage: ${tempUploadResult.tempPath}`)
 
-    // Step 2: Extract text, metadata AND classification from the document (integrated step)
+    // Step 2: Extract text and metadata from the document
     let extractionResult = null
     let documentMetadata = null
-    let classification = null // Classification now comes from extraction
     let documentText = "Text extraction failed"
     
     try {
-      console.log("Starting integrated document text, metadata and classification extraction...")
+      console.log("Starting document text and metadata extraction...")
       
       extractionResult = await extractDocumentText(
         fileData.buffer, 
@@ -181,21 +163,30 @@ async function uploadDocument(fileData, documentData) {
       
       documentText = extractionResult.text
       documentMetadata = extractionResult.metadata
-      classification = extractionResult.classification // NEW: classification comes from extraction
       
       console.log("Document metadata extracted:", documentMetadata)
-      console.log("Document classification extracted:", classification)
     } catch (extractionError) {
       console.error('Document extraction failed:', extractionError)
       // Continue with upload even if extraction fails
     }
     
-    // REMOVED: Step 3 separate classification - now integrated above
+    // Step 3: Classify document
+    let classification = null
     
-    // Determine document category
-    const documentCategory = classification?.primaryCategory || documentData.category || 'General'
+    try {
+      console.log("Starting document classification...")
+      
+      classification = await classifyDocument(documentText, fileData.mimetype)
+      console.log("Document classification result:", classification)
+    } catch (classificationError) {
+      console.error('Document classification failed:', classificationError)
+      // Continue with upload even if classification fails
+    }
 
-    // Step 3 (was 4): Move from temp to permanent storage
+    // Determine document category
+    const documentCategory = classification?.classification || documentData.category || 'General'
+
+    // Step 4: Move from temp to permanent storage
     const storageResult = await moveFromTempToPermanentStorage(
       tempUploadResult.tempPath,
       documentData.vesselId,
@@ -210,7 +201,7 @@ async function uploadDocument(fileData, documentData) {
       return storageResult
     }
 
-    // Step 4 (was 5): Prepare document record with AI-extracted data taking precedence
+    // Step 5: Prepare document record with AI-extracted data taking precedence
     const documentRecord = {
       id: uuidv4(),
       vessel_id: documentData.vesselId,
@@ -257,9 +248,6 @@ async function uploadDocument(fileData, documentData) {
     console.log("Final document record before insert:", {
       title: documentRecord.title,
       document_type: documentRecord.document_type,
-      document_category: documentRecord.document_category,
-      document_subcategory: documentRecord.document_subcategory,
-      classification_confidence: documentRecord.classification_confidence,
       issuer: documentRecord.issuer,
       issue_date: documentRecord.issue_date,
       expiry_date: documentRecord.expiry_date,

@@ -1,12 +1,12 @@
 const pdfParse = require("pdf-parse")
 const axios = require("axios")
-const modelName = "gpt-4o" // Upgraded to full GPT-4o for better accuracy and classification
+const modelName = "gpt-4o-mini" // Using mini for cost efficiency
 
 /**
- * Enhanced PDF processor that extracts text, structured metadata, AND classification
+ * Enhanced PDF processor that extracts both text and structured metadata
  * @param {Buffer} fileBuffer - PDF file buffer
  * @param {string} documentType - Optional document type hint
- * @returns {Object} Extracted text, metadata, and classification
+ * @returns {Object} Extracted text and metadata
  */
 async function processPDFDocument(fileBuffer, documentType = null) {
   try {
@@ -15,14 +15,13 @@ async function processPDFDocument(fileBuffer, documentType = null) {
     const pdfData = await pdfParse(fileBuffer)
     const extractedText = pdfData.text
 
-    // Step 2: Use AI to extract structured metadata AND classification from the text
-    console.log("Extracting metadata and classification from PDF text...")
-    const extractionResult = await extractMetadataAndClassificationFromText(extractedText, documentType)
+    // Step 2: Use AI to extract structured metadata from the text
+    console.log("Extracting metadata from PDF text...")
+    const extractionResult = await extractMetadataFromText(extractedText, documentType)
 
     return {
       fullText: extractedText,
       metadata: extractionResult.metadata,
-      classification: extractionResult.classification,
       keyValuePairs: extractionResult.keyValuePairs,
     }
   } catch (error) {
@@ -32,17 +31,16 @@ async function processPDFDocument(fileBuffer, documentType = null) {
     try {
       console.log("Trying alternative PDF parser...")
       const fallbackData = await alternativePdfParse(fileBuffer)
-      const extractionResult = await extractMetadataAndClassificationFromText(fallbackData.text, documentType)
+      const extractionResult = await extractMetadataFromText(fallbackData.text, documentType)
 
       return {
         fullText: fallbackData.text,
         metadata: extractionResult.metadata,
-        classification: extractionResult.classification,
         keyValuePairs: extractionResult.keyValuePairs,
       }
     } catch (fallbackError) {
       console.error("Error processing PDF with alternative parser:", fallbackError)
-      throw new Error("PDF processing failed with both parsers: " + fallbackError.message)
+      throw new Error("PDF processing failed with both parsers.")
     }
   }
 }
@@ -67,12 +65,12 @@ async function alternativePdfParse(fileBuffer) {
 }
 
 /**
- * Extract structured metadata AND classification from text using OpenAI
+ * Extract structured metadata from text using OpenAI
  */
-async function extractMetadataAndClassificationFromText(text, documentType = null) {
-  // Create a maritime-specific system prompt with integrated classification
+async function extractMetadataFromText(text, documentType = null) {
+  // Create a maritime-specific system prompt
   const systemPrompt = `
-    You are an expert maritime document processor specialized in extracting structured data AND classifying maritime certificates, forms, and documents.
+    You are an expert maritime document processor specialized in extracting structured data from maritime certificates, forms, and documents.
     
     EXTRACTION GUIDELINES:
     1. Analyze the provided text from a maritime document
@@ -84,36 +82,8 @@ async function extractMetadataAndClassificationFromText(text, documentType = nul
        - Issuing authorities
     3. Format all dates in DD/MM/YYYY format
     4. Identify key-value pairs present in the document
-    
-    CLASSIFICATION GUIDELINES:
-    PRIMARY CATEGORIES (Classify into one of these):
-    1. 'Vessel Certificate' - Any official certificate related to vessel compliance
-    2. 'Crew Document' - Documents related to crew members
-    3. 'Port Document' - Documents specific to port entry/departure
-    4. 'Cargo Document' - Documents related to cargo
-    5. 'Commercial Document' - Commercial agreements, invoices, etc.
-    6. 'General' - Documents that don't fit the above categories
-
-    SECONDARY CLASSIFICATION (Only if primary category is 'Vessel Certificate'):
-    A. 'Safety Certificate' - Documents related to vessel safety
-    B. 'Environmental Certificate' - Documents related to environmental compliance
-    C. 'Structural Certificate' - Documents related to vessel structure and class
-    D. 'Operational Certificate' - Documents related to vessel operations
-    E. 'Regulatory Certificate' - Other regulatory compliance documents
-
-    SPECIFIC MARITIME DOCUMENT TYPES include:
-    - Safety Management Certificate (SMC), Document of Compliance (DOC)
-    - International Ship Security Certificate (ISSC)
-    - International Oil Pollution Prevention Certificate (IOPP)
-    - International Air Pollution Prevention Certificate (IAPP)
-    - International Load Line Certificate, Classification Certificate
-    - Maritime Labour Certificate (MLC), Minimum Safe Manning Document
-    - Crew Lists, Seafarer's Identity Documents, Medical Certificates
-    - Port Entry Forms, Maritime Declaration of Health
-    - Bills of Lading, Cargo Manifests, Charter Parties
-    - And many other maritime document types
-    
-    DATE FORMAT RULES:
+    5. Always return dates in YYYY-MM-DD format (e.g., 2025-06-01, not 01/06/2025)
+    6. DATE FORMAT RULES:
     - Always return dates in DD/MM/YYYY format (e.g., 15/01/2023)
     - If you see dates in other formats, convert them to DD/MM/YYYY
     
@@ -128,19 +98,11 @@ async function extractMetadataAndClassificationFromText(text, documentType = nul
         "documentNumber": "Any unique identifier or certificate number",
         "vesselName": "Name of the vessel if present",
         "imoNumber": "IMO number if present",
-        "callSign": "Call sign if present",
         "flagState": "Flag state if present",
         "grossTonnage": "Gross tonnage if present",
         "issuer": "Issuing authority or organization",
         "issueDate": "Date of issuance in DD/MM/YYYY format if present",
         "expiryDate": "Expiration date in DD/MM/YYYY format if present"
-      },
-      "classification": {
-        "primaryCategory": "one of the 6 primary categories",
-        "secondaryCategory": "only if primary is 'Vessel Certificate', otherwise null",
-        "specificDocumentType": "most specific document type if identifiable",
-        "confidence": "High/Medium/Low",
-        "explanation": "brief explanation of classification reasoning"
       },
       "keyValuePairs": [
         {"key": "Field name 1", "value": "Field value 1"},
@@ -154,7 +116,7 @@ async function extractMetadataAndClassificationFromText(text, documentType = nul
     { role: "system", content: systemPrompt },
     {
       role: "user",
-      content: `Extract structured data and classify this maritime document text: 
+      content: `Extract structured data from this maritime document text: 
 
 ${text.substring(0, 8000)}`, // Limit text length to avoid token limits
     },
@@ -168,7 +130,7 @@ ${text.substring(0, 8000)}`, // Limit text length to avoid token limits
   }
 
   try {
-    console.log("Sending text to OpenAI for metadata extraction and classification...")
+    console.log("Sending text to OpenAI for metadata extraction...")
 
     const response = await axios.post("https://api.openai.com/v1/chat/completions", prompt, {
       headers: {
@@ -182,23 +144,14 @@ ${text.substring(0, 8000)}`, // Limit text length to avoid token limits
     try {
       // Parse the JSON response
       extractionResult = JSON.parse(response.data.choices[0].message.content.trim())
-      console.log("Successfully extracted structured data and classification from text")
+      console.log("Successfully extracted structured data from text")
 
       // Clean up the extraction result
       extractionResult = cleanExtractionResult(extractionResult)
-
-      console.log("Document classified as:", extractionResult.classification)
     } catch (parseError) {
       console.error("Failed to parse JSON response:", parseError)
       extractionResult = {
         metadata: {},
-        classification: {
-          primaryCategory: "General",
-          secondaryCategory: null,
-          specificDocumentType: null,
-          confidence: "Low",
-          explanation: "JSON parsing failed - manual review required",
-        },
         keyValuePairs: [],
       }
     }
@@ -208,11 +161,6 @@ ${text.substring(0, 8000)}`, // Limit text length to avoid token limits
     console.error("Error extracting metadata from text with OpenAI:", error)
     if (error.response) {
       console.error("API error details:", error.response.data)
-      if (error.response.status === 401) {
-        throw new Error("Authentication failed. Please check your OpenAI API key.")
-      } else if (error.response.status === 429) {
-        throw new Error("Rate limit exceeded. Please try again later or check your OpenAI plan limits.")
-      }
     }
     throw new Error("Metadata extraction failed: " + (error.message || "Unknown error"))
   }
@@ -227,17 +175,6 @@ function cleanExtractionResult(extractionResult) {
     extractionResult.metadata = {}
   }
 
-  // Ensure classification object exists
-  if (!extractionResult.classification) {
-    extractionResult.classification = {
-      primaryCategory: "General",
-      secondaryCategory: null,
-      specificDocumentType: null,
-      confidence: "Low",
-      explanation: "Classification data not provided by AI",
-    }
-  }
-
   const metadata = extractionResult.metadata
 
   // Clean IMO number (remove "IMO" prefix if present)
@@ -245,33 +182,16 @@ function cleanExtractionResult(extractionResult) {
     metadata.imoNumber = metadata.imoNumber.replace(/^IMO\s*/i, "").trim()
   }
 
-  // Use the improved date conversion function (same as image processor)
+  // Validate date formats (should be DD/MM/YYYY)
   if (metadata.issueDate) {
-    metadata.issueDate = convertToDateFormat(metadata.issueDate)
+    metadata.issueDate = validateDateFormat(metadata.issueDate)
   }
 
   if (metadata.expiryDate) {
-    metadata.expiryDate = convertToDateFormat(metadata.expiryDate)
+    metadata.expiryDate = validateDateFormat(metadata.expiryDate)
   }
 
-  // Also convert dates in keyValuePairs
-  if (extractionResult.keyValuePairs && Array.isArray(extractionResult.keyValuePairs)) {
-    extractionResult.keyValuePairs = extractionResult.keyValuePairs.map((pair) => {
-      // Check if the value might be a date
-      if (
-        pair.value &&
-        (pair.key.toLowerCase().includes("date") ||
-          pair.key.toLowerCase().includes("issued") ||
-          pair.key.toLowerCase().includes("expiry") ||
-          pair.key.toLowerCase().includes("valid"))
-      ) {
-        pair.value = convertToDateFormat(pair.value)
-      }
-      return pair
-    })
-  }
-
-  // Clean up empty or null values in metadata
+  // Clean up empty or null values
   Object.keys(metadata).forEach((key) => {
     if (metadata[key] === null || metadata[key] === "" || metadata[key] === "Not found" || metadata[key] === "N/A") {
       delete metadata[key]
@@ -287,26 +207,37 @@ function cleanExtractionResult(extractionResult) {
 }
 
 /**
- * UPDATED: Use the same comprehensive date conversion function as the image processor
- * Convert dates to DD/MM/YYYY format - matches ExtractTextFromImageAlgo.js
+ * Validate and normalize date format to DD/MM/YYYY
  */
-function convertToDateFormat(dateString) {
-  if (!dateString) return dateString
+function validateDateFormat(dateString) {
+  if (!dateString) return null
 
   // If already in DD/MM/YYYY format, return as is
   if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) {
     return dateString
   }
 
-  // Try to convert from YYYY-MM-DD format (this handles your ISO dates from AI)
-  const isoFormatMatch = dateString.match(/^(\d{4})-(\d{2})-(\d{2})$/)
-  if (isoFormatMatch) {
-    const [_, year, month, day] = isoFormatMatch
-    return `${day}/${month}/${year}`
-  }
-
-  // Try to parse other date formats
+  // Try to parse and convert other formats
   try {
+    // YYYY-MM-DD format
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      const [year, month, day] = dateString.split("-")
+      return `${day}/${month}/${year}`
+    }
+
+    // MM/DD/YYYY format (convert to DD/MM/YYYY)
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateString)) {
+      const [month, day, year] = dateString.split("/")
+      return `${day.padStart(2, "0")}/${month.padStart(2, "0")}/${year}`
+    }
+
+    // DD-MM-YYYY format
+    if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(dateString)) {
+      const [day, month, year] = dateString.split("-")
+      return `${day.padStart(2, "0")}/${month.padStart(2, "0")}/${year}`
+    }
+
+    // Try parsing with Date object for other formats
     const date = new Date(dateString)
     if (!isNaN(date.getTime())) {
       const day = date.getDate().toString().padStart(2, "0")
@@ -314,21 +245,12 @@ function convertToDateFormat(dateString) {
       const year = date.getFullYear()
       return `${day}/${month}/${year}`
     }
-  } catch (e) {
+  } catch (error) {
     console.warn("Could not parse date:", dateString)
   }
 
   // Return original if we can't parse it
   return dateString
-}
-
-/**
- * DEPRECATED: Replaced with convertToDateFormat for consistency
- * Keeping for reference but not used anymore
- */
-function validateDateFormat(dateString) {
-  console.warn("validateDateFormat is deprecated, using convertToDateFormat instead")
-  return convertToDateFormat(dateString)
 }
 
 /**

@@ -2,9 +2,9 @@ const axios = require("axios")
 const modelName = "gpt-4o" // Upgraded to full GPT-4o for better accuracy
 
 async function extractTextFromImageBase64(base64Image, documentType = null) {
-  // Create a maritime-specific system prompt with integrated classification
+  // Create a maritime-specific system prompt
   const systemPrompt = `
-    You are an expert maritime document OCR system specialized in extracting text, structured data, AND classifying maritime certificates, forms, and documents.
+    You are an expert maritime document OCR system specialized in extracting text and structured data from maritime certificates, forms, and documents.
     
     EXTRACTION GUIDELINES:
     1. Extract ALL text visible in the image with high accuracy
@@ -22,34 +22,6 @@ async function extractTextFromImageBase64(base64Image, documentType = null) {
     5. Extract ALL text even if it appears in stamps, watermarks, or handwriting
     6. If text is partially visible or unclear, indicate with [unclear: best guess]
     
-    CLASSIFICATION GUIDELINES:
-    PRIMARY CATEGORIES (Classify into one of these):
-    1. 'Vessel Certificate' - Any official certificate related to vessel compliance
-    2. 'Crew Document' - Documents related to crew members
-    3. 'Port Document' - Documents specific to port entry/departure  
-    4. 'Cargo Document' - Documents related to cargo
-    5. 'Commercial Document' - Commercial agreements, invoices, etc.
-    6. 'General' - Documents that don't fit the above categories
-
-    SECONDARY CLASSIFICATION (Only if primary category is 'Vessel Certificate'):
-    A. 'Safety Certificate' - Documents related to vessel safety
-    B. 'Environmental Certificate' - Documents related to environmental compliance
-    C. 'Structural Certificate' - Documents related to vessel structure and class
-    D. 'Operational Certificate' - Documents related to vessel operations  
-    E. 'Regulatory Certificate' - Other regulatory compliance documents
-
-    SPECIFIC MARITIME DOCUMENT TYPES include:
-    - Safety Management Certificate (SMC), Document of Compliance (DOC)
-    - International Ship Security Certificate (ISSC)  
-    - International Oil Pollution Prevention Certificate (IOPP)
-    - International Air Pollution Prevention Certificate (IAPP)
-    - International Load Line Certificate, Classification Certificate
-    - Maritime Labour Certificate (MLC), Minimum Safe Manning Document
-    - Crew Lists, Seafarer's Identity Documents, Medical Certificates
-    - Port Entry Forms, Maritime Declaration of Health
-    - Bills of Lading, Cargo Manifests, Charter Parties
-    - And many other maritime document types
-    
     DATE FORMAT RULES:
     - Always return dates in DD/MM/YYYY format (e.g., 15/01/2023)
     - If you see dates in other formats, convert them to DD/MM/YYYY
@@ -66,18 +38,9 @@ async function extractTextFromImageBase64(base64Image, documentType = null) {
         "documentNumber": "Any unique identifier or certificate number",
         "vesselName": "Name of the vessel if present",
         "imoNumber": "IMO number if present",
-        "callSign": "Call sign if present",
-        "flagState": "Flag state if present",
         "issuer": "Issuing authority or organization",
         "issueDate": "Date in DD/MM/YYYY format if present",
         "expiryDate": "Expiration date in DD/MM/YYYY format if present"
-      },
-      "classification": {
-        "primaryCategory": "one of the 6 primary categories",
-        "secondaryCategory": "only if primary is 'Vessel Certificate', otherwise null",
-        "specificDocumentType": "most specific document type if identifiable",
-        "confidence": "High/Medium/Low based on image quality and text clarity",
-        "explanation": "brief explanation of classification reasoning"
       },
       "keyValuePairs": [
         {"key": "Field name 1", "value": "Field value 1"},
@@ -97,7 +60,7 @@ async function extractTextFromImageBase64(base64Image, documentType = null) {
       content: [
         {
           type: "text",
-          text: "Extract all text, structured data, and classify this maritime document image. Return the results in the specified JSON format with dates in DD/MM/YYYY format.",
+          text: "Extract all text and structured data from this maritime document image. Return the results in the specified JSON format with dates in DD/MM/YYYY format.",
         },
         {
           type: "image_url",
@@ -115,7 +78,7 @@ async function extractTextFromImageBase64(base64Image, documentType = null) {
   }
 
   try {
-    console.log("Sending image to OpenAI for text extraction and classification...")
+    console.log("Sending image to OpenAI for text extraction...")
 
     const response = await axios.post("https://api.openai.com/v1/chat/completions", prompt, {
       headers: {
@@ -129,18 +92,7 @@ async function extractTextFromImageBase64(base64Image, documentType = null) {
     try {
       // Parse the JSON response
       extractionResult = JSON.parse(response.data.choices[0].message.content.trim())
-      console.log("Successfully extracted structured data and classification from image")
-
-      // Ensure classification object exists
-      if (!extractionResult.classification) {
-        extractionResult.classification = {
-          primaryCategory: 'General',
-          secondaryCategory: null,
-          specificDocumentType: null,
-          confidence: 'Low',
-          explanation: 'Classification data not provided by AI'
-        }
-      }
+      console.log("Successfully extracted structured data from image")
 
       // Convert dates to DD/MM/YYYY format if needed
       if (extractionResult.metadata) {
@@ -168,8 +120,6 @@ async function extractTextFromImageBase64(base64Image, documentType = null) {
           return pair
         })
       }
-
-      console.log("Document classified as:", extractionResult.classification)
     } catch (parseError) {
       // Fallback if JSON parsing fails
       console.error("Failed to parse JSON response:", parseError)
@@ -177,13 +127,6 @@ async function extractTextFromImageBase64(base64Image, documentType = null) {
       extractionResult = {
         fullText: rawText,
         metadata: {},
-        classification: {
-          primaryCategory: 'General',
-          secondaryCategory: null,
-          specificDocumentType: null,
-          confidence: 'Low',
-          explanation: 'JSON parsing failed - manual review required'
-        },
         keyValuePairs: [],
       }
     }
@@ -193,11 +136,6 @@ async function extractTextFromImageBase64(base64Image, documentType = null) {
     console.error("Error extracting text from image with OpenAI:", error)
     if (error.response) {
       console.error("API error details:", error.response.data)
-      if (error.response.status === 401) {
-        throw new Error("Authentication failed. Please check your OpenAI API key.")
-      } else if (error.response.status === 429) {
-        throw new Error("Rate limit exceeded. Please try again later or check your OpenAI plan limits.")
-      }
     }
     throw new Error("Text extraction from image failed: " + (error.message || "Unknown error"))
   }

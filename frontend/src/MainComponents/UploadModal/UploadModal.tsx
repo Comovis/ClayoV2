@@ -34,7 +34,12 @@ import { useFetchVessels } from "../../Hooks/useFetchVessels"
 import { useDocumentUpload } from "../../Hooks/useDocumentUpload"
 import { useDocumentPreview } from "../../Hooks/useDocumentPreview"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import PDFViewer from "./PDFViewer"
+import { supabase } from "../../Auth/SupabaseAuth"
+import DocumentPreview from "./PDFViewer"
+
+// API Base URL Configuration
+const apiBaseUrl =
+  import.meta.env.MODE === "development" ? import.meta.env.VITE_DEVELOPMENT_URL : import.meta.env.VITE_API_URL
 
 /**
  * Parse extracted date string in DD/MM/YYYY format (maritime standard)
@@ -72,70 +77,6 @@ interface DocumentUploadModalProps {
   onClose: () => void
   initialVesselId?: string
   onUploadComplete?: (documentData: any) => void
-}
-
-// Enhanced Document Preview Component
-function DocumentPreview({
-  file,
-  previewUrl,
-  className = "",
-}: {
-  file?: File
-  previewUrl?: string
-  className?: string
-}) {
-  const isPDF = file?.type === "application/pdf"
-  const isImage = file?.type.startsWith("image/")
-
-  if (isPDF && file) {
-    const fileUrl = URL.createObjectURL(file)
-    return (
-      <div className={className}>
-        <PDFViewer fileUrl={fileUrl} fileName={file.name} className="w-full" />
-      </div>
-    )
-  }
-
-  if (isImage && file) {
-    const imageUrl = URL.createObjectURL(file)
-    return (
-      <div
-        className={`flex justify-center items-center bg-gray-50 rounded-lg border-2 border-gray-200 p-6 ${className}`}
-      >
-        <img
-          src={imageUrl || "/placeholder.svg"}
-          alt="Document preview"
-          className="max-w-full max-h-[500px] object-contain rounded shadow-lg"
-          onLoad={() => URL.revokeObjectURL(imageUrl)}
-        />
-      </div>
-    )
-  }
-
-  if (previewUrl) {
-    return (
-      <div
-        className={`flex justify-center items-center bg-gray-50 rounded-lg border-2 border-gray-200 p-6 ${className}`}
-      >
-        <img
-          src={previewUrl || "/placeholder.svg"}
-          alt="Document preview"
-          className="max-w-full max-h-[500px] object-contain rounded shadow-lg"
-        />
-      </div>
-    )
-  }
-
-  return (
-    <div
-      className={`flex justify-center items-center bg-gray-100 rounded-lg border-2 border-gray-200 p-8 ${className}`}
-    >
-      <div className="text-center text-gray-400">
-        <FileText className="h-16 w-16 mx-auto mb-4" />
-        <p className="text-lg">Document preview loading...</p>
-      </div>
-    </div>
-  )
 }
 
 export default function DocumentUploadModal({
@@ -189,6 +130,9 @@ export default function DocumentUploadModal({
   // AI extraction state
   const [extractedData, setExtractedData] = useState<any>(null)
   const [isExtracting, setIsExtracting] = useState(false)
+
+  // Loading state for save button
+  const [isSaving, setIsSaving] = useState(false)
 
   // Document types for maritime
   const documentTypes = [
@@ -252,6 +196,7 @@ export default function DocumentUploadModal({
     setIsPermanent(false)
     setDocumentNumber("")
     setDocumentTitle("")
+    setIsSaving(false)
   }
 
   // Generate preview URLs for files
@@ -333,7 +278,16 @@ export default function DocumentUploadModal({
       const result = await uploadDocument(files[0], documentData)
 
       if (result) {
-        setUploadedDocument(result)
+        console.log("Upload result:", result) // Add this for debugging
+
+        // IMPORTANT: Make sure we're using the correct document ID
+        const documentId = result.data?.id || result.id
+        console.log("Document ID to use for updates:", documentId) // Add this for debugging
+
+        setUploadedDocument({
+          ...result,
+          id: documentId, // Ensure we have the correct ID
+        })
 
         // Extract the AI-processed data from the result
         if (result.extractedMetadata) {
@@ -343,12 +297,19 @@ export default function DocumentUploadModal({
           // Pre-fill form fields with extracted data
           setDocumentTitle(metadata.documentTitle || documentTitle)
 
-          // Set document type from classification or metadata
+          // IMPROVED: Set document type from classification or metadata with better fallback handling
+          // SIMPLIFIED: Just set whatever the AI extracted directly - no smart matching
           if (result.classification?.specificDocumentType) {
             setDocumentType(result.classification.specificDocumentType)
           } else if (metadata.documentType) {
             setDocumentType(metadata.documentType)
+          } else if (result.classification?.primaryCategory) {
+            setDocumentType(result.classification.primaryCategory)
+          } else {
+            setDocumentType("Unknown") // Default fallback
           }
+
+          // Remove the smart matching logic entirely - we don't need it
 
           // Simply set the extracted issuer directly - no dropdown matching needed
           setIssuingAuthority(metadata.issuer || "")
@@ -388,28 +349,76 @@ export default function DocumentUploadModal({
   const handleFinalSubmit = async () => {
     if (!uploadedDocument) return
 
+    setIsSaving(true) // Set loading state
+
+    // Add debugging
+    console.log("Updating document with ID:", uploadedDocument.id)
+    console.log("Full uploadedDocument object:", uploadedDocument)
+
     try {
-      // Update the document with user-edited data
+      // Get the current session to include the auth token (following team management pattern)
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+
+      if (sessionError || !sessionData.session) {
+        throw new Error("Authentication required. Please log in again.")
+      }
+
+      // Get the access token from the session
+      const token = sessionData.session.access_token
+
       const updateData = {
         title: documentTitle,
-        documentType: documentType === "other" ? customDocumentType : documentType,
-        issuer: issuingAuthority, // Use the text input value directly
+        documentType: documentType,
+        issuer: issuingAuthority,
         certificateNumber: documentNumber,
         issueDate: issueDate?.toISOString().split("T")[0],
         expiryDate: isPermanent ? undefined : expiryDate?.toISOString().split("T")[0],
         isPermanent,
       }
 
-      // Here you would call an update API endpoint
-      // For now, we'll just complete the flow
+      console.log("Update data:", updateData) // Add this for debugging
+
+      // Call your existing update endpoint using the same pattern as team management
+      const response = await fetch(`${apiBaseUrl}/api/documents/${uploadedDocument.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(updateData),
+      })
+
+      console.log("Update response status:", response.status) // Add this for debugging
+
+      if (!response.ok) {
+        // Better error handling for non-JSON responses
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`
+
+        try {
+          const errorData = await response.json()
+          errorMessage = errorData.error || errorData.message || errorMessage
+        } catch (jsonError) {
+          // Response is not JSON, use the status text
+          console.log("Response is not JSON:", jsonError)
+        }
+
+        throw new Error(errorMessage)
+      }
+
+      const result = await response.json()
+      console.log("Document updated successfully:", result)
+
       setUploadStep(4)
       setUploadComplete(true)
 
       if (onUploadComplete) {
-        onUploadComplete({ ...uploadedDocument, ...updateData })
+        onUploadComplete(result.document)
       }
     } catch (error) {
       console.error("Error updating document:", error)
+      alert(`Failed to save document changes: ${error.message}`)
+    } finally {
+      setIsSaving(false) // Clear loading state
     }
   }
 
@@ -658,27 +667,40 @@ export default function DocumentUploadModal({
                   {/* Document Type */}
                   <div className="space-y-2">
                     <Label htmlFor="documentType">Document Type *</Label>
-                    <Select value={documentType} onValueChange={setDocumentType}>
-                      <SelectTrigger className="h-10">
-                        <SelectValue placeholder="Select document type" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[200px]">
-                        {documentTypes.map((type) => (
-                          <SelectItem key={type} value={type}>
-                            {type}
-                          </SelectItem>
-                        ))}
-                        <SelectItem value="other">Other (specify)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {documentType === "other" && (
+                    <div className="space-y-2">
+                      {/* Show what AI extracted */}
+                      {extractedData && (
+                        <div className="text-sm text-green-600 bg-green-50 px-3 py-2 rounded border">
+                          <span className="font-medium">AI Extracted:</span> {documentType}
+                        </div>
+                      )}
+
+                      {/* Allow user to edit the document type directly */}
                       <Input
-                        className="mt-2"
-                        placeholder="Specify document type"
-                        value={customDocumentType}
-                        onChange={(e) => setCustomDocumentType(e.target.value)}
+                        id="documentType"
+                        className="h-10"
+                        value={documentType}
+                        onChange={(e) => setDocumentType(e.target.value)}
+                        placeholder="Enter document type"
                       />
-                    )}
+
+                      {/* Optional: Keep dropdown for common types as suggestions */}
+                      <div className="text-xs text-gray-500">
+                        <span className="font-medium">Common types:</span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {documentTypes.slice(0, 5).map((type) => (
+                            <button
+                              key={type}
+                              type="button"
+                              onClick={() => setDocumentType(type)}
+                              className="px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs"
+                            >
+                              {type}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Issuing Authority - UPDATED TO TEXT INPUT */}
@@ -917,9 +939,18 @@ export default function DocumentUploadModal({
             <Button variant="outline" onClick={() => setUploadStep(1)} className="h-12 px-6">
               Start Over
             </Button>
-            <Button onClick={handleFinalSubmit} disabled={!isFormValid} className="h-12 px-6">
-              <Edit3 className="mr-2 h-5 w-5" />
-              Save Document
+            <Button onClick={handleFinalSubmit} disabled={!isFormValid || isSaving} className="h-12 px-6">
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Saving Document...
+                </>
+              ) : (
+                <>
+                  <Edit3 className="mr-2 h-5 w-5" />
+                  Save Document
+                </>
+              )}
             </Button>
           </>
         )

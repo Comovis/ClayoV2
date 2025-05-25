@@ -518,15 +518,7 @@ app.post("/api/documents/batch-download", authenticateUser, async (req, res) => 
   }
 })
 
-// Cleanup temp files (admin only)
-app.post("/api/admin/cleanup-temp-files", authenticateUser, async (req, res) => {
-  try {
-    await handleCleanupTempFiles(req, res)
-  } catch (error) {
-    console.error("Error cleaning up temp files:", error)
-    res.status(500).json({ error: "Failed to clean up temp files" })
-  }
-})
+
 
 // Start server
 app.listen(port, "0.0.0.0", () => {

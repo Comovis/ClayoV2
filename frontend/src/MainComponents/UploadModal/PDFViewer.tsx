@@ -1,12 +1,13 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, memo } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Download, ExternalLink, FileText, Loader2, AlertTriangle, ZoomIn, ZoomOut } from "lucide-react"
 
+// PDF Viewer Component
 interface PDFViewerProps {
   fileUrl: string
   className?: string
@@ -160,4 +161,69 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ fileUrl, className = "", fileName
   )
 }
 
-export default PDFViewer
+// Document Preview Component
+interface DocumentPreviewProps {
+  file?: File
+  previewUrl?: string
+  className?: string
+}
+
+// Memoized Document Preview Component to prevent unnecessary re-renders and PDF flashing
+const DocumentPreview = memo<DocumentPreviewProps>(({ file, previewUrl, className = "" }) => {
+  const isPDF = file?.type === "application/pdf"
+  const isImage = file?.type.startsWith("image/")
+
+  if (isPDF && file) {
+    const fileUrl = URL.createObjectURL(file)
+    return (
+      <div className={className}>
+        <PDFViewer fileUrl={fileUrl} fileName={file.name} className="w-full" />
+      </div>
+    )
+  }
+
+  if (isImage && file) {
+    const imageUrl = URL.createObjectURL(file)
+    return (
+      <div
+        className={`flex justify-center items-center bg-gray-50 rounded-lg border-2 border-gray-200 p-6 ${className}`}
+      >
+        <img
+          src={imageUrl || "/placeholder.svg"}
+          alt="Document preview"
+          className="max-w-full max-h-[500px] object-contain rounded shadow-lg"
+          onLoad={() => URL.revokeObjectURL(imageUrl)}
+        />
+      </div>
+    )
+  }
+
+  if (previewUrl) {
+    return (
+      <div
+        className={`flex justify-center items-center bg-gray-50 rounded-lg border-2 border-gray-200 p-6 ${className}`}
+      >
+        <img
+          src={previewUrl || "/placeholder.svg"}
+          alt="Document preview"
+          className="max-w-full max-h-[500px] object-contain rounded shadow-lg"
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className={`flex justify-center items-center bg-gray-100 rounded-lg border-2 border-gray-200 p-8 ${className}`}
+    >
+      <div className="text-center text-gray-400">
+        <FileText className="h-16 w-16 mx-auto mb-4" />
+        <p className="text-lg">Document preview loading...</p>
+      </div>
+    </div>
+  )
+})
+
+DocumentPreview.displayName = "DocumentPreview"
+
+export default DocumentPreview
