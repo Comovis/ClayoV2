@@ -121,6 +121,31 @@ async function extractDocumentText(fileBuffer, mimeType, documentType = null) {
   }
 }
 
+// Add this helper function to determine if document should be permanent
+function shouldDocumentBePermanent(classification, documentType) {
+  // Only certificates require expiry dates - everything else is permanent
+  const certificateKeywords = [
+    'certificate', 'cert', 'smc', 'doc', 'iopp', 'issc', 'mlc', 
+    'safety management', 'document of compliance', 'classification',
+    'load line', 'tonnage', 'registry', 'security', 'pollution'
+  ];
+  
+  const docTypeText = (documentType || '').toLowerCase();
+  const categoryText = (classification?.category || '').toLowerCase();
+  const specificType = (classification?.originalAiClassification?.specificDocumentType || '').toLowerCase();
+  
+  // Check if it's a certificate based on keywords
+  const isCertificate = certificateKeywords.some(keyword => 
+    docTypeText.includes(keyword) || 
+    specificType.includes(keyword) ||
+    categoryText === 'statutory' // Most statutory docs are certificates
+  );
+  
+  console.log(`Document type: ${documentType}, Category: ${categoryText}, Is Certificate: ${isCertificate}`);
+  
+  return !isCertificate; // If NOT a certificate, make it permanent
+}
+
 /**
  * Upload a document file to storage and create document record
  * Enhanced to handle AI extraction and update document with extracted data
@@ -270,22 +295,30 @@ async function uploadDocument(fileData, documentData) {
     }
 
     // Handle expiry date logic with AI-extracted data
-    if (documentMetadata?.expiryDate) {
-      // AI found an expiry date, convert it to ISO format
-      documentRecord.expiry_date = convertDDMMYYYYtoISO(documentMetadata.expiryDate)
-      documentRecord.is_permanent = false
+    // NEW: Auto-determine if document should be permanent based on type
+    const shouldBePermanent = shouldDocumentBePermanent(validatedClassification, documentData.documentType);
+
+    if (shouldBePermanent) {
+      // Non-certificate documents are automatically permanent
+      documentRecord.expiry_date = null;
+      documentRecord.is_permanent = true;
+      console.log("Document automatically marked as permanent (non-certificate)");
+    } else if (documentMetadata?.expiryDate) {
+      // Certificate with AI-extracted expiry date
+      documentRecord.expiry_date = convertDDMMYYYYtoISO(documentMetadata.expiryDate);
+      documentRecord.is_permanent = false;
     } else if (documentData.isPermanent) {
-      // User specified permanent or no expiry found
-      documentRecord.expiry_date = null
-      documentRecord.is_permanent = true
+      // User specified permanent
+      documentRecord.expiry_date = null;
+      documentRecord.is_permanent = true;
     } else if (documentData.expiryDate) {
-      // User provided expiry date, convert to ISO
-      documentRecord.expiry_date = convertDDMMYYYYtoISO(documentData.expiryDate)
-      documentRecord.is_permanent = false
+      // User provided expiry date
+      documentRecord.expiry_date = convertDDMMYYYYtoISO(documentData.expiryDate);
+      documentRecord.is_permanent = false;
     } else {
-      // Default to permanent if no expiry information available
-      documentRecord.expiry_date = null
-      documentRecord.is_permanent = true
+      // Default for certificates without expiry info - require manual input
+      documentRecord.expiry_date = null;
+      documentRecord.is_permanent = true; // Default to permanent to avoid validation errors
     }
 
     console.log("Final document record before insert:", {

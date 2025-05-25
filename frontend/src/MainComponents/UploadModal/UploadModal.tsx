@@ -9,21 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import {
-  Upload,
-  Camera,
-  X,
-  Ship,
-  FileText,
-  Calendar,
-  CheckCircle,
-  Loader2,
-  Eye,
-  ZoomIn,
-  AlertTriangle,
-  Sparkles,
-  Edit3,
-} from "lucide-react"
+import { Upload, Camera, X, Ship, FileText, Calendar, CheckCircle, Loader2, Eye, ZoomIn, AlertTriangle, Sparkles, Edit3 } from 'lucide-react'
 import { Progress } from "@/components/ui/progress"
 import { Switch } from "@/components/ui/switch"
 import { format } from "date-fns"
@@ -71,6 +57,23 @@ function parseExtractedDate(dateString: string | null | undefined): Date | null 
     return null
   }
 }
+
+// Add helper function to determine if document is a certificate
+const isCertificateDocument = (documentType: string, classification?: any) => {
+  const certificateKeywords = [
+    'certificate', 'cert', 'smc', 'doc', 'iopp', 'issc', 'mlc', 
+    'safety management', 'document of compliance', 'classification',
+    'load line', 'tonnage', 'registry', 'security', 'pollution'
+  ];
+  
+  const docTypeText = documentType.toLowerCase();
+  const categoryText = (classification?.category || '').toLowerCase();
+  
+  return certificateKeywords.some(keyword => 
+    docTypeText.includes(keyword) || 
+    categoryText === 'statutory'
+  );
+};
 
 interface DocumentUploadModalProps {
   isOpen: boolean
@@ -291,42 +294,51 @@ export default function DocumentUploadModal({
 
         // Extract the AI-processed data from the result
         if (result.extractedMetadata) {
-          const metadata = result.extractedMetadata
-          setExtractedData(metadata)
+          const metadata = result.extractedMetadata;
+          setExtractedData(metadata);
 
           // Pre-fill form fields with extracted data
-          setDocumentTitle(metadata.documentTitle || documentTitle)
+          setDocumentTitle(metadata.documentTitle || documentTitle);
 
-          // IMPROVED: Set document type from classification or metadata with better fallback handling
-          // SIMPLIFIED: Just set whatever the AI extracted directly - no smart matching
           if (result.classification?.specificDocumentType) {
-            setDocumentType(result.classification.specificDocumentType)
+            setDocumentType(result.classification.specificDocumentType);
           } else if (metadata.documentType) {
-            setDocumentType(metadata.documentType)
+            setDocumentType(metadata.documentType);
           } else if (result.classification?.primaryCategory) {
-            setDocumentType(result.classification.primaryCategory)
+            setDocumentType(result.classification.primaryCategory);
           } else {
-            setDocumentType("Unknown") // Default fallback
+            setDocumentType("Unknown");
           }
 
-          // Remove the smart matching logic entirely - we don't need it
-
-          // Simply set the extracted issuer directly - no dropdown matching needed
-          setIssuingAuthority(metadata.issuer || "")
-          setDocumentNumber(metadata.documentNumber || "")
+          setIssuingAuthority(metadata.issuer || "");
+          setDocumentNumber(metadata.documentNumber || "");
 
           if (metadata.issueDate) {
-            // Parse date more carefully to avoid timezone issues
-            const issueDate = parseExtractedDate(metadata.issueDate)
-            if (issueDate) setIssueDate(issueDate)
+            const issueDate = parseExtractedDate(metadata.issueDate);
+            if (issueDate) setIssueDate(issueDate);
           }
-          if (metadata.expiryDate) {
-            // Parse date more carefully to avoid timezone issues
-            const expiryDate = parseExtractedDate(metadata.expiryDate)
+
+          // NEW: Auto-determine if document should be permanent
+          const isDocumentCertificate = isCertificateDocument(
+            result.classification?.specificDocumentType || metadata.documentType || documentType,
+            result.classification
+          );
+
+          if (!isDocumentCertificate) {
+            // Non-certificate documents are automatically permanent
+            setIsPermanent(true);
+            setExpiryDate(undefined);
+            console.log("Document automatically marked as permanent (non-certificate)");
+          } else if (metadata.expiryDate) {
+            // Certificate with extracted expiry date
+            const expiryDate = parseExtractedDate(metadata.expiryDate);
             if (expiryDate) {
-              setExpiryDate(expiryDate)
-              setIsPermanent(false) // Reset to false since we have an expiry date
+              setExpiryDate(expiryDate);
+              setIsPermanent(false);
             }
+          } else {
+            // Certificate without expiry date - let user decide
+            setIsPermanent(false);
           }
         }
 
@@ -759,17 +771,30 @@ export default function DocumentUploadModal({
                     </Popover>
                   </div>
 
-                  {/* Expiry Date */}
+                  {/* Expiry Date - UPDATED with auto-permanent logic */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <Label className={isPermanent ? "text-gray-400" : ""}>Expiry Date</Label>
                       <div className="flex items-center space-x-2">
-                        <Switch id="permanent" checked={isPermanent} onCheckedChange={setIsPermanent} />
+                        <Switch 
+                          id="permanent" 
+                          checked={isPermanent} 
+                          onCheckedChange={setIsPermanent}
+                          disabled={!isCertificateDocument(documentType, extractedData)} // Disable for non-certificates
+                        />
                         <Label htmlFor="permanent" className="text-sm cursor-pointer">
                           No Expiry
                         </Label>
                       </div>
                     </div>
+                    
+                    {/* Show auto-permanent message for non-certificates */}
+                    {!isCertificateDocument(documentType, extractedData) && (
+                      <div className="text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded border">
+                        <span className="font-medium">Auto-Permanent:</span> Non-certificate documents don't require expiry dates
+                      </div>
+                    )}
+                    
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button
