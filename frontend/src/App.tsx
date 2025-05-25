@@ -26,6 +26,7 @@ import EmailVerificationPage from "./Auth/Signup/ConfirmEmail"
 import InvitationAccept from "./Auth/Signup/InvitationAccept"
 import UnauthorizedMessage from "./Auth/UnauthorisedMsg"
 import { UserProvider } from "./Auth/Contexts/UserContext"
+import PitchDeckAuth from "./MainPages/PitchDeck/PitchDeckAuth"
 
 // Define a simple user type for demonstration
 interface UserType {
@@ -68,7 +69,8 @@ function AppContent() {
     location.pathname === "/onboarding" ||
     location.pathname === "/confirm-email" ||
     location.pathname === "/email-confirmed" ||
-    location.pathname === "/accept-invite"
+    location.pathname === "/accept-invite" ||
+    location.pathname === "/pitch-deck" // Add this line
 
   // Check if it's a share page (public document sharing)
   const isSharePage = location.pathname.startsWith("/share/")
@@ -91,6 +93,7 @@ function AppContent() {
       "/pricing",
       "/team",
       "/notifications",
+      "/pitch-deck", // Add this line
     ],
     [],
   )
@@ -141,6 +144,9 @@ function AppContent() {
           <Routes>
             {/* Public routes */}
             <Route path="/" element={<LandingPage />} />
+
+            {/* Pitch deck route - password protected */}
+            <Route path="/pitch-deck" element={<PitchDeckAuth />} />
 
             {/* Public document sharing routes - no authentication required */}
             <Route path="/share/:token" element={<DocumentSharingRecipientView />} />
