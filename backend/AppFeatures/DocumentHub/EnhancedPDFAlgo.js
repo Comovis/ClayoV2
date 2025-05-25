@@ -1,9 +1,11 @@
 const pdfParse = require("pdf-parse")
 const axios = require("axios")
-const modelName = "gpt-4o" // Upgraded to full GPT-4o for better accuracy and classification
+const { generateAIGuidancePrompt } = require("./DocumentCategories")
+const modelName = "gpt-4o"
 
 /**
  * Enhanced PDF processor that extracts text, structured metadata, AND classification
+ * UPDATED: Now uses AI-first classification system with your exact categories
  * @param {Buffer} fileBuffer - PDF file buffer
  * @param {string} documentType - Optional document type hint
  * @returns {Object} Extracted text, metadata, and classification
@@ -67,9 +69,12 @@ async function alternativePdfParse(fileBuffer) {
 }
 
 /**
- * Extract structured metadata AND classification from text using OpenAI
+ * UPDATED: Extract structured metadata AND classification using AI-first approach
  */
 async function extractMetadataAndClassificationFromText(text, documentType = null) {
+  // Get the AI guidance from our unified classification system
+  const aiGuidance = generateAIGuidancePrompt()
+
   // Create a maritime-specific system prompt with integrated classification
   const systemPrompt = `
     You are an expert maritime document processor specialized in extracting structured data AND classifying maritime certificates, forms, and documents.
@@ -85,33 +90,7 @@ async function extractMetadataAndClassificationFromText(text, documentType = nul
     3. Format all dates in DD/MM/YYYY format
     4. Identify key-value pairs present in the document
     
-    CLASSIFICATION GUIDELINES:
-    PRIMARY CATEGORIES (Classify into one of these):
-    1. 'Vessel Certificate' - Any official certificate related to vessel compliance
-    2. 'Crew Document' - Documents related to crew members
-    3. 'Port Document' - Documents specific to port entry/departure
-    4. 'Cargo Document' - Documents related to cargo
-    5. 'Commercial Document' - Commercial agreements, invoices, etc.
-    6. 'General' - Documents that don't fit the above categories
-
-    SECONDARY CLASSIFICATION (Only if primary category is 'Vessel Certificate'):
-    A. 'Safety Certificate' - Documents related to vessel safety
-    B. 'Environmental Certificate' - Documents related to environmental compliance
-    C. 'Structural Certificate' - Documents related to vessel structure and class
-    D. 'Operational Certificate' - Documents related to vessel operations
-    E. 'Regulatory Certificate' - Other regulatory compliance documents
-
-    SPECIFIC MARITIME DOCUMENT TYPES include:
-    - Safety Management Certificate (SMC), Document of Compliance (DOC)
-    - International Ship Security Certificate (ISSC)
-    - International Oil Pollution Prevention Certificate (IOPP)
-    - International Air Pollution Prevention Certificate (IAPP)
-    - International Load Line Certificate, Classification Certificate
-    - Maritime Labour Certificate (MLC), Minimum Safe Manning Document
-    - Crew Lists, Seafarer's Identity Documents, Medical Certificates
-    - Port Entry Forms, Maritime Declaration of Health
-    - Bills of Lading, Cargo Manifests, Charter Parties
-    - And many other maritime document types
+    ${aiGuidance}
     
     DATE FORMAT RULES:
     - Always return dates in DD/MM/YYYY format (e.g., 15/01/2023)
@@ -136,8 +115,8 @@ async function extractMetadataAndClassificationFromText(text, documentType = nul
         "expiryDate": "Expiration date in DD/MM/YYYY format if present"
       },
       "classification": {
-        "primaryCategory": "one of the 6 primary categories",
-        "secondaryCategory": "only if primary is 'Vessel Certificate', otherwise null",
+        "primaryCategory": "one of: statutory, classification, crew, commercial, inspection, general",
+        "subcategory": "appropriate subcategory based on primary category",
         "specificDocumentType": "most specific document type if identifiable",
         "confidence": "High/Medium/Low",
         "explanation": "brief explanation of classification reasoning"
@@ -145,7 +124,6 @@ async function extractMetadataAndClassificationFromText(text, documentType = nul
       "keyValuePairs": [
         {"key": "Field name 1", "value": "Field value 1"},
         {"key": "Field name 2", "value": "Field value 2"}
-        // All other key-value pairs identified in the document
       ]
     }
   `
@@ -154,17 +132,17 @@ async function extractMetadataAndClassificationFromText(text, documentType = nul
     { role: "system", content: systemPrompt },
     {
       role: "user",
-      content: `Extract structured data and classify this maritime document text: 
+      content: `Extract structured data and classify this maritime document text using the exact categories provided: 
 
-${text.substring(0, 8000)}`, // Limit text length to avoid token limits
+${text.substring(0, 8000)}`,
     },
   ]
 
   const prompt = {
     model: modelName,
     messages: messages,
-    response_format: { type: "json_object" }, // Ensure JSON response
-    temperature: 0.1, // Lower temperature for more consistent extraction
+    response_format: { type: "json_object" },
+    temperature: 0.1,
   }
 
   try {
@@ -180,7 +158,6 @@ ${text.substring(0, 8000)}`, // Limit text length to avoid token limits
     let extractionResult
 
     try {
-      // Parse the JSON response
       extractionResult = JSON.parse(response.data.choices[0].message.content.trim())
       console.log("Successfully extracted structured data and classification from text")
 
@@ -193,8 +170,8 @@ ${text.substring(0, 8000)}`, // Limit text length to avoid token limits
       extractionResult = {
         metadata: {},
         classification: {
-          primaryCategory: "General",
-          secondaryCategory: null,
+          primaryCategory: "general",
+          subcategory: "other",
           specificDocumentType: null,
           confidence: "Low",
           explanation: "JSON parsing failed - manual review required",
@@ -227,15 +204,25 @@ function cleanExtractionResult(extractionResult) {
     extractionResult.metadata = {}
   }
 
-  // Ensure classification object exists
+  // Ensure classification object exists with proper defaults
   if (!extractionResult.classification) {
     extractionResult.classification = {
-      primaryCategory: "General",
-      secondaryCategory: null,
+      primaryCategory: "general",
+      subcategory: "other",
       specificDocumentType: null,
       confidence: "Low",
       explanation: "Classification data not provided by AI",
     }
+  }
+
+  // Validate that primaryCategory is one of our allowed values
+  const allowedCategories = ["statutory", "classification", "crew", "commercial", "inspection", "general"]
+  if (!allowedCategories.includes(extractionResult.classification.primaryCategory)) {
+    console.warn(
+      `Invalid primary category: ${extractionResult.classification.primaryCategory}, defaulting to 'general'`,
+    )
+    extractionResult.classification.primaryCategory = "general"
+    extractionResult.classification.subcategory = "other"
   }
 
   const metadata = extractionResult.metadata
@@ -245,7 +232,7 @@ function cleanExtractionResult(extractionResult) {
     metadata.imoNumber = metadata.imoNumber.replace(/^IMO\s*/i, "").trim()
   }
 
-  // Use the improved date conversion function (same as image processor)
+  // Use the improved date conversion function
   if (metadata.issueDate) {
     metadata.issueDate = convertToDateFormat(metadata.issueDate)
   }
@@ -257,7 +244,6 @@ function cleanExtractionResult(extractionResult) {
   // Also convert dates in keyValuePairs
   if (extractionResult.keyValuePairs && Array.isArray(extractionResult.keyValuePairs)) {
     extractionResult.keyValuePairs = extractionResult.keyValuePairs.map((pair) => {
-      // Check if the value might be a date
       if (
         pair.value &&
         (pair.key.toLowerCase().includes("date") ||
@@ -287,8 +273,7 @@ function cleanExtractionResult(extractionResult) {
 }
 
 /**
- * UPDATED: Use the same comprehensive date conversion function as the image processor
- * Convert dates to DD/MM/YYYY format - matches ExtractTextFromImageAlgo.js
+ * Convert dates to DD/MM/YYYY format
  */
 function convertToDateFormat(dateString) {
   if (!dateString) return dateString
@@ -298,7 +283,7 @@ function convertToDateFormat(dateString) {
     return dateString
   }
 
-  // Try to convert from YYYY-MM-DD format (this handles your ISO dates from AI)
+  // Try to convert from YYYY-MM-DD format
   const isoFormatMatch = dateString.match(/^(\d{4})-(\d{2})-(\d{2})$/)
   if (isoFormatMatch) {
     const [_, year, month, day] = isoFormatMatch
@@ -318,17 +303,7 @@ function convertToDateFormat(dateString) {
     console.warn("Could not parse date:", dateString)
   }
 
-  // Return original if we can't parse it
   return dateString
-}
-
-/**
- * DEPRECATED: Replaced with convertToDateFormat for consistency
- * Keeping for reference but not used anymore
- */
-function validateDateFormat(dateString) {
-  console.warn("validateDateFormat is deprecated, using convertToDateFormat instead")
-  return convertToDateFormat(dateString)
 }
 
 /**
@@ -345,6 +320,7 @@ function getDocumentSpecificInstructions(documentType) {
       - Interim or full certificate status
       - Verification audit dates
       - Any conditions of issue
+      CLASSIFICATION: This should be classified as 'statutory' with subcategory 'safety'
     `,
     "International Oil Pollution Prevention Certificate": `
       For IOPP Certificate, pay special attention to:
@@ -353,6 +329,7 @@ function getDocumentSpecificInstructions(documentType) {
       - Exemptions granted
       - Endorsements and additional inspections
       - Oil filtering equipment specifications
+      CLASSIFICATION: This should be classified as 'statutory' with subcategory 'environmental'
     `,
     "Certificate of Registry": `
       For Certificate of Registry, pay special attention to:
@@ -363,6 +340,7 @@ function getDocumentSpecificInstructions(documentType) {
       - Propulsion details
       - Owner details
       - Build information (shipyard, year)
+      CLASSIFICATION: This should be classified as 'statutory' with subcategory 'structural'
     `,
     "Bill of Lading": `
       For Bill of Lading, pay special attention to:
@@ -375,6 +353,7 @@ function getDocumentSpecificInstructions(documentType) {
       - Quantity, weight, and measurement
       - Freight terms
       - Number of original B/Ls issued
+      CLASSIFICATION: This should be classified as 'commercial' with subcategory 'cargo'
     `,
   }
 

@@ -41,6 +41,37 @@ interface UseDocumentsReturn {
   downloadDocument: (documentId: string) => Promise<string | null>
   batchDownload: (documentIds: string[]) => Promise<any>
   clearMessages: () => void
+  categories: string[]
+  getCategoryBadge: (category: string) => { className: string; label: string }
+  getDocumentsByCategory: (category: string) => Document[]
+}
+
+// Category configuration with maritime-focused styling
+const CATEGORY_CONFIG = {
+  statutory: {
+    label: "Statutory",
+    className: "bg-blue-50 text-blue-700 border-blue-200",
+  },
+  classification: {
+    label: "Classification",
+    className: "bg-purple-50 text-purple-700 border-purple-200",
+  },
+  crew: {
+    label: "Crew",
+    className: "bg-green-50 text-green-700 border-green-200",
+  },
+  commercial: {
+    label: "Commercial",
+    className: "bg-orange-50 text-orange-700 border-orange-200",
+  },
+  inspection: {
+    label: "Inspection",
+    className: "bg-red-50 text-red-700 border-red-200",
+  },
+  general: {
+    label: "General",
+    className: "bg-gray-50 text-gray-700 border-gray-200",
+  },
 }
 
 export function useDocuments(): UseDocumentsReturn {
@@ -252,6 +283,21 @@ export function useDocuments(): UseDocumentsReturn {
     }
   }, [])
 
+  // Category utilities
+  const categories = Object.keys(CATEGORY_CONFIG)
+
+  const getCategoryBadge = useCallback((category: string) => {
+    const config = CATEGORY_CONFIG[category.toLowerCase()]
+    return config || CATEGORY_CONFIG.general
+  }, [])
+
+  const getDocumentsByCategory = useCallback(
+    (category: string) => {
+      return documents.filter((doc) => doc.document_category?.toLowerCase() === category.toLowerCase())
+    },
+    [documents],
+  )
+
   return {
     documents,
     isLoading,
@@ -264,5 +310,8 @@ export function useDocuments(): UseDocumentsReturn {
     downloadDocument,
     batchDownload,
     clearMessages,
+    categories,
+    getCategoryBadge,
+    getDocumentsByCategory,
   }
 }

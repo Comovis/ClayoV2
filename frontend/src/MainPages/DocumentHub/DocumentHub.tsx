@@ -36,6 +36,10 @@ import {
   CalendarDays,
   ShieldAlert,
   ClipboardList,
+  FolderOpen,
+  Edit,
+  Archive,
+  MoreHorizontal,
 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetClose } from "@/components/ui/sheet"
@@ -75,6 +79,9 @@ export default function DocumentHub() {
     batchDownload,
     archiveDocument,
     clearMessages,
+    categories,
+    getCategoryBadge,
+    getDocumentsByCategory,
   } = useDocuments()
   const { generatePreviewUrl, previewUrl, clearPreview } = useDocumentPreview()
 
@@ -293,8 +300,9 @@ export default function DocumentHub() {
       // Issuer filter
       const matchesIssuer = activeFilters.issuer.length === 0 || activeFilters.issuer.includes(doc.issuer)
 
-      // Category filter (based on tabs)
-      const matchesCategory = activeFilters.category.length === 0 || activeFilters.category.includes(doc.category)
+      // Category filter (using document_category)
+      const matchesCategory =
+        activeFilters.category.length === 0 || activeFilters.category.includes(doc.document_category)
 
       // Permanent filter
       const matchesPermanent = activeFilters.permanent === null || doc.is_permanent === activeFilters.permanent
@@ -345,6 +353,11 @@ export default function DocumentHub() {
     expiring_soon: documents.filter((doc) => doc.status === "expiring_soon").length,
     expired: documents.filter((doc) => doc.status === "expired").length,
     missing: documents.filter((doc) => doc.status === "missing").length,
+  }
+
+  // Calculate category counts for tabs
+  const getCategoryCount = (category: string) => {
+    return getDocumentsByCategory(category).length
   }
 
   // Mock document templates data (keep existing)
@@ -549,10 +562,11 @@ export default function DocumentHub() {
                       <div className="space-y-2">
                         {[
                           { value: "statutory", label: "Statutory", icon: Scale },
-                          { value: "class", label: "Classification", icon: Building2 },
+                          { value: "classification", label: "Classification", icon: Building2 },
                           { value: "crew", label: "Crew", icon: Users },
                           { value: "commercial", label: "Commercial", icon: Briefcase },
                           { value: "inspection", label: "Inspection", icon: SearchIcon },
+                          { value: "general", label: "General", icon: FolderOpen },
                         ].map((category) => {
                           const IconComponent = category.icon
                           return (
@@ -811,12 +825,13 @@ export default function DocumentHub() {
 
           <Tabs defaultValue="all">
             <TabsList className="mb-4">
-              <TabsTrigger value="all">All Documents</TabsTrigger>
-              <TabsTrigger value="statutory">Statutory</TabsTrigger>
-              <TabsTrigger value="class">Classification</TabsTrigger>
-              <TabsTrigger value="crew">Crew</TabsTrigger>
-              <TabsTrigger value="commercial">Commercial</TabsTrigger>
-              <TabsTrigger value="inspection">Inspection Reports</TabsTrigger>
+              <TabsTrigger value="all">All Documents ({documents.length})</TabsTrigger>
+              <TabsTrigger value="statutory">Statutory ({getCategoryCount("statutory")})</TabsTrigger>
+              <TabsTrigger value="classification">Classification ({getCategoryCount("classification")})</TabsTrigger>
+              <TabsTrigger value="crew">Crew ({getCategoryCount("crew")})</TabsTrigger>
+              <TabsTrigger value="commercial">Commercial ({getCategoryCount("commercial")})</TabsTrigger>
+              <TabsTrigger value="inspection">Inspection ({getCategoryCount("inspection")})</TabsTrigger>
+              <TabsTrigger value="general">General ({getCategoryCount("general")})</TabsTrigger>
               <TabsTrigger value="templates">Templates</TabsTrigger>
             </TabsList>
 
@@ -912,12 +927,8 @@ export default function DocumentHub() {
                   {getFilteredDocuments().map((document) => (
                     <DocumentCard
                       key={document.id}
-                      title={document.title}
-                      issuer={document.issuer}
-                      issueDate={document.issue_date}
-                      expiryDate={document.expiry_date}
-                      status={document.status}
-                      permanent={document.is_permanent}
+                      document={document}
+                      getCategoryBadge={getCategoryBadge}
                       onClick={() => handleDocumentSelect(document)}
                       onDownload={() => handleDocumentDownload(document.id)}
                       onArchive={() => handleDocumentArchive(document.id)}
@@ -925,7 +936,7 @@ export default function DocumentHub() {
                   ))}
                 </div>
               ) : (
-                // Table View
+                // Table View - Updated with new Category column
                 <Card>
                   <Table>
                     <TableHeader>
@@ -935,6 +946,7 @@ export default function DocumentHub() {
                         <TableHead>Issue Date</TableHead>
                         <TableHead>Expiry Date</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>Category</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -946,9 +958,11 @@ export default function DocumentHub() {
                           onClick={() => handleDocumentSelect(document)}
                         >
                           <TableCell className="font-medium">
-                            <div className="flex items-center">
-                              <FileText className="h-4 w-4 mr-2 text-gray-400" />
-                              {document.title}
+                            <div className="flex items-center space-x-3">
+                              <FileText className="h-4 w-4 text-gray-400" />
+                              <div>
+                                <div className="font-medium">{document.title}</div>
+                              </div>
                             </div>
                           </TableCell>
                           <TableCell>{document.issuer}</TableCell>
@@ -962,39 +976,61 @@ export default function DocumentHub() {
                             {document.is_permanent ? "Permanent" : new Date(document.expiry_date).toLocaleDateString()}
                           </TableCell>
                           <TableCell>{getStatusBadge(document.status, undefined, document.is_permanent)}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={`text-xs ${getCategoryBadge(document.document_category).className}`}
+                            >
+                              {getCategoryBadge(document.document_category).label}
+                            </Badge>
+                          </TableCell>
                           <TableCell className="text-right">
-                            <div className="flex justify-end space-x-1">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleDocumentSelect(document)
-                                }}
-                              >
-                                <Eye className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleDocumentDownload(document.id)
-                                }}
-                              >
-                                <Download className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  openUploadModal("single")
-                                }}
-                              >
-                                <Upload className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button size="sm" variant="ghost" onClick={(e) => e.stopPropagation()}>
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleDocumentSelect(document)
+                                  }}
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleDocumentDownload(document.id)
+                                  }}
+                                >
+                                  <Download className="h-4 w-4 mr-2" />
+                                  Download
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    openUploadModal("single")
+                                  }}
+                                >
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Update
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleDocumentArchive(document.id)
+                                  }}
+                                  className="text-red-600"
+                                >
+                                  <Archive className="h-4 w-4 mr-2" />
+                                  Archive
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -1002,6 +1038,103 @@ export default function DocumentHub() {
                   </Table>
                 </Card>
               )}
+            </TabsContent>
+
+            {/* Individual Category Tabs */}
+            <TabsContent value="statutory" className="space-y-4">
+              <CategoryDocumentView
+                category="statutory"
+                documents={getDocumentsByCategory("statutory")}
+                isLoading={isDocumentsLoading}
+                onDocumentSelect={handleDocumentSelect}
+                onDocumentDownload={handleDocumentDownload}
+                onUploadClick={() => openUploadModal("single")}
+                searchQuery={searchQuery}
+                viewMode={viewMode}
+                getStatusBadge={getStatusBadge}
+                getCategoryBadge={getCategoryBadge}
+                showCategoryBadges={false}
+              />
+            </TabsContent>
+
+            <TabsContent value="classification" className="space-y-4">
+              <CategoryDocumentView
+                category="classification"
+                documents={getDocumentsByCategory("classification")}
+                isLoading={isDocumentsLoading}
+                onDocumentSelect={handleDocumentSelect}
+                onDocumentDownload={handleDocumentDownload}
+                onUploadClick={() => openUploadModal("single")}
+                searchQuery={searchQuery}
+                viewMode={viewMode}
+                getStatusBadge={getStatusBadge}
+                getCategoryBadge={getCategoryBadge}
+                showCategoryBadges={false}
+              />
+            </TabsContent>
+
+            <TabsContent value="crew" className="space-y-4">
+              <CategoryDocumentView
+                category="crew"
+                documents={getDocumentsByCategory("crew")}
+                isLoading={isDocumentsLoading}
+                onDocumentSelect={handleDocumentSelect}
+                onDocumentDownload={handleDocumentDownload}
+                onUploadClick={() => openUploadModal("single")}
+                searchQuery={searchQuery}
+                viewMode={viewMode}
+                getStatusBadge={getStatusBadge}
+                getCategoryBadge={getCategoryBadge}
+                showCategoryBadges={false}
+              />
+            </TabsContent>
+
+            <TabsContent value="commercial" className="space-y-4">
+              <CategoryDocumentView
+                category="commercial"
+                documents={getDocumentsByCategory("commercial")}
+                isLoading={isDocumentsLoading}
+                onDocumentSelect={handleDocumentSelect}
+                onDocumentDownload={handleDocumentDownload}
+                onUploadClick={() => openUploadModal("single")}
+                searchQuery={searchQuery}
+                viewMode={viewMode}
+                getStatusBadge={getStatusBadge}
+                getCategoryBadge={getCategoryBadge}
+                showCategoryBadges={false}
+              />
+            </TabsContent>
+
+            <TabsContent value="inspection" className="space-y-4">
+              <CategoryDocumentView
+                category="inspection"
+                documents={getDocumentsByCategory("inspection")}
+                isLoading={isDocumentsLoading}
+                onDocumentSelect={handleDocumentSelect}
+                onDocumentDownload={handleDocumentDownload}
+                onUploadClick={() => openUploadModal("single")}
+                searchQuery={searchQuery}
+                viewMode={viewMode}
+                getStatusBadge={getStatusBadge}
+                getCategoryBadge={getCategoryBadge}
+                showCategoryBadges={false}
+              />
+            </TabsContent>
+
+            <TabsContent value="general" className="space-y-4">
+              <CategoryDocumentView
+                category="general"
+                documents={getDocumentsByCategory("general")}
+                isLoading={isDocumentsLoading}
+                onDocumentSelect={handleDocumentSelect}
+                onDocumentDownload={handleDocumentDownload}
+                onUploadClick={() => openUploadModal("single")}
+                searchQuery={searchQuery}
+                viewMode={viewMode}
+                getStatusBadge={getStatusBadge}
+                getCategoryBadge={getCategoryBadge}
+                showCategoryBadges={false}
+              />
             </TabsContent>
 
             {/* Templates tab (keep existing) */}
@@ -1124,6 +1257,17 @@ export default function DocumentHub() {
                         <div className="text-sm">{selectedDocument.document_type}</div>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
+                        <div className="text-sm text-gray-500">Category:</div>
+                        <div className="text-sm">
+                          <Badge
+                            variant="outline"
+                            className={`text-xs ${getCategoryBadge(selectedDocument.document_category).className}`}
+                          >
+                            {getCategoryBadge(selectedDocument.document_category).label}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
                         <div className="text-sm text-gray-500">Issuer:</div>
                         <div className="text-sm">{selectedDocument.issuer}</div>
                       </div>
@@ -1230,7 +1374,174 @@ export default function DocumentHub() {
   )
 }
 
-// Helper components (keep existing but update props)
+// Helper component for category-specific document views
+function CategoryDocumentView({
+  category,
+  documents,
+  isLoading,
+  onDocumentSelect,
+  onDocumentDownload,
+  onUploadClick,
+  searchQuery,
+  viewMode,
+  getStatusBadge,
+  getCategoryBadge,
+  showCategoryBadges = false,
+}) {
+  const filteredDocuments = documents.filter(
+    (doc) =>
+      !searchQuery ||
+      doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      doc.document_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      doc.issuer?.toLowerCase().includes(searchQuery.toLowerCase()),
+  )
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center p-8">
+        <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+        <span className="ml-2">Loading {category} documents...</span>
+      </div>
+    )
+  }
+
+  if (filteredDocuments.length === 0) {
+    return (
+      <Card className="p-8 text-center">
+        <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+        <h3 className="text-lg font-medium mb-2">No {category} documents found</h3>
+        <p className="text-gray-500 mb-4">Upload your first {category} document for this vessel.</p>
+        <Button onClick={onUploadClick}>
+          <Upload className="mr-2 h-4 w-4" />
+          Upload {category.charAt(0).toUpperCase() + category.slice(1)} Document
+        </Button>
+      </Card>
+    )
+  }
+
+  if (viewMode === "card") {
+    return (
+      <div className="space-y-4">
+        {filteredDocuments.map((document) => (
+          <DocumentCard
+            key={document.id}
+            document={document}
+            getCategoryBadge={getCategoryBadge}
+            showCategoryBadge={showCategoryBadges}
+            onClick={() => onDocumentSelect(document)}
+            onDownload={() => onDocumentDownload(document.id)}
+            onArchive={() => {}}
+          />
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <Card>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[300px]">Document</TableHead>
+            <TableHead>Issuer</TableHead>
+            <TableHead>Issue Date</TableHead>
+            <TableHead>Expiry Date</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filteredDocuments.map((document) => (
+            <TableRow
+              key={document.id}
+              className="cursor-pointer hover:bg-gray-50"
+              onClick={() => onDocumentSelect(document)}
+            >
+              <TableCell className="font-medium">
+                <div className="flex items-center">
+                  <FileText className="h-4 w-4 mr-2 text-gray-400" />
+                  <div>
+                    <div className="font-medium">{document.title}</div>
+                    {/* Only show category badge if showCategoryBadges is true */}
+                    {showCategoryBadges && (
+                      <Badge
+                        variant="outline"
+                        className={`text-xs mt-1 ${getCategoryBadge(document.document_category).className}`}
+                      >
+                        {getCategoryBadge(document.document_category).label}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </TableCell>
+              <TableCell>{document.issuer}</TableCell>
+              <TableCell>
+                <div className="flex items-center">
+                  <Calendar className="h-4 w-4 mr-1 text-gray-400" />
+                  {new Date(document.issue_date).toLocaleDateString()}
+                </div>
+              </TableCell>
+              <TableCell>
+                {document.is_permanent ? "Permanent" : new Date(document.expiry_date).toLocaleDateString()}
+              </TableCell>
+              <TableCell>{getStatusBadge(document.status, undefined, document.is_permanent)}</TableCell>
+              <TableCell className="text-right">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="ghost" onClick={(e) => e.stopPropagation()}>
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onDocumentSelect(document)
+                      }}
+                    >
+                      <Eye className="h-4 w-4 mr-2" />
+                      View
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onDocumentDownload(document.id)
+                      }}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Download
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onUploadClick()
+                      }}
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Update
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        // Archive functionality would go here
+                      }}
+                      className="text-red-600"
+                    >
+                      <Archive className="h-4 w-4 mr-2" />
+                      Archive
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Card>
+  )
+}
+
+// Helper components
 function DocumentStatusBadge({ status, count }) {
   const statusConfig = {
     valid: {
@@ -1267,17 +1578,7 @@ function DocumentStatusBadge({ status, count }) {
   )
 }
 
-function DocumentCard({
-  title,
-  issuer,
-  issueDate,
-  expiryDate,
-  status,
-  permanent = false,
-  onClick,
-  onDownload,
-  onArchive,
-}) {
+function DocumentCard({ document, getCategoryBadge, showCategoryBadge = true, onClick, onDownload, onArchive }) {
   const statusConfig = {
     valid: {
       className: "border-l-green-500",
@@ -1305,7 +1606,7 @@ function DocumentCard({
     },
   }
 
-  const config = statusConfig[status]
+  const config = statusConfig[document.status]
   const Icon = config.icon
 
   return (
@@ -1315,47 +1616,78 @@ function DocumentCard({
     >
       <CardContent className="p-4">
         <div className="flex justify-between">
-          <div>
-            <h3 className="font-medium">{title}</h3>
-            <p className="text-sm text-gray-500">{issuer}</p>
+          <div className="flex-1">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-medium">{document.title}</h3>
+              {showCategoryBadge && (
+                <Badge
+                  variant="outline"
+                  className={`text-xs ${getCategoryBadge(document.document_category).className}`}
+                >
+                  {getCategoryBadge(document.document_category).label}
+                </Badge>
+              )}
+            </div>
+            <p className="text-sm text-gray-500">{document.issuer}</p>
           </div>
-          <div className="flex items-center">
+          <div className="flex items-center ml-4">
             <Icon className={`h-4 w-4 mr-1 ${config.iconColor}`} />
             <span className={`text-sm font-medium ${config.textColor}`}>
-              {permanent ? "Permanent" : status === "expiring_soon" ? "Expiring Soon" : "Valid"}
+              {document.is_permanent ? "Permanent" : document.status === "expiring_soon" ? "Expiring Soon" : "Valid"}
             </span>
           </div>
         </div>
         <div className="flex justify-between mt-3">
           <div className="flex space-x-4 text-xs text-gray-500">
-            <span>Issued: {new Date(issueDate).toLocaleDateString()}</span>
-            <span>Expires: {permanent ? "N/A" : new Date(expiryDate).toLocaleDateString()}</span>
+            <span>Issued: {new Date(document.issue_date).toLocaleDateString()}</span>
+            <span>Expires: {document.is_permanent ? "N/A" : new Date(document.expiry_date).toLocaleDateString()}</span>
           </div>
-          <div className="flex space-x-1">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={(e) => {
-                e.stopPropagation()
-                onClick()
-              }}
-            >
-              <Eye className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={(e) => {
-                e.stopPropagation()
-                onDownload()
-              }}
-            >
-              <Download className="h-3.5 w-3.5" />
-            </Button>
-            <Button size="sm" variant="ghost">
-              <Share2 className="h-3.5 w-3.5" />
-            </Button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="ghost" onClick={(e) => e.stopPropagation()}>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onClick()
+                }}
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                View
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDownload()
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation()
+                  // Update functionality would go here
+                }}
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Update
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onArchive()
+                }}
+                className="text-red-600"
+              >
+                <Archive className="h-4 w-4 mr-2" />
+                Archive
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </CardContent>
     </Card>
