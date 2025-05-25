@@ -14,6 +14,42 @@ const { v4: uuidv4 } = require("uuid")
 const path = require("path")
 
 /**
+ * Convert text to Title Case with maritime-specific handling
+ * @param {String} text - Text to convert
+ * @returns {String} Title cased text
+ */
+function toTitleCase(text) {
+  if (!text) return text
+
+  // Maritime abbreviations that should stay uppercase
+  const maritimeAbbreviations = [
+    'SMC', 'DOC', 'IOPP', 'ISSC', 'MLC', 'IMO', 'SOLAS', 'MARPOL', 
+    'STCW', 'ISM', 'ISPS', 'PSC', 'MV', 'MS', 'SS', 'MT', 'FV',
+    'LLC', 'LTD', 'INC', 'CO', 'CORP', 'USA', 'UK', 'EU', 'US',
+    'ID', 'NO', 'REF', 'CERT', 'PDF', 'JPG', 'PNG', 'GIF'
+  ]
+
+  return text
+    .toLowerCase()
+    .split(' ')
+    .map(word => {
+      // Handle empty words
+      if (!word) return word
+      
+      // Check if word (without punctuation) is a maritime abbreviation
+      const cleanWord = word.replace(/[^\w]/g, '')
+      if (maritimeAbbreviations.includes(cleanWord.toUpperCase())) {
+        // Keep the original punctuation but make the word uppercase
+        return word.replace(cleanWord, cleanWord.toUpperCase())
+      }
+      
+      // Regular title case for other words
+      return word.charAt(0).toUpperCase() + word.slice(1)
+    })
+    .join(' ')
+}
+
+/**
  * Convert DD/MM/YYYY date format to ISO YYYY-MM-DD format for PostgreSQL
  * @param {String} dateString - Date string in DD/MM/YYYY format
  * @returns {String|null} Date string in YYYY-MM-DD format or null
@@ -151,6 +187,7 @@ function shouldDocumentBePermanent(classification, documentType) {
  * Enhanced to handle AI extraction and update document with extracted data
  * UPDATED: Now uses proper two-stage AI-first classification with validation
  * UPDATED: Now stores full extracted text in full_text column
+ * UPDATED: Now normalizes document titles to Title Case
  *
  * @param {Object} fileData - The file data object
  * @param {Buffer} fileData.buffer - The file buffer
@@ -265,20 +302,21 @@ async function uploadDocument(fileData, documentData) {
     }
 
     // Step 4: Prepare document record with AI-extracted data taking precedence
-    // UPDATED: Now includes full_text field
+    // UPDATED: Now includes full_text field and title normalization
     const documentRecord = {
       id: uuidv4(),
       vessel_id: documentData.vesselId,
-      title: documentMetadata?.documentTitle || documentData.title,
-      document_type:
+      title: toTitleCase(documentMetadata?.documentTitle || documentData.title), // NORMALIZE TITLE
+      document_type: toTitleCase(
         validatedClassification?.originalAiClassification?.specificDocumentType ||
         documentMetadata?.documentType ||
-        documentData.documentType,
+        documentData.documentType
+      ), // NORMALIZE DOCUMENT TYPE
       document_category: documentCategory,
       document_subcategory: documentSubcategory,
       classification_confidence: validatedClassification?.confidence || null,
       classification_explanation: validatedClassification?.explanation || null,
-      issuer: documentMetadata?.issuer || documentData.issuer,
+      issuer: toTitleCase(documentMetadata?.issuer || documentData.issuer), // NORMALIZE ISSUER
       certificate_number: documentMetadata?.documentNumber || documentData.certificateNumber,
       issue_date: convertDDMMYYYYtoISO(documentMetadata?.issueDate) || convertDDMMYYYYtoISO(documentData.issueDate),
       expiry_date: null, // Will be set below based on extracted data
@@ -721,6 +759,7 @@ async function getVesselDocuments(vesselId) {
 
 /**
  * Update a document
+ * UPDATED: Now normalizes titles to Title Case
  * @param {String} documentId - Document ID
  * @param {Object} updateData - Data to update
  * @param {String} userId - ID of the user making the update
@@ -742,12 +781,12 @@ async function updateDocument(documentId, updateData, userId) {
       }
     }
 
-    // Prepare update data
+    // Prepare update data with title normalization
     const documentUpdate = {
-      title: updateData.title || existingDoc.title,
-      document_type: updateData.documentType || existingDoc.document_type,
+      title: toTitleCase(updateData.title) || existingDoc.title, // NORMALIZE TITLE
+      document_type: toTitleCase(updateData.documentType) || existingDoc.document_type, // NORMALIZE DOCUMENT TYPE
       document_category: updateData.category || existingDoc.document_category || "statutory",
-      issuer: updateData.issuer || existingDoc.issuer,
+      issuer: toTitleCase(updateData.issuer) || existingDoc.issuer, // NORMALIZE ISSUER
       certificate_number: updateData.certificateNumber || existingDoc.certificate_number,
       issue_date: updateData.issueDate || existingDoc.issue_date,
       expiry_date: updateData.isPermanent ? null : updateData.expiryDate || existingDoc.expiry_date,
