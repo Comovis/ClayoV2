@@ -35,6 +35,7 @@ function convertDDMMYYYYtoISO(dateString) {
  * Extract text content from document with integrated classification
  * Enhanced with specialized PDF processing and OCR for images
  * NOW INCLUDES AI-FIRST CLASSIFICATION with proper validation
+ * UPDATED: Now returns FULL text instead of truncated text
  *
  * @param {Buffer} fileBuffer - File buffer
  * @param {String} mimeType - File MIME type
@@ -52,9 +53,9 @@ async function extractDocumentText(fileBuffer, mimeType, documentType = null) {
       // STAGE 2: Validate and process the raw AI classification
       const validatedClassification = validateAndProcessAIClassification(pdfResult.classification, pdfResult.metadata)
 
-      // Return text, metadata AND validated classification
+      // Return FULL text, metadata AND validated classification
       return {
-        text: pdfResult.fullText.substring(0, 4000),
+        text: pdfResult.fullText, // REMOVED .substring(0, 4000) - now stores full text
         metadata: pdfResult.metadata,
         classification: validatedClassification, // Now properly validated
         keyValuePairs: pdfResult.keyValuePairs,
@@ -68,9 +69,9 @@ async function extractDocumentText(fileBuffer, mimeType, documentType = null) {
       // STAGE 2: Validate and process the raw AI classification
       const validatedClassification = validateAndProcessAIClassification(ocrResult.classification, ocrResult.metadata)
 
-      // Return text, metadata AND validated classification
+      // Return FULL text, metadata AND validated classification
       return {
-        text: ocrResult.fullText.substring(0, 4000),
+        text: ocrResult.fullText, // REMOVED .substring(0, 4000) - now stores full text
         metadata: ocrResult.metadata,
         classification: validatedClassification, // Now properly validated
         keyValuePairs: ocrResult.keyValuePairs || [],
@@ -91,7 +92,7 @@ async function extractDocumentText(fileBuffer, mimeType, documentType = null) {
       })
 
       return {
-        text: fileBuffer.toString("utf8").substring(0, 4000),
+        text: fileBuffer.toString("utf8"), // REMOVED .substring(0, 4000) - now stores full text
         metadata: null,
         classification: validatedClassification,
         keyValuePairs: [],
@@ -124,6 +125,7 @@ async function extractDocumentText(fileBuffer, mimeType, documentType = null) {
  * Upload a document file to storage and create document record
  * Enhanced to handle AI extraction and update document with extracted data
  * UPDATED: Now uses proper two-stage AI-first classification with validation
+ * UPDATED: Now stores full extracted text in full_text column
  *
  * @param {Object} fileData - The file data object
  * @param {Buffer} fileData.buffer - The file buffer
@@ -193,15 +195,16 @@ async function uploadDocument(fileData, documentData) {
     try {
       console.log("Starting integrated document text, metadata and AI-first classification extraction...")
 
-      // This now returns properly validated classification
+      // This now returns properly validated classification AND full text
       extractionResult = await extractDocumentText(fileData.buffer, fileData.mimetype, documentData.documentType)
 
-      documentText = extractionResult.text
+      documentText = extractionResult.text // Now contains FULL text, not truncated
       documentMetadata = extractionResult.metadata
       validatedClassification = extractionResult.classification // Already validated in extractDocumentText
 
       console.log("Document metadata extracted:", documentMetadata)
       console.log("Validated classification result:", validatedClassification)
+      console.log("Full text length:", documentText.length, "characters") // Log full text length
     } catch (extractionError) {
       console.error("Document extraction failed:", extractionError)
       // Continue with upload even if extraction fails - use fallback classification
@@ -237,6 +240,7 @@ async function uploadDocument(fileData, documentData) {
     }
 
     // Step 4: Prepare document record with AI-extracted data taking precedence
+    // UPDATED: Now includes full_text field
     const documentRecord = {
       id: uuidv4(),
       vessel_id: documentData.vesselId,
@@ -258,6 +262,7 @@ async function uploadDocument(fileData, documentData) {
       file_path: storageResult.filePath,
       file_type: fileData.mimetype,
       file_size: fileData.size,
+      full_text: documentText, // NEW: Store the complete extracted text
       created_by: documentData.userId,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -293,6 +298,7 @@ async function uploadDocument(fileData, documentData) {
       issue_date: documentRecord.issue_date,
       expiry_date: documentRecord.expiry_date,
       is_permanent: documentRecord.is_permanent,
+      full_text_length: documentRecord.full_text?.length || 0, // Log full text length
     })
 
     // Insert document record into database
@@ -679,10 +685,6 @@ async function getVesselDocuments(vesselId) {
     }
   }
 }
-
-
-
-
 
 /**
  * Update a document
