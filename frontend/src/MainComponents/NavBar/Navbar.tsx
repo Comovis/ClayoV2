@@ -6,6 +6,7 @@ import { ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import UserProfileDropdown from "./UserProfileDropdown"
 import NotificationsPanel, { type Notification } from "../../MainComponents/Notifications/NotificationsPanel"
+import MaritimeSearchBar from "./SearchBar/SearchBar"
 import {
   getNotifications,
   markNotificationAsRead,
@@ -22,8 +23,6 @@ interface AppHeaderProps {
   showRightPanel: boolean
   setShowRightPanel: (show: boolean) => void
 }
-
-
 
 // Define the window.chatDashboardAPI interface
 declare global {
@@ -91,27 +90,44 @@ const AppHeader: FC<AppHeaderProps> = ({
     }
   }
 
+  // Handle search navigation
+  const handleSearchNavigate = (url: string) => {
+    // In a real app, you would use your router here
+    console.log("Navigating to:", url)
+    // Example: router.push(url)
+    window.location.href = url
+  }
+
   return (
     <div className="flex items-center justify-between p-3 border-b bg-white/80 dark:bg-slate-900/80 backdrop-blur-md backdrop-saturate-150 sticky top-0 z-10 dark:border-slate-800">
+      {/* Left side - Logo/Sidebar toggle */}
       <div className="flex items-center">
-        {/* Logo with subtle arrow to open side panel when closed */}
-        <div className="flex items-center">
-          {!showSidePanel && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => {
-                setShowSidePanel(true)
-                callDashboardAPI("setShowSidePanel", true)
-              }}
-              className="mr-1 h-8 w-8 opacity-60 hover:opacity-100"
-              title="Open conversations"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
+        {!showSidePanel && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              setShowSidePanel(true)
+              callDashboardAPI("setShowSidePanel", true)
+            }}
+            className="mr-1 h-8 w-8 opacity-60 hover:opacity-100"
+            title="Open conversations"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        )}
       </div>
+
+      {/* Center - Maritime Search Bar */}
+      <div className="flex-1 max-w-md mx-4">
+        <MaritimeSearchBar
+          onNavigate={handleSearchNavigate}
+          placeholder="Search vessels, documents, ports..."
+          className="w-full"
+        />
+      </div>
+
+      {/* Right side - Notifications and User Profile */}
       <div className="flex items-center space-x-2">
         {/* Notifications panel */}
         <NotificationsPanel
