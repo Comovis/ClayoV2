@@ -121,50 +121,42 @@ app.use("/api/documents", (req, res, next) => {
 
 
 // ===== GITHUB - WEBHOOK =====
-
-app.post('/github-webhook', express.raw({type: 'application/json'}), (req, res) => {
+// Add GitHub webhook endpoint
+app.post('/github-webhook', express.json(), (req, res) => {
   const secret = process.env.GITHUB_WEBHOOK_SECRET;
-  
   if (!secret) {
-    console.error('🚨 Webhook secret not set');
+    console.error('Webhook secret not set in environment variables');
     return res.status(500).send('Server configuration error');
   }
 
-  // Convert buffer to string for signature verification
-  const body = req.body.toString();
-  const signature = `sha256=${crypto.createHmac('sha256', secret).update(body).digest('hex')}`;
+  const signature = `sha256=${crypto.createHmac('sha256', secret).update(JSON.stringify(req.body)).digest('hex')}`;
   const githubSignature = req.headers['x-hub-signature-256'];
 
   if (!githubSignature || signature !== githubSignature) {
-    console.error('🚨 Unauthorized webhook attempt');
+    console.error('Unauthorized: Signature mismatch');
     return res.status(401).send('Unauthorized');
   }
 
-  let payload;
-  try {
-    payload = JSON.parse(body);
-  } catch (error) {
-    return res.status(400).send('Invalid JSON');
-  }
+  // Log the ref to ensure the correct branch is being detected
+  console.log(`🚢 Received push event for ref: ${req.body.ref}`);
 
-  console.log(`🚢 Received push event for ref: ${payload.ref}`);
-  
-  if (payload.ref === 'refs/heads/master') {
-    console.log('⚓ Executing Comovis deployment...');
-    
+  if (req.body.ref === 'refs/heads/master') {
+    console.log('⚓ Executing Comovis deployment script...');
     exec(
       'cd /var/www/Comovis/backend && git pull origin master && npm install --production && pm2 restart Comovis',
       (error, stdout, stderr) => {
         if (error) {
           console.error(`🚨 Deployment error: ${error.message}`);
+          console.error(`stderr: ${stderr}`);
           return res.status(500).send('Deployment failed');
         }
-        console.log(`✅ Deployment successful: ${stdout}`);
+        console.log(`✅ Deployment stdout: ${stdout}`);
+        console.error(`Deployment stderr: ${stderr}`);
         return res.status(200).send('Deployment successful');
       }
     );
   } else {
-    res.status(200).send('Push to non-master branch, no action taken');
+    res.status(200).send('Push event to non-master branch, no action taken');
   }
 });
 
