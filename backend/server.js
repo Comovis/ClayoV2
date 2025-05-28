@@ -148,11 +148,11 @@ app.post('/github-webhook', express.raw({type: 'application/json'}), (req, res) 
 
   console.log(`🚢 Received push event for ref: ${payload.ref}`);
   
-  if (payload.ref === 'refs/heads/main') {
+  if (payload.ref === 'refs/heads/master') {
     console.log('⚓ Executing Comovis deployment...');
     
     exec(
-      'cd /var/www/Comovis/backend && git pull origin main && npm install --production && pm2 restart Comovis',
+      'cd /var/www/Comovis/backend && git pull origin master && npm install --production && pm2 restart Comovis',
       (error, stdout, stderr) => {
         if (error) {
           console.error(`🚨 Deployment error: ${error.message}`);
@@ -163,7 +163,7 @@ app.post('/github-webhook', express.raw({type: 'application/json'}), (req, res) 
       }
     );
   } else {
-    res.status(200).send('Push to non-main branch, no action taken');
+    res.status(200).send('Push to non-master branch, no action taken');
   }
 });
 
