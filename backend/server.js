@@ -200,6 +200,8 @@ app.post("/api/send-confirmation-email", authLimiter, async (req, res) => {
   }
 })
 
+//test
+
 app.post("/api/resend-confirmation-email", authLimiter, async (req, res) => {
   try {
     const { email } = req.body
