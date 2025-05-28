@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react"
 import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom"
+import { Helmet, HelmetProvider } from "react-helmet-async"
 import { Footer } from "./MainComponents/Footer/Footer"
 import Dashboard from "./MainPages/Dashboard/MainDashboard"
 import AppHeader from "./MainComponents/NavBar/Navbar"
@@ -28,6 +29,184 @@ import UnauthorizedMessage from "./Auth/UnauthorisedMsg"
 import { UserProvider } from "./Auth/Contexts/UserContext"
 import PitchDeckAuth from "./MainPages/PitchDeck/PitchDeckAuth"
 
+// Google Analytics Configuration
+const GA_TRACKING_ID = "G-16JECJB6T"
+
+// Initialize Google Analytics
+const initializeGoogleAnalytics = () => {
+  // Create script tag for gtag
+  const script = document.createElement("script")
+  script.async = true
+  script.src = `https://www.googletagmanager.com/gtag/js?id=${GA_TRACKING_ID}`
+  document.head.appendChild(script)
+
+  // Initialize gtag
+  window.dataLayer = window.dataLayer || []
+  function gtag(...args: any[]) {
+    window.dataLayer.push(args)
+  }
+  window.gtag = gtag
+
+  gtag("js", new Date())
+  gtag("config", GA_TRACKING_ID)
+}
+
+// Hook to track page views automatically
+const useAnalyticsTracking = () => {
+  const location = useLocation()
+
+  useEffect(() => {
+    // Initialize GA on first load
+    if (!window.gtag) {
+      initializeGoogleAnalytics()
+    }
+
+    // Track page view
+    if (window.gtag) {
+      window.gtag("config", GA_TRACKING_ID, {
+        page_path: location.pathname + location.search,
+        page_title: document.title,
+      })
+    }
+  }, [location])
+}
+
+// SEO metadata configuration based on route
+const getPageMetadata = (pathname: string) => {
+  const pageMetadata: Record<string, { title: string; description: string }> = {
+    // Landing and main pages
+    "/": {
+      title: "Comovis - Prevent Vessel Detentions",
+      description:
+        "AI-powered maritime compliance platform helping shipping companies prevent vessel detentions through intelligent document management and port preparation.",
+    },
+
+    // Main application pages
+    "/dashboard": {
+      title: "Fleet Compliance Dashboard | Comovis",
+      description:
+        "Monitor your fleet compliance status, track vessel readiness, and get AI-powered insights to prevent detentions.",
+    },
+    "/fleet": {
+      title: "Vessel Fleet Management | Comovis",
+      description:
+        "Manage your vessel fleet, track compliance status, certificates, and ensure all ships meet port requirements.",
+    },
+    "/document-hub": {
+      title: "Maritime Document Hub | Comovis",
+      description:
+        "Centralized document management for vessel certificates, crew documents, and maritime compliance paperwork.",
+    },
+    "/port-preparation": {
+      title: "Port Arrival Preparation | Comovis",
+      description:
+        "AI-powered port preparation tools to ensure your vessels meet all port state control requirements before arrival.",
+    },
+    "/document-sharing": {
+      title: "Secure Document Sharing | Comovis",
+      description:
+        "Securely share vessel documents with port authorities, agents, surveyors, and maritime stakeholders.",
+    },
+    "/notifications": {
+      title: "Maritime Compliance Alerts | Comovis",
+      description: "Stay updated with certificate expiry alerts, compliance notifications, and vessel status updates.",
+    },
+    "/team": {
+      title: "Maritime Team Management | Comovis",
+      description:
+        "Manage your maritime operations team, assign vessel responsibilities, and control access permissions.",
+    },
+    "/pricing": {
+      title: "Maritime Compliance Pricing | Comovis",
+      description: "Transparent pricing for maritime compliance management. Plans for single vessels to large fleets.",
+    },
+
+    // Authentication pages
+    "/login": {
+      title: "Login to Maritime Platform | Comovis",
+      description: "Access your maritime compliance dashboard and manage your vessel fleet operations.",
+    },
+    "/signup": {
+      title: "Join Maritime Compliance Platform | Comovis",
+      description: "Start preventing vessel detentions with AI-powered maritime compliance management.",
+    },
+    "/onboarding": {
+      title: "Setup Your Maritime Operations | Comovis",
+      description: "Get started with Comovis - configure your fleet and begin maritime compliance management.",
+    },
+    "/confirm-email": {
+      title: "Verify Your Maritime Account | Comovis",
+      description: "Confirm your email address to access your maritime compliance platform.",
+    },
+    "/email-confirmed": {
+      title: "Account Verified | Comovis",
+      description: "Your maritime account has been verified. Access your compliance dashboard now.",
+    },
+    "/accept-invite": {
+      title: "Join Maritime Team | Comovis",
+      description: "Accept your team invitation and start collaborating on maritime compliance operations.",
+    },
+
+    // Special pages
+    "/pitch-deck": {
+      title: "Investor Information | Comovis",
+      description: "Learn about Comovis' mission to revolutionize maritime compliance and prevent vessel detentions.",
+    },
+
+    // Document sharing pages (dynamic)
+    "/share": {
+      title: "Shared Maritime Document | Comovis",
+      description: "View shared vessel documents and maritime compliance information.",
+    },
+  }
+
+  // Handle dynamic share routes
+  if (pathname.startsWith("/share/")) {
+    if (pathname.includes("/expired/")) {
+      return {
+        title: "Document Link Expired | Comovis",
+        description: "This document sharing link has expired. Contact the sender for a new link.",
+      }
+    }
+    return pageMetadata["/share"]
+  }
+
+  // Return specific page metadata or default
+  return (
+    pageMetadata[pathname] || {
+      title: "Maritime Compliance Platform | Comovis",
+      description: "AI-powered maritime compliance platform helping shipping companies prevent vessel detentions.",
+    }
+  )
+}
+
+// SEO Component
+const SEOHead = () => {
+  const location = useLocation()
+  const { title, description } = getPageMetadata(location.pathname)
+
+  return (
+    <Helmet>
+      <title>{title}</title>
+      <meta name="description" content={description} />
+      <meta property="og:title" content={title} />
+      <meta property="og:description" content={description} />
+      <meta property="og:type" content="website" />
+      <meta property="og:url" content={`https://comovis.com${location.pathname}`} />
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta name="twitter:title" content={title} />
+      <meta name="twitter:description" content={description} />
+      <link rel="canonical" href={`https://comovis.com${location.pathname}`} />
+
+      {/* Maritime-specific keywords */}
+      <meta
+        name="keywords"
+        content="maritime compliance, vessel detention prevention, port state control, ship certificates, maritime documents, fleet management, vessel compliance, shipping compliance, maritime AI"
+      />
+    </Helmet>
+  )
+}
+
 // Define a simple user type for demonstration
 interface UserType {
   id?: string
@@ -38,6 +217,9 @@ interface UserType {
 
 // Create a wrapper component to handle conditional header rendering
 function AppContent() {
+  // Track page views automatically
+  useAnalyticsTracking()
+
   // State for the navbar props
   const [activeTab, setActiveTab] = useState("aiChat")
   const [showSidePanel, setShowSidePanel] = useState(true)
@@ -70,7 +252,7 @@ function AppContent() {
     location.pathname === "/confirm-email" ||
     location.pathname === "/email-confirmed" ||
     location.pathname === "/accept-invite" ||
-    location.pathname === "/pitch-deck" // Add this line
+    location.pathname === "/pitch-deck"
 
   // Check if it's a share page (public document sharing)
   const isSharePage = location.pathname.startsWith("/share/")
@@ -93,7 +275,7 @@ function AppContent() {
       "/pricing",
       "/team",
       "/notifications",
-      "/pitch-deck", // Add this line
+      "/pitch-deck",
     ],
     [],
   )
@@ -104,169 +286,163 @@ function AppContent() {
   // If path is unknown, we should hide navbar, sidebar, and footer
   const isUnknownPath = !isKnownPath
 
-  // Mock user data
-  const user: UserType = {
-    id: "1",
-    name: "John Smith",
-    email: "john.smith@example.com",
-  }
-
-  // Mock logout function
-  const handleLogout = () => {
-    console.log("User logged out")
-    // Add actual logout logic here
-  }
-
   return (
-    <div className="flex h-screen">
-      {/* Only show sidebar on known paths that are not landing pages, auth pages, or share pages */}
-      {!isLandingPage && !isAuthPage && !isUnknownPath && !isSharePage && !isShowingLoadingScreen && <Sidebar />}
+    <>
+      {/* SEO metadata for all pages */}
+      <SEOHead />
 
-      <div className="flex flex-col flex-1">
-        {/* Conditionally render the appropriate header */}
-        {isShowingLoadingScreen ? null : isLandingPage ? (
-          <LandingHeader user={user} logout={handleLogout} />
-        ) : isAuthPage || isUnknownPath || isSharePage ? null : (
-          <AppHeader
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-            showSidePanel={showSidePanel}
-            setShowSidePanel={setShowSidePanel}
-            showRightPanel={showRightPanel}
-            setShowRightPanel={setShowRightPanel}
-            user={user}
-            logout={handleLogout}
-          />
-        )}
+      <div className="flex h-screen">
+        {/* Only show sidebar on known paths that are not landing pages, auth pages, or share pages */}
+        {!isLandingPage && !isAuthPage && !isUnknownPath && !isSharePage && !isShowingLoadingScreen && <Sidebar />}
 
-        {/* Main content area */}
-        <div className="flex-1 overflow-auto">
-          <Routes>
-            {/* Public routes */}
-            <Route path="/" element={<LandingPage />} />
+        <div className="flex flex-col flex-1">
+          {/* Conditionally render the appropriate header */}
+          {isShowingLoadingScreen ? null : isLandingPage ? (
+            <LandingHeader user={undefined} logout={undefined} />
+          ) : isAuthPage || isUnknownPath || isSharePage ? null : (
+            <AppHeader
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              showSidePanel={showSidePanel}
+              setShowSidePanel={setShowSidePanel}
+              showRightPanel={showRightPanel}
+              setShowRightPanel={setShowRightPanel}
+              user={undefined}
+              logout={undefined}
+            />
+          )}
 
-            {/* Pitch deck route - password protected */}
-            <Route path="/pitch-deck" element={<PitchDeckAuth />} />
+          {/* Main content area */}
+          <div className="flex-1 overflow-auto">
+            <Routes>
+              {/* Public routes */}
+              <Route path="/" element={<LandingPage />} />
 
-            {/* Public document sharing routes - no authentication required */}
-            <Route path="/share/:token" element={<DocumentSharingRecipientView />} />
-            <Route path="/share/expired/:token" element={<ExpiredShareView />} />
+              {/* Pitch deck route - password protected */}
+              <Route path="/pitch-deck" element={<PitchDeckAuth />} />
 
-            {/* Auth pages with redirect for authenticated users */}
-            <Route
-              path="/login"
-              element={
-                <ProtectedRoute authRedirect={true} requireFullAuth={false}>
-                  <LoginPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/signup"
-              element={
-                <ProtectedRoute authRedirect={true} requireFullAuth={false}>
-                  <SignupPage />
-                </ProtectedRoute>
-              }
-            />
+              {/* Public document sharing routes - no authentication required */}
+              <Route path="/share/:token" element={<DocumentSharingRecipientView />} />
+              <Route path="/share/expired/:token" element={<ExpiredShareView />} />
 
-            <Route path="/accept-invite" element={<InvitationAccept />} />
-            <Route path="/confirm-email" element={<EmailVerificationPage />} />
+              {/* Auth pages with redirect for authenticated users */}
+              <Route
+                path="/login"
+                element={
+                  <ProtectedRoute authRedirect={true} requireFullAuth={false}>
+                    <LoginPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/signup"
+                element={
+                  <ProtectedRoute authRedirect={true} requireFullAuth={false}>
+                    <SignupPage />
+                  </ProtectedRoute>
+                }
+              />
 
-            <Route
-              path="/onboarding"
-              element={
-                <ProtectedRoute requireFullAuth={false} checkOnboardingStatus={true}>
-                  <OnboardingPage />
-                </ProtectedRoute>
-              }
-            />
+              <Route path="/accept-invite" element={<InvitationAccept />} />
+              <Route path="/confirm-email" element={<EmailVerificationPage />} />
 
-            {/* Protected routes */}
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Dashboard hideSidebar={true} />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/fleet"
-              element={
-                <ProtectedRoute>
-                  <VesselsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/document-hub"
-              element={
-                <ProtectedRoute>
-                  <DocumentHub />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/port-preparation"
-              element={
-                <ProtectedRoute>
-                  <PortPreparation />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/document-sharing"
-              element={
-                <ProtectedRoute>
-                  <DocumentSharing />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/pricing"
-              element={
-                <ProtectedRoute>
-                  <PricingPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/team"
-              element={
-                <ProtectedRoute>
-                  <TeamPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/notifications"
-              element={
-                <ProtectedRoute>
-                  <NotificationsPage />
-                </ProtectedRoute>
-              }
-            />
+              <Route
+                path="/onboarding"
+                element={
+                  <ProtectedRoute requireFullAuth={false} checkOnboardingStatus={true}>
+                    <OnboardingPage />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Catch-all route for unauthorized access */}
-            <Route path="*" element={<UnauthorizedMessage />} />
-          </Routes>
+              {/* Protected routes */}
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <Dashboard hideSidebar={true} />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/fleet"
+                element={
+                  <ProtectedRoute>
+                    <VesselsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/document-hub"
+                element={
+                  <ProtectedRoute>
+                    <DocumentHub />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/port-preparation"
+                element={
+                  <ProtectedRoute>
+                    <PortPreparation />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/document-sharing"
+                element={
+                  <ProtectedRoute>
+                    <DocumentSharing />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/pricing"
+                element={
+                  <ProtectedRoute>
+                    <PricingPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/team"
+                element={
+                  <ProtectedRoute>
+                    <TeamPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/notifications"
+                element={
+                  <ProtectedRoute>
+                    <NotificationsPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Catch-all route for unauthorized access */}
+              <Route path="*" element={<UnauthorizedMessage />} />
+            </Routes>
+          </div>
+
+          {/* Only show footer on known paths that are not auth pages or share pages */}
+          {!isAuthPage && !isUnknownPath && !isSharePage && !isShowingLoadingScreen && <Footer />}
         </div>
-
-        {/* Only show footer on known paths that are not auth pages or share pages */}
-        {!isAuthPage && !isUnknownPath && !isSharePage && !isShowingLoadingScreen && <Footer />}
       </div>
-    </div>
+    </>
   )
 }
 
 function App() {
   return (
-    <Router>
-      <UserProvider>
-        <AppContent />
-      </UserProvider>
-    </Router>
+    <HelmetProvider>
+      <Router>
+        <UserProvider>
+          <AppContent />
+        </UserProvider>
+      </Router>
+    </HelmetProvider>
   )
 }
 
