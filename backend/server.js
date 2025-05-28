@@ -53,7 +53,7 @@ app.use(cors({
   origin: [
     'https://comovis.co',
     'https://www.comovis.co',
-    'http://localhost:1601', // for development
+    'http://localhost:1601', 
     
   ],
   credentials: true,
@@ -62,7 +62,7 @@ app.use(cors({
 }));
 
 
-//
+//Live
 
 
 const port = process.env.PORT || 2807
