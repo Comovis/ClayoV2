@@ -122,7 +122,6 @@ app.use("/api/documents", (req, res, next) => {
 
 // ===== GITHUB WEBHOOK =====
 
-// GitHub Webhook for Auto-Deployment
 app.post('/github-webhook', express.raw({type: 'application/json'}), (req, res) => {
   const secret = process.env.GITHUB_WEBHOOK_SECRET;
   
@@ -131,7 +130,9 @@ app.post('/github-webhook', express.raw({type: 'application/json'}), (req, res) 
     return res.status(500).send('Server configuration error');
   }
 
-  const signature = `sha256=${crypto.createHmac('sha256', secret).update(req.body).digest('hex')}`;
+  // Convert buffer to string for signature verification
+  const body = req.body.toString();
+  const signature = `sha256=${crypto.createHmac('sha256', secret).update(body).digest('hex')}`;
   const githubSignature = req.headers['x-hub-signature-256'];
 
   if (!githubSignature || signature !== githubSignature) {
@@ -141,7 +142,7 @@ app.post('/github-webhook', express.raw({type: 'application/json'}), (req, res) 
 
   let payload;
   try {
-    payload = JSON.parse(req.body);
+    payload = JSON.parse(body);
   } catch (error) {
     return res.status(400).send('Invalid JSON');
   }
@@ -166,9 +167,6 @@ app.post('/github-webhook', express.raw({type: 'application/json'}), (req, res) 
     res.status(200).send('Push to non-master branch, no action taken');
   }
 });
-
-//testing--
-
 
 
 
