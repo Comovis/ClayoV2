@@ -120,7 +120,7 @@ app.use("/api/documents", (req, res, next) => {
 
 
 
-// ===== GITHUB -- WEBHOOK =====
+// ===== GITHUB - WEBHOOK =====
 
 app.post('/github-webhook', express.raw({type: 'application/json'}), (req, res) => {
   const secret = process.env.GITHUB_WEBHOOK_SECRET;
