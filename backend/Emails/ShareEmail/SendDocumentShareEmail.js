@@ -55,7 +55,7 @@ async function sendDocumentShareEmail({
 
     console.log(`Sending Document Share Email to ${recipientEmail}...`)
     const response = await resend.emails.send({
-      from: "documents@notifications.comovis.co",
+      from: "documents@comovis.co",
       to: recipientEmail,
       subject: subject,
       html: emailHtml,

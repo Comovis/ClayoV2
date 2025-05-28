@@ -57,8 +57,9 @@ import { ShareTemplateList } from "./ShareTemplateList"
 import { VesselSelector, type Vessel, type PortInfo } from "../../MainComponents/VesselSelector/VesselSelector"
 import { AccessLogsModal } from "../../MainComponents/AccessLogs/AccessLogs"
 import { useFetchVessels } from "../../Hooks/useFetchVessels"
-import { createDocumentShare, sendShareEmail, getDocumentShares } from "./DocumentShareEndpointService"
+import { createDocumentShare, sendShareEmail } from "../../Hooks/useDocumentShares"
 import { supabase } from "../../Auth/SupabaseAuth"
+import { useDocuments } from "../../Hooks/useDocuments"
 
 export default function PortDocumentSharing() {
   // State for UI
@@ -92,7 +93,14 @@ export default function PortDocumentSharing() {
   const [success, setSuccess] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingShares, setIsLoadingShares] = useState(false)
-  const [documentShares, setDocumentShares] = useState([])
+  // Use the documents hook instead of document shares
+  const {
+    documents: fetchedDocuments,
+    isLoading: isLoadingDocuments,
+    error: documentsError,
+    fetchDocuments,
+    clearMessages: clearDocumentMessages,
+  } = useDocuments()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   // Use the fetch vessels hook
@@ -120,13 +128,13 @@ export default function PortDocumentSharing() {
     fetchVessels()
   }, [fetchVessels])
 
-  // Fetch document shares when authenticated
+  // Fetch vessel documents when authenticated and vessel is selected
   useEffect(() => {
-    if (isAuthenticated) {
-      console.log("User authenticated, fetching document shares...")
-      fetchDocumentShares()
+    if (isAuthenticated && selectedVessel) {
+      console.log("User authenticated and vessel selected, fetching documents...")
+      fetchVesselDocuments(selectedVessel)
     }
-  }, [isAuthenticated])
+  }, [isAuthenticated, selectedVessel])
 
   // Set the first vessel as selected when vessels are loaded
   useEffect(() => {
@@ -136,27 +144,20 @@ export default function PortDocumentSharing() {
     }
   }, [fetchedVessels, selectedVessel])
 
-  // Fetch document shares
-  const fetchDocumentShares = async () => {
-    if (!isAuthenticated) {
-      console.log("Not authenticated, skipping document shares fetch")
+  // Fetch vessel documents when vessel is selected
+  const fetchVesselDocuments = async (vesselId: string) => {
+    if (!vesselId) {
+      console.log("No vessel ID provided, skipping document fetch")
       return
     }
 
-    setIsLoadingShares(true)
-    setError("")
-
+    console.log("Fetching documents for vessel:", vesselId)
     try {
-      console.log("Fetching document shares from API...")
-      const shares = await getDocumentShares()
-      console.log("Fetched document shares:", shares)
-      setDocumentShares(shares)
+      await fetchDocuments(vesselId)
+      console.log("Documents fetched successfully")
     } catch (err) {
-      console.error("Error fetching document shares:", err)
-      setError("Failed to load document shares. Using sample data for visualization.")
-      // Don't clear documentShares here - let it fall back to dummy data
-    } finally {
-      setIsLoadingShares(false)
+      console.error("Error fetching vessel documents:", err)
+      setError("Failed to load vessel documents. Using sample data for visualization.")
     }
   }
 
@@ -295,70 +296,32 @@ export default function PortDocumentSharing() {
         }))
       : dummyVessels
 
-  // Documents (keep all dummy data)
-  const documents = [
-    {
-      id: "smc",
-      name: "Safety Management Certificate",
-      issuer: "Panama Maritime Authority",
-      status: "expiring-soon",
-      expiryDays: 28,
-      category: "statutory",
-      required: true,
-    },
-    {
-      id: "iopp",
-      name: "Int'l Oil Pollution Prevention Certificate",
-      issuer: "DNV GL",
-      status: "expiring-soon",
-      expiryDays: 45,
-      category: "statutory",
-      required: true,
-    },
-    {
-      id: "registry",
-      name: "Certificate of Registry",
-      issuer: "Panama Maritime Authority",
-      status: "valid",
-      expiryDays: 365,
-      category: "statutory",
-      required: true,
-    },
-    {
-      id: "loadline",
-      name: "International Load Line Certificate",
-      issuer: "DNV GL",
-      status: "valid",
-      expiryDays: 395,
-      category: "statutory",
-      required: true,
-    },
-    {
-      id: "tonnage",
-      name: "International Tonnage Certificate",
-      issuer: "Panama Maritime Authority",
-      status: "permanent",
-      category: "statutory",
-      required: false,
-    },
-    {
-      id: "crew-list",
-      name: "Crew List",
-      issuer: "Company",
-      status: "valid",
-      category: "crew",
-      required: true,
-    },
-    {
-      id: "ballast-plan",
-      name: "Ballast Water Management Plan",
-      issuer: "Company",
-      status: "valid",
-      expiryDays: 180,
-      category: "environmental",
-      required: false,
-    },
-  ]
+  // Use fetched documents if available, otherwise empty array
+  const documents =
+    fetchedDocuments.length > 0
+      ? // Map fetched documents to the expected format
+        fetchedDocuments.map((doc) => ({
+          id: doc.id,
+          name: doc.title,
+          issuer: doc.issuer || "Unknown Issuer",
+          status: doc.status || "valid",
+          expiryDays: doc.expiry_date
+            ? Math.ceil((new Date(doc.expiry_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+            : null,
+          category: doc.document_category || "statutory",
+          required: true,
+          // Add the original document data for reference
+          originalDoc: doc,
+        }))
+      : // No dummy data - empty array
+        []
+
+  // Add this after the documents mapping
+  useEffect(() => {
+    console.log("Fetched documents:", fetchedDocuments)
+    console.log("Mapped documents:", documents)
+    console.log("Required documents for port:", getRequiredDocuments(selectedPort))
+  }, [fetchedDocuments, documents, selectedPort])
 
   // Upcoming port calls (keep dummy data)
   const upcomingPortCalls = [
@@ -500,7 +463,7 @@ export default function PortDocumentSharing() {
 
       // Refresh document shares if authenticated
       if (isAuthenticated) {
-        fetchDocumentShares()
+        // fetchDocumentShares()
       }
     } catch (error) {
       console.error("Error creating share:", error)
@@ -572,9 +535,13 @@ export default function PortDocumentSharing() {
 
   // Get required documents for a port
   const getRequiredDocuments = (portId) => {
-    const port = getPort(portId)
-    if (!port) return []
-    return documents.filter((doc) => port.requiredDocs.includes(doc.id))
+    // Only show real fetched documents, no dummy data
+    if (fetchedDocuments.length > 0) {
+      return documents // Show all fetched documents
+    }
+
+    // Return empty array if no real documents
+    return []
   }
 
   // Toggle document selection
@@ -646,16 +613,11 @@ export default function PortDocumentSharing() {
 
   // Calculate compliance percentage
   const calculateCompliancePercentage = (portId) => {
-    const port = getPort(portId)
-    if (!port) return 0
+    if (documents.length === 0) return 0
 
-    const requiredDocs = port.requiredDocs
-    const validDocs = requiredDocs.filter((docId) => {
-      const doc = getDocument(docId)
-      return doc && (doc.status === "valid" || doc.status === "permanent")
-    })
+    const validDocs = documents.filter((doc) => doc.status === "valid" || doc.status === "permanent")
 
-    return (validDocs.length / requiredDocs.length) * 100
+    return (validDocs.length / documents.length) * 100
   }
 
   // Toggle security option
@@ -779,11 +741,11 @@ ${localStorage.getItem("userName") || "Comovis User"}`
       />
 
       {/* Display errors/success messages */}
-      {error && (
+      {(error || documentsError) && (
         <Alert variant="destructive" className="mb-4">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>{error || documentsError}</AlertDescription>
         </Alert>
       )}
 
@@ -863,7 +825,7 @@ ${localStorage.getItem("userName") || "Comovis User"}`
                     </div>
 
                     <div className="flex justify-between items-center">
-                      <span className="text-xs text-gray-500">{port?.requiredDocs.length} required documents</span>
+                      <span className="text-xs text-gray-500">{documents.length} available documents</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -1031,47 +993,68 @@ ${localStorage.getItem("userName") || "Comovis User"}`
                                 <Input placeholder="Search documents..." className="pl-8" />
                               </div>
 
-                              <ScrollArea className="h-64">
-                                <div className="space-y-1">
-                                  {getRequiredDocuments(selectedPort).map((doc) => (
-                                    <div key={doc.id} className="flex items-center justify-between py-2 border-b">
-                                      <div className="flex items-center">
-                                        <Checkbox
-                                          id={doc.id}
-                                          checked={selectedDocuments.includes(doc.id)}
-                                          onCheckedChange={() => toggleDocument(doc.id)}
-                                        />
-                                        <div className="ml-2">
-                                          <Label htmlFor={doc.id} className="cursor-pointer">
-                                            {doc.name}
-                                          </Label>
-                                          <p className="text-xs text-gray-500">{doc.issuer}</p>
+                              {getRequiredDocuments(selectedPort).length > 0 ? (
+                                <ScrollArea className="h-64">
+                                  <div className="space-y-1">
+                                    {getRequiredDocuments(selectedPort).map((doc) => (
+                                      <div key={doc.id} className="flex items-center justify-between py-2 border-b">
+                                        <div className="flex items-center">
+                                          <Checkbox
+                                            id={doc.id}
+                                            checked={selectedDocuments.includes(doc.id)}
+                                            onCheckedChange={() => toggleDocument(doc.id)}
+                                          />
+                                          <div className="ml-2">
+                                            <Label htmlFor={doc.id} className="cursor-pointer">
+                                              {doc.name}
+                                            </Label>
+                                            <p className="text-xs text-gray-500">{doc.issuer}</p>
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center">
+                                          {formatDocumentStatus(doc.status, doc.expiryDays)}
+                                          <TooltipProvider>
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <Button variant="ghost" size="sm" className="ml-2 h-8 w-8 p-0">
+                                                  <Eye className="h-4 w-4" />
+                                                </Button>
+                                              </TooltipTrigger>
+                                              <TooltipContent>
+                                                <p>Preview document</p>
+                                              </TooltipContent>
+                                            </Tooltip>
+                                          </TooltipProvider>
                                         </div>
                                       </div>
-                                      <div className="flex items-center">
-                                        {formatDocumentStatus(doc.status, doc.expiryDays)}
-                                        <TooltipProvider>
-                                          <Tooltip>
-                                            <TooltipTrigger asChild>
-                                              <Button variant="ghost" size="sm" className="ml-2 h-8 w-8 p-0">
-                                                <Eye className="h-4 w-4" />
-                                              </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                              <p>Preview document</p>
-                                            </TooltipContent>
-                                          </Tooltip>
-                                        </TooltipProvider>
-                                      </div>
-                                    </div>
-                                  ))}
+                                    ))}
+                                  </div>
+                                </ScrollArea>
+                              ) : (
+                                // Empty state
+                                <div className="h-64 flex flex-col items-center justify-center text-center p-8">
+                                  <FileText className="h-12 w-12 text-gray-300 mb-4" />
+                                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Documents Available</h3>
+                                  <p className="text-sm text-gray-500 mb-4 max-w-sm">
+                                    {isLoadingDocuments
+                                      ? "Loading vessel documents..."
+                                      : isAuthenticated
+                                        ? "No documents found for this vessel. Upload documents to get started."
+                                        : "Log in to view and manage vessel documents."}
+                                  </p>
+                                  {isAuthenticated && !isLoadingDocuments && (
+                                    <Button variant="outline" size="sm">
+                                      <Plus className="h-4 w-4 mr-2" />
+                                      Upload Documents
+                                    </Button>
+                                  )}
                                 </div>
-                              </ScrollArea>
+                              )}
 
                               <div className="mt-3 pt-3 border-t flex justify-between items-center">
                                 <span className="text-sm text-gray-500">
-                                  {selectedDocuments.length} of {getRequiredDocuments(selectedPort).length} required
-                                  documents selected
+                                  {selectedDocuments.length} of {getRequiredDocuments(selectedPort).length} documents
+                                  selected
                                 </span>
                                 <Button variant="outline" size="sm">
                                   <Plus className="h-4 w-4 mr-2" />
@@ -1475,6 +1458,8 @@ ${localStorage.getItem("userName") || "Comovis User"}`
                             <div className="flex items-center">
                               <Shield className="h-4 w-4 text-blue-500 mr-2" />
                               <span className="text-sm">Downloads prevented</span>
+
+                              <span className="text-sm">Downloads prevented</span>
                             </div>
                           )}
                           {securityOptions.accessTracking && (
@@ -1555,76 +1540,72 @@ ${localStorage.getItem("userName") || "Comovis User"}`
                 <CardDescription>View and manage your document shares</CardDescription>
               </CardHeader>
               <CardContent>
-                {isLoadingShares ? (
+                {isLoadingShares || isLoadingDocuments ? (
                   <div className="flex justify-center items-center p-8">
                     <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mr-3"></div>
-                    <p>Loading document shares...</p>
+                    <p>Loading {isLoadingDocuments ? "documents" : "document shares"}...</p>
                   </div>
                 ) : (
                   <ShareHistoryTable
                     // Pass both real and dummy data with hybrid approach
-                    shares={
-                      documentShares.length > 0
-                        ? documentShares
-                        : [
-                            {
-                              id: "share1",
-                              recipient: "Singapore MPA",
-                              recipientEmail: "portdocs@mpa.gov.sg",
-                              date: "2025-05-15T10:30:00",
-                              vessel: "Humble Warrior",
-                              documentCount: 5,
-                              accessCount: 3,
-                              expiryDate: "2025-05-21",
-                              status: "active",
-                            },
-                            {
-                              id: "share2",
-                              recipient: "Shell Vetting",
-                              recipientEmail: "vetting@shell.com",
-                              date: "2025-05-10T14:45:00",
-                              vessel: "Humble Warrior",
-                              documentCount: 12,
-                              accessCount: 5,
-                              expiryDate: "2025-05-17",
-                              status: "active",
-                            },
-                            {
-                              id: "share3",
-                              recipient: "Hong Kong Marine Department",
-                              recipientEmail: "mardep@gov.hk",
-                              date: "2025-05-01T09:30:00",
-                              vessel: "Pacific Explorer",
-                              documentCount: 4,
-                              accessCount: 2,
-                              expiryDate: "2025-05-08",
-                              status: "expired",
-                            },
-                            {
-                              id: "share4",
-                              recipient: "DNV GL",
-                              recipientEmail: "certification@dnvgl.com",
-                              date: "2025-04-28T16:15:00",
-                              vessel: "Northern Star",
-                              documentCount: 8,
-                              accessCount: 6,
-                              expiryDate: "2025-05-28",
-                              status: "active",
-                            },
-                            {
-                              id: "share5",
-                              recipient: "Rotterdam Port Authority",
-                              recipientEmail: "docs@portofrotterdam.com",
-                              date: "2025-04-20T11:05:00",
-                              vessel: "Pacific Explorer",
-                              documentCount: 6,
-                              accessCount: 0,
-                              expiryDate: "2025-04-27",
-                              status: "expired",
-                            },
-                          ]
-                    }
-                    onRefresh={fetchDocumentShares}
+                    shares={[
+                      {
+                        id: "share1",
+                        recipient: "Singapore MPA",
+                        recipientEmail: "portdocs@mpa.gov.sg",
+                        date: "2025-05-15T10:30:00",
+                        vessel: "Humble Warrior",
+                        documentCount: 5,
+                        accessCount: 3,
+                        expiryDate: "2025-05-21",
+                        status: "active",
+                      },
+                      {
+                        id: "share2",
+                        recipient: "Shell Vetting",
+                        recipientEmail: "vetting@shell.com",
+                        date: "2025-05-10T14:45:00",
+                        vessel: "Humble Warrior",
+                        documentCount: 12,
+                        accessCount: 5,
+                        expiryDate: "2025-05-17",
+                        status: "active",
+                      },
+                      {
+                        id: "share3",
+                        recipient: "Hong Kong Marine Department",
+                        recipientEmail: "mardep@gov.hk",
+                        date: "2025-05-01T09:30:00",
+                        vessel: "Pacific Explorer",
+                        documentCount: 4,
+                        accessCount: 2,
+                        expiryDate: "2025-05-08",
+                        status: "expired",
+                      },
+                      {
+                        id: "share4",
+                        recipient: "DNV GL",
+                        recipientEmail: "certification@dnvgl.com",
+                        date: "2025-04-28T16:15:00",
+                        vessel: "Northern Star",
+                        documentCount: 8,
+                        accessCount: 6,
+                        expiryDate: "2025-05-28",
+                        status: "active",
+                      },
+                      {
+                        id: "share5",
+                        recipient: "Rotterdam Port Authority",
+                        recipientEmail: "docs@portofrotterdam.com",
+                        date: "2025-04-20T11:05:00",
+                        vessel: "Pacific Explorer",
+                        documentCount: 6,
+                        accessCount: 0,
+                        expiryDate: "2025-04-27",
+                        status: "expired",
+                      },
+                    ]}
+                    onRefresh={() => {}}
                   />
                 )}
               </CardContent>

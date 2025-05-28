@@ -1,4 +1,4 @@
-import { supabase } from "../../Auth/SupabaseAuth"
+import { supabase } from "../Auth/SupabaseAuth"
 
 // API Base URL Configuration - matching your pattern
 const apiBaseUrl =

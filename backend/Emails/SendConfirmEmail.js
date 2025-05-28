@@ -12,7 +12,7 @@ async function sendConfirmationEmail(recipientEmail, confirmationLink) {
 
     console.log(`Sending Confirmation Email to ${recipientEmail}...`)
     const response = await resend.emails.send({
-      from: "noreply@notifications.comovis.co",
+      from: "Verify@comovis.co",
       to: recipientEmail,
       subject: "Confirm Your Comovis Account",
       html: emailHtml,

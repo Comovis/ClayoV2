@@ -21,10 +21,11 @@ import {
   AlertCircle,
   CheckCircle,
   Trash2,
+  Info,
 } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { getDocumentShares, revokeDocumentShare, sendShareEmail } from "./DocumentShareEndpointService"
+import { revokeDocumentShare, sendShareEmail } from "../../Hooks/useDocumentShares"
 
 interface ShareHistoryTableProps {
   shares?: any[]
@@ -128,30 +129,12 @@ export function ShareHistoryTable({ shares: propShares, onRefresh }: ShareHistor
     setError("")
 
     try {
-      const fetchedShares = await getDocumentShares()
-
-      if (fetchedShares.length > 0) {
-        // Map API data to component format
-        const mappedShares = fetchedShares.map((share) => ({
-          id: share.id,
-          recipient: share.recipients?.[0]?.name || share.recipients?.[0]?.email || "Unknown",
-          recipientEmail: share.recipients?.[0]?.email || "unknown@example.com",
-          date: share.createdAt,
-          vessel: share.vesselName || "Unknown Vessel",
-          documentCount: share.documentCount || 0,
-          accessCount: share.accessLogs?.length || 0,
-          expiryDate: share.expiresAt,
-          status: share.isRevoked ? "revoked" : share.isExpired ? "expired" : "active",
-        }))
-        setShares(mappedShares)
-      } else {
-        // Use dummy data if no real data available
-        setShares(dummyShareHistory)
-      }
+      // For now, we'll use dummy data since we're focusing on documents
+      console.log("Using dummy share data while focusing on document management")
+      setShares(dummyShareHistory)
     } catch (err) {
       console.error("Error fetching document shares:", err)
       setError("Failed to load document shares. Showing sample data.")
-      // Use dummy data on error
       setShares(dummyShareHistory)
     } finally {
       setIsLoading(false)
@@ -305,6 +288,16 @@ export function ShareHistoryTable({ shares: propShares, onRefresh }: ShareHistor
           <AlertDescription>{success}</AlertDescription>
         </Alert>
       )}
+
+      {/* Notice about document focus */}
+      <Alert className="mb-4 bg-blue-50 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+        <Info className="h-4 w-4" />
+        <AlertTitle>Document Management Focus</AlertTitle>
+        <AlertDescription>
+          Currently focusing on document management. Share history shows sample data while we perfect the document
+          fetching functionality.
+        </AlertDescription>
+      </Alert>
 
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center space-x-2">

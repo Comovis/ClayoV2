@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState } from "react"
-import { Mail, Lock, User, Building2, Loader2, AlertCircle } from "lucide-react"
+import { Mail, Lock, User, Building2, Loader2, AlertCircle, Shield, Anchor } from "lucide-react"
 import { Link, useNavigate } from "react-router-dom"
 
 // Simple image import for logo
@@ -71,7 +71,7 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-white">
       {/* Signup Form Section - LEFT */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 md:p-12">
         <div className="w-full max-w-md">
@@ -216,75 +216,135 @@ export default function SignupPage() {
         </div>
       </div>
 
-      {/* Maritime Media Section - RIGHT */}
-      <div className="hidden lg:block lg:w-1/2 relative bg-blue-900">
-        <div className="absolute inset-0 z-10 bg-gradient-to-b from-blue-900/70 to-blue-900/40" />
-        <img
-          src="/container-ship-at-sea.png"
-          alt="Maritime vessel at sea"
-          className="absolute inset-0 w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 z-20 flex flex-col justify-center p-12 text-white">
-          <h2 className="text-3xl font-bold mb-4">Navigate compliance with confidence</h2>
-          <ul className="space-y-4">
-            <li className="flex items-start">
-              <div className="mr-3 mt-1 h-6 w-6 flex items-center justify-center rounded-full bg-blue-500/20">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="text-blue-100"
-                >
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
+      {/* Premium Geometric Design Section - RIGHT */}
+      <div className="hidden lg:block lg:w-1/2 relative overflow-hidden">
+        {/* Complex gradient background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950" />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/50 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-blue-900/20 to-slate-900/30" />
+
+        {/* Sophisticated flowing shapes */}
+        <div className="absolute inset-0 overflow-hidden">
+          {/* Primary flowing shape */}
+          <div className="absolute -top-32 -right-32 w-[800px] h-[800px] opacity-30">
+            <svg viewBox="0 0 800 800" className="w-full h-full">
+              <defs>
+                <linearGradient id="flow1" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="rgba(59, 130, 246, 0.4)" />
+                  <stop offset="50%" stopColor="rgba(147, 197, 253, 0.2)" />
+                  <stop offset="100%" stopColor="rgba(219, 234, 254, 0.1)" />
+                </linearGradient>
+                <filter id="glow1">
+                  <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+                  <feMerge>
+                    <feMergeNode in="coloredBlur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+              <path
+                d="M200,100 Q400,50 600,150 Q700,250 650,400 Q600,550 400,600 Q200,650 100,500 Q50,350 150,200 Q200,100 200,100"
+                fill="url(#flow1)"
+                filter="url(#glow1)"
+                className="animate-pulse"
+                style={{ animationDuration: "4s" }}
+              />
+            </svg>
+          </div>
+
+          {/* Secondary flowing shape */}
+          <div className="absolute top-1/4 -left-24 w-[600px] h-[600px] opacity-20">
+            <svg viewBox="0 0 600 600" className="w-full h-full">
+              <defs>
+                <linearGradient id="flow2" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="rgba(99, 102, 241, 0.3)" />
+                  <stop offset="100%" stopColor="rgba(165, 180, 252, 0.1)" />
+                </linearGradient>
+                <filter id="glow2">
+                  <feGaussianBlur stdDeviation="2" result="coloredBlur" />
+                  <feMerge>
+                    <feMergeNode in="coloredBlur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+              <path
+                d="M150,200 Q300,100 450,200 Q500,300 400,450 Q300,500 200,400 Q100,300 150,200"
+                fill="url(#flow2)"
+                filter="url(#glow2)"
+                className="animate-pulse"
+                style={{ animationDuration: "6s", animationDelay: "1s" }}
+              />
+            </svg>
+          </div>
+
+          {/* Tertiary accent shape */}
+          <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] opacity-25">
+            <svg viewBox="0 0 400 400" className="w-full h-full">
+              <defs>
+                <radialGradient id="flow3">
+                  <stop offset="0%" stopColor="rgba(147, 197, 253, 0.4)" />
+                  <stop offset="100%" stopColor="rgba(59, 130, 246, 0.1)" />
+                </radialGradient>
+              </defs>
+              <path
+                d="M100,150 Q200,50 300,150 Q350,200 300,250 Q200,350 100,250 Q50,200 100,150"
+                fill="url(#flow3)"
+                className="animate-pulse"
+                style={{ animationDuration: "5s", animationDelay: "2s" }}
+              />
+            </svg>
+          </div>
+
+          {/* Floating particles */}
+          <div className="absolute top-1/3 right-1/3 w-3 h-3 bg-blue-400/60 rounded-full animate-pulse shadow-lg shadow-blue-400/30" />
+          <div
+            className="absolute top-2/3 right-1/2 w-2 h-2 bg-indigo-300/40 rounded-full animate-pulse shadow-lg shadow-indigo-300/20"
+            style={{ animationDelay: "1.5s", animationDuration: "3s" }}
+          />
+          <div
+            className="absolute top-1/2 right-1/4 w-2.5 h-2.5 bg-blue-500/50 rounded-full animate-pulse shadow-lg shadow-blue-500/25"
+            style={{ animationDelay: "0.5s", animationDuration: "4s" }}
+          />
+          <div
+            className="absolute top-1/4 right-2/3 w-1.5 h-1.5 bg-slate-300/30 rounded-full animate-pulse"
+            style={{ animationDelay: "2.5s", animationDuration: "2s" }}
+          />
+        </div>
+
+        {/* Content overlay with better typography */}
+        <div className="absolute inset-0 z-20 flex flex-col justify-center p-16">
+          <div className="max-w-lg">
+            <h2 className="text-3xl font-bold mb-8 leading-tight text-white font-inter">
+              Navigate compliance with confidence
+            </h2>
+
+            <div className="space-y-6">
+              <div className="flex items-start group">
+                <div className="mr-5 mt-1 h-8 w-8 flex items-center justify-center rounded-full bg-blue-500/20 backdrop-blur-sm border border-blue-400/30 group-hover:bg-blue-500/30 transition-all duration-300">
+                  <Shield size={16} className="text-blue-200" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-white mb-2 text-base font-inter">Automated Document Management</h3>
+                  <p className="text-blue-100/70 leading-relaxed text-sm font-inter">
+                    AI-powered certificate tracking with intelligent expiry alerts and compliance gap detection
+                  </p>
+                </div>
               </div>
-              <span>Automated document management</span>
-            </li>
-            <li className="flex items-start">
-              <div className="mr-3 mt-1 h-6 w-6 flex items-center justify-center rounded-full bg-blue-500/20">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="text-blue-100"
-                >
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
+
+              <div className="flex items-start group">
+                <div className="mr-5 mt-1 h-8 w-8 flex items-center justify-center rounded-full bg-blue-500/20 backdrop-blur-sm border border-blue-400/30 group-hover:bg-blue-500/30 transition-all duration-300">
+                  <Anchor size={16} className="text-blue-200" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-white mb-2 text-base font-inter">Detention Prevention</h3>
+                  <p className="text-blue-100/70 leading-relaxed text-sm font-inter">
+                    Proactive compliance monitoring that prevents costly delays and port state control issues
+                  </p>
+                </div>
               </div>
-              <span>Real-time port requirement intelligence</span>
-            </li>
-            <li className="flex items-start">
-              <div className="mr-3 mt-1 h-6 w-6 flex items-center justify-center rounded-full bg-blue-500/20">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="text-blue-100"
-                >
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </div>
-              <span>AI-powered compliance gap detection</span>
-            </li>
-          </ul>
+            </div>
+          </div>
         </div>
       </div>
     </div>

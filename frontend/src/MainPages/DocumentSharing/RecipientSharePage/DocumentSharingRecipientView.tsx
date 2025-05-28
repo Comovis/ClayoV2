@@ -30,7 +30,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { fetchShareByToken, logDocumentAccess } from "../DocumentShareEndpointService"
+import { fetchShareByToken, logDocumentAccess } from "../../../Hooks/useDocumentShares"
 import ExpiredShareView from "./ExpiredShareView"
 
 export default function DocumentSharingRecipientView() {

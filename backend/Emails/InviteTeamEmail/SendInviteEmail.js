@@ -44,7 +44,7 @@ async function sendInvitationEmail(recipientEmail, invitationLink, inviterName, 
 
     console.log(`Sending Invitation Email to ${recipientEmail}...`)
     const response = await resend.emails.send({
-      from: "invites@notifications.comovis.co",
+      from: "invites@comovis.co",
       to: recipientEmail,
       subject: `${inviterName} invited you to join Comovis Maritime Compliance Platform`,
       html: emailHtml,
