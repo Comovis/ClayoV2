@@ -121,7 +121,7 @@ app.use("/api/documents", (req, res, next) => {
 
 
 // ===== GITHUB - WEBHOOK =====
-// Add GitHub webhook endpoint
+
 app.post('/github-webhook', express.json(), (req, res) => {
   const secret = process.env.GITHUB_WEBHOOK_SECRET;
   if (!secret) {
