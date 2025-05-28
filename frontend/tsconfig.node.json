@@ -5,17 +5,15 @@
     "lib": ["ES2023"],
     "module": "ESNext",
     "skipLibCheck": true,
+    "composite": true,
 
     /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
-    
-    /* Project reference settings */
-    "composite": true,
-    "declaration": true,
-    "declarationMap": true,
+    // Remove "noEmit": true or set it to false
+    "noEmit": false,
 
     /* Linting */
     "strict": true,
