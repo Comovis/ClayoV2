@@ -140,23 +140,28 @@ app.post('/github-webhook', express.json(), (req, res) => {
   console.log(`🚢 Received push event for ref: ${req.body.ref}`);
 
   if (req.body.ref === 'refs/heads/master') {
-    console.log('⚓ Executing Comovis deployment script...');
+    console.log('⚓ Starting Comovis deployment...');
     
-    // Send response BEFORE starting deployment to avoid 502
-    res.status(200).send('Deployment started');
+    // Respond to GitHub IMMEDIATELY
+    res.status(200).send('Deployment initiated successfully');
     
-    exec(
-      'cd /var/www/Comovis/backend && git pull origin master && npm install --production && pm2 reload Comovis',
-      (error, stdout, stderr) => {
-        if (error) {
-          console.error(`🚨 Deployment error: ${error.message}`);
-          console.error(`stderr: ${stderr}`);
-        } else {
-          console.log(`✅ Deployment stdout: ${stdout}`);
-          console.error(`Deployment stderr: ${stderr}`);
+    // Run deployment in background with setTimeout to ensure response is sent first
+    setTimeout(() => {
+      exec(
+        'cd /var/www/Comovis/backend && git pull origin master && npm install --production && pm2 reload Comovis',
+        (error, stdout, stderr) => {
+          if (error) {
+            console.error(`🚨 Deployment error: ${error.message}`);
+            console.error(`stderr: ${stderr}`);
+          } else {
+            console.log(`✅ Deployment completed successfully`);
+            console.log(`stdout: ${stdout}`);
+            if (stderr) console.log(`stderr: ${stderr}`);
+          }
         }
-      }
-    );
+      );
+    }, 100); // Small delay to ensure response is sent
+    
   } else {
     res.status(200).send('Push event to non-master branch, no action taken');
   }
