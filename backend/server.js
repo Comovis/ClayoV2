@@ -121,7 +121,7 @@ app.use("/api/documents", (req, res, next) => {
 
 
 // ===== GITHUB - WEBHOOK =====
-
+// Add GitHub webhook endpoint
 app.post('/github-webhook', express.json(), (req, res) => {
   const secret = process.env.GITHUB_WEBHOOK_SECRET;
   if (!secret) {
@@ -137,22 +137,24 @@ app.post('/github-webhook', express.json(), (req, res) => {
     return res.status(401).send('Unauthorized');
   }
 
-  // Log the ref to ensure the correct branch is being detected
   console.log(`🚢 Received push event for ref: ${req.body.ref}`);
 
   if (req.body.ref === 'refs/heads/master') {
     console.log('⚓ Executing Comovis deployment script...');
+    
+    // Send response BEFORE starting deployment to avoid 502
+    res.status(200).send('Deployment started');
+    
     exec(
-      'cd /var/www/Comovis/backend && git pull origin master && npm install --production && pm2 restart Comovis',
+      'cd /var/www/Comovis/backend && git pull origin master && npm install --production && pm2 reload Comovis',
       (error, stdout, stderr) => {
         if (error) {
           console.error(`🚨 Deployment error: ${error.message}`);
           console.error(`stderr: ${stderr}`);
-          return res.status(500).send('Deployment failed');
+        } else {
+          console.log(`✅ Deployment stdout: ${stdout}`);
+          console.error(`Deployment stderr: ${stderr}`);
         }
-        console.log(`✅ Deployment stdout: ${stdout}`);
-        console.error(`Deployment stderr: ${stderr}`);
-        return res.status(200).send('Deployment successful');
       }
     );
   } else {
