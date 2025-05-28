@@ -7,6 +7,7 @@ require("dotenv").config()
 const crypto = require("crypto")
 const { exec } = require("child_process")
 
+
 // Import your existing handlers
 const { sendUserConfirmationEmail, resendConfirmationEmail } = require("./Emails/EmailAuthLinkService")
 const { createUserWithCompany } = require("./Auth/SignupAuthService")
@@ -42,7 +43,28 @@ const {
 
 const { handleBatchDocumentDownload } = require("./AppFeatures/DocumentHub/BatchDownload")
 
+
 const app = express()
+
+
+
+
+app.use(cors({
+  origin: [
+    'https://comovis.co',
+    'https://www.comovis.co',
+    'http://localhost:1601', // for development
+    
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+
+//
+
+
 const port = process.env.PORT || 2807
 
 // ===== SECURITY MIDDLEWARE =====
@@ -200,7 +222,7 @@ app.post("/api/send-confirmation-email", authLimiter, async (req, res) => {
   }
 })
 
-//test
+
 
 app.post("/api/resend-confirmation-email", authLimiter, async (req, res) => {
   try {
