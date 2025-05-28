@@ -4,6 +4,8 @@ const multer = require("multer")
 const helmet = require("helmet")
 const rateLimit = require("express-rate-limit")
 require("dotenv").config()
+const crypto = require("crypto")
+const { exec } = require("child_process")
 
 // Import your existing handlers
 const { sendUserConfirmationEmail, resendConfirmationEmail } = require("./Emails/EmailAuthLinkService")
@@ -115,6 +117,64 @@ app.use("/api/documents", (req, res, next) => {
   res.setHeader("Pragma", "no-cache")
   next()
 })
+
+
+
+// ===== GITHUB WEBHOOK =====
+
+// GitHub Webhook for Auto-Deployment
+app.post('/github-webhook', express.raw({type: 'application/json'}), (req, res) => {
+  const secret = process.env.GITHUB_WEBHOOK_SECRET;
+  
+  if (!secret) {
+    console.error('🚨 Webhook secret not set');
+    return res.status(500).send('Server configuration error');
+  }
+
+  const signature = `sha256=${crypto.createHmac('sha256', secret).update(req.body).digest('hex')}`;
+  const githubSignature = req.headers['x-hub-signature-256'];
+
+  if (!githubSignature || signature !== githubSignature) {
+    console.error('🚨 Unauthorized webhook attempt');
+    return res.status(401).send('Unauthorized');
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(req.body);
+  } catch (error) {
+    return res.status(400).send('Invalid JSON');
+  }
+
+  console.log(`🚢 Received push event for ref: ${payload.ref}`);
+  
+  if (payload.ref === 'refs/heads/main') {
+    console.log('⚓ Executing Comovis deployment...');
+    
+    exec(
+      'cd /var/www/Comovis/backend && git pull origin main && npm install --production && pm2 restart Comovis',
+      (error, stdout, stderr) => {
+        if (error) {
+          console.error(`🚨 Deployment error: ${error.message}`);
+          return res.status(500).send('Deployment failed');
+        }
+        console.log(`✅ Deployment successful: ${stdout}`);
+        return res.status(200).send('Deployment successful');
+      }
+    );
+  } else {
+    res.status(200).send('Push to non-main branch, no action taken');
+  }
+});
+
+
+
+
+
+
+
+
+
 
 // ===== AUTH & USER SETUP ROUTES =====
 
@@ -365,7 +425,7 @@ app.post("/api/add-vessel", authenticateUser, async (req, res) => {
 })
 
 // Share Documents
-app.post("/send-document-share-email", authenticateUser, async (req, res) => {
+app.post("/api/send-document-share-email", authenticateUser, async (req, res) => {
   try {
     const { shareId } = req.body
 
