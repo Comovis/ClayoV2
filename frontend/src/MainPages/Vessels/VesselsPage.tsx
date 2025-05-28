@@ -28,7 +28,37 @@ import {
   type SubscriptionData,
 } from "../../MainComponents/UserSubscriptions/SubscriptionIndicator"
 import { useUser } from "../../Auth/Contexts/UserContext"
-import { useFetchVessels } from "../../Hooks/useFetchVessels" // Import our new hook
+import { useFetchVessels } from "../../Hooks/useFetchVessels"
+
+// Add these type definitions after the imports
+interface VesselType {
+  id: string
+  name: string
+  type: string
+  flag: string
+  imo: string
+  complianceScore: number
+  documentStatus: {
+    valid: number
+    expiringSoon: number
+    expired: number
+    missing: number
+  }
+  nextPort: string
+  eta: string
+}
+
+interface VesselCardProps {
+  vessel: VesselType
+}
+
+interface VesselListItemProps {
+  vessel: VesselType
+}
+
+interface AddVesselCardProps {
+  onClick: () => void
+}
 
 export default function FleetPage() {
   const { isAuthenticated, isLoading: isUserLoading, user } = useUser()
@@ -63,7 +93,7 @@ export default function FleetPage() {
 
   // Filter vessels based on search query (client-side filtering as backup)
   const filteredVessels = vessels.filter(
-    (vessel) =>
+    (vessel: VesselType) =>
       vessel.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (vessel.imo && vessel.imo.includes(searchQuery)) ||
       vessel.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -182,10 +212,10 @@ export default function FleetPage() {
         <TabsList>
           <TabsTrigger value="all">All Vessels ({vessels.length})</TabsTrigger>
           <TabsTrigger value="compliant">
-            Compliant ({vessels.filter((v) => v.complianceScore >= 80).length})
+            Compliant ({vessels.filter((v: VesselType) => v.complianceScore >= 80).length})
           </TabsTrigger>
           <TabsTrigger value="attention">
-            Needs Attention ({vessels.filter((v) => v.complianceScore < 80).length})
+            Needs Attention ({vessels.filter((v: VesselType) => v.complianceScore < 80).length})
           </TabsTrigger>
         </TabsList>
       </Tabs>
@@ -233,7 +263,7 @@ export default function FleetPage() {
       {/* Vessels grid */}
       {!isLoading && !error && viewMode === "grid" && vessels.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredVessels.map((vessel) => (
+          {filteredVessels.map((vessel: VesselType) => (
             <VesselCard key={vessel.id} vessel={vessel} />
           ))}
 
@@ -247,7 +277,7 @@ export default function FleetPage() {
       {/* Vessels list view */}
       {!isLoading && !error && viewMode === "list" && vessels.length > 0 && (
         <div className="space-y-4">
-          {filteredVessels.map((vessel) => (
+          {filteredVessels.map((vessel: VesselType) => (
             <VesselListItem key={vessel.id} vessel={vessel} />
           ))}
         </div>
@@ -276,20 +306,29 @@ export default function FleetPage() {
   )
 }
 
-function VesselCard({ vessel }) {
-  let scoreColor = "bg-red-500"
-  let scoreTextColor = "text-red-700"
-  let scoreBgColor = "bg-red-50"
-
-  if (vessel.complianceScore >= 90) {
-    scoreColor = "bg-green-500"
-    scoreTextColor = "text-green-700"
-    scoreBgColor = "bg-green-50"
-  } else if (vessel.complianceScore >= 70) {
-    scoreColor = "bg-yellow-500"
-    scoreTextColor = "text-yellow-700"
-    scoreBgColor = "bg-yellow-50"
+function VesselCard({ vessel }: VesselCardProps) {
+  const getScoreColors = (score: number) => {
+    if (score >= 90) {
+      return {
+        scoreColor: "bg-green-500",
+        scoreTextColor: "text-green-700",
+        scoreBgColor: "bg-green-50",
+      }
+    } else if (score >= 70) {
+      return {
+        scoreColor: "bg-yellow-500",
+        scoreTextColor: "text-yellow-700",
+        scoreBgColor: "bg-yellow-50",
+      }
+    }
+    return {
+      scoreColor: "bg-red-500",
+      scoreTextColor: "text-red-700",
+      scoreBgColor: "bg-red-50",
+    }
   }
+
+  const { scoreColor, scoreTextColor, scoreBgColor } = getScoreColors(vessel.complianceScore)
 
   return (
     <Card
@@ -355,17 +394,17 @@ function VesselCard({ vessel }) {
         </div>
       </CardContent>
       <CardFooter className="pt-2 flex justify-between">
-        <Link href={`/document-hub?vessel=${vessel.id}`}>
+        <Link to={`/document-hub?vessel=${vessel.id}`}>
           <Button variant="outline" size="sm">
             Documents
           </Button>
         </Link>
-        <Link href={`/port-preparation?vessel=${vessel.id}`}>
+        <Link to={`/port-preparation?vessel=${vessel.id}`}>
           <Button variant="outline" size="sm">
             Port Prep
           </Button>
         </Link>
-        <Link href={`/vessels/${vessel.id}`}>
+        <Link to={`/vessels/${vessel.id}`}>
           <Button size="sm">Details</Button>
         </Link>
       </CardFooter>
@@ -373,20 +412,29 @@ function VesselCard({ vessel }) {
   )
 }
 
-function VesselListItem({ vessel }) {
-  let scoreColor = "bg-red-500"
-  let scoreTextColor = "text-red-700"
-  let scoreBgColor = "bg-red-50"
-
-  if (vessel.complianceScore >= 90) {
-    scoreColor = "bg-green-500"
-    scoreTextColor = "text-green-700"
-    scoreBgColor = "bg-green-50"
-  } else if (vessel.complianceScore >= 70) {
-    scoreColor = "bg-yellow-500"
-    scoreTextColor = "text-yellow-700"
-    scoreBgColor = "bg-yellow-50"
+function VesselListItem({ vessel }: VesselListItemProps) {
+  const getScoreColors = (score: number) => {
+    if (score >= 90) {
+      return {
+        scoreColor: "bg-green-500",
+        scoreTextColor: "text-green-700",
+        scoreBgColor: "bg-green-50",
+      }
+    } else if (score >= 70) {
+      return {
+        scoreColor: "bg-yellow-500",
+        scoreTextColor: "text-yellow-700",
+        scoreBgColor: "bg-yellow-50",
+      }
+    }
+    return {
+      scoreColor: "bg-red-500",
+      scoreTextColor: "text-red-700",
+      scoreBgColor: "bg-red-50",
+    }
   }
+
+  const { scoreTextColor, scoreBgColor } = getScoreColors(vessel.complianceScore)
 
   return (
     <Card className="overflow-hidden hover:shadow-md transition-shadow duration-200">
@@ -434,12 +482,12 @@ function VesselListItem({ vessel }) {
             </div>
 
             <div className="flex gap-2">
-              <Link href={`/document-hub?vessel=${vessel.id}`}>
+              <Link to={`/document-hub?vessel=${vessel.id}`}>
                 <Button variant="outline" size="sm">
                   Documents
                 </Button>
               </Link>
-              <Link href={`/vessels/${vessel.id}`}>
+              <Link to={`/vessels/${vessel.id}`}>
                 <Button size="sm">Details</Button>
               </Link>
             </div>
@@ -450,7 +498,7 @@ function VesselListItem({ vessel }) {
   )
 }
 
-function AddVesselCard({ onClick }) {
+function AddVesselCard({ onClick }: AddVesselCardProps) {
   return (
     <Card
       className="border-2 border-dashed flex flex-col items-center justify-center h-full min-h-[300px] cursor-pointer hover:border-blue-300 hover:bg-blue-50/50 transition-colors"
