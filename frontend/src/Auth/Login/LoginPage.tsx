@@ -121,12 +121,6 @@ export default function LoginPage() {
 
       console.log("✅ User authenticated successfully:", data.user.email)
 
-      // Extract first name from user data - try multiple fields
-      // const firstName =
-      //   data.user.first_name || data.user.full_name?.split(" ")[0] || data.user.name?.split(" ")[0] || "Captain"
-      // console.log("👤 User first name:", firstName)
-      // setUserFirstName(firstName)
-
       // Store user data in localStorage if remember me is checked
       if (rememberMe) {
         localStorage.setItem("userId", data.user.id)
@@ -279,17 +273,26 @@ export default function LoginPage() {
       </div>
 
       {/* Maritime Media Section - RIGHT */}
-      <div className="hidden lg:block lg:w-1/2 relative bg-blue-900">
-        <div className="absolute inset-0 z-10 bg-gradient-to-b from-blue-900/70 to-blue-900/40" />
-        <img
-          src="/container-ship-at-sea.png"
-          alt="Maritime vessel at sea"
-          className="absolute inset-0 w-full h-full object-cover"
+      <div className="hidden lg:block lg:w-1/2 relative">
+        {/* Deep ocean gradient background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-900/20 via-transparent to-transparent" />
+
+        {/* Subtle wave pattern overlay */}
+        <div
+          className="absolute inset-0 opacity-10"
+          style={{
+            backgroundImage:
+              "url(\"data:image/svg+xml,%3Csvg width='100' height='20' viewBox='0 0 100 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M21.184 20c.357-.13.72-.264.888-.14 1.005-.174 1.837-.83 2.718-1.085.878-.257 1.74-.424 2.58-.482 1.653-.23 2.343.105 3.942.105 1.6 0 2.29-.335 3.942-.105.842.058 1.704.225 2.582.482.88.254 1.713.91 2.718 1.084.17.123.53.257.887.14.36.12.72.026.887-.14 1.005-.174 1.837-.83 2.718-1.085.878-.257 1.74-.424 2.58-.482 1.653-.23 2.343.105 3.942.105 1.6 0 2.29-.335 3.942-.105.842.058 1.704.225 2.582.482.88.254 1.713.91 2.718 1.084.17.123.53.257.887.14.36.12.72.026.887-.14 1.005-.174 1.837-.83 2.718-1.085.878-.257 1.74-.424 2.58-.482 1.653-.23 2.343.105 3.942.105 1.6 0 2.29-.335 3.942-.105.842.058 1.704.225 2.582.482.88.254 1.713.91 2.718 1.084.17.123.53.257.887.14.36.12.72.026.887-.14 1.005-.174 1.837-.83 2.718-1.085.878-.257 1.74-.424 2.58-.482 1.653-.23 2.343.105 3.942.105V0H0v20h21.184z'%3E%3C/path%3E%3C/svg%3E\")",
+            backgroundSize: "100px 20px",
+          }}
         />
+
         <div className="absolute inset-0 z-20 flex flex-col justify-center p-12 text-white">
-          <h2 className="text-3xl font-bold mb-4">Welcome back</h2>
-          <p className="text-xl mb-6">Access your maritime compliance dashboard</p>
-          <ul className="space-y-4">
+        <h2 className="text-3xl font-bold mb-6 text-white">Welcome back</h2>
+          <p className="text-xl mb-8">Access your maritime compliance dashboard</p>
+
+          <ul className="space-y-6">
             <li className="flex items-start">
               <div className="mr-3 mt-1 h-6 w-6 flex items-center justify-center rounded-full bg-blue-500/20">
                 <svg
@@ -307,8 +310,14 @@ export default function LoginPage() {
                   <polyline points="20 6 9 17 4 12"></polyline>
                 </svg>
               </div>
-              <span>Monitor document expirations</span>
+              <div>
+                <p className="font-medium">Monitor document expirations</p>
+                <p className="text-sm text-blue-100/70 mt-1">
+                  Track certificates, licenses, and crew documents with automated expiry alerts to maintain compliance
+                </p>
+              </div>
             </li>
+
             <li className="flex items-start">
               <div className="mr-3 mt-1 h-6 w-6 flex items-center justify-center rounded-full bg-blue-500/20">
                 <svg
@@ -326,8 +335,14 @@ export default function LoginPage() {
                   <polyline points="20 6 9 17 4 12"></polyline>
                 </svg>
               </div>
-              <span>Check port requirements</span>
+              <div>
+                <p className="font-medium">Check & prepare for port requirements</p>
+                <p className="text-sm text-blue-100/70 mt-1">
+                  Access up-to-date port entry requirements and regulations
+                </p>
+              </div>
             </li>
+
             <li className="flex items-start">
               <div className="mr-3 mt-1 h-6 w-6 flex items-center justify-center rounded-full bg-blue-500/20">
                 <svg
@@ -345,7 +360,12 @@ export default function LoginPage() {
                   <polyline points="20 6 9 17 4 12"></polyline>
                 </svg>
               </div>
-              <span>Prepare for inspections</span>
+              <div>
+                <p className="font-medium">Securely send documents</p>
+                <p className="text-sm text-blue-100/70 mt-1">
+                  Send documents instantly and securely to port authorities, agents, charterers, and other stakeholders
+                </p>
+              </div>
             </li>
           </ul>
         </div>

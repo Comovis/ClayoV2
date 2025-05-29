@@ -1,8 +1,10 @@
+
 "use client"
 
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { ArrowRight } from "lucide-react"
+import { Link } from "react-router-dom"
 
 export default function CallToAction() {
   return (
@@ -16,18 +18,17 @@ export default function CallToAction() {
           transition={{ duration: 0.5 }}
         >
           <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
-            Ready to transform your maritime compliance?
+            Transform Your Fleet Operations Today
           </h2>
           <p className="text-xl text-slate-300 mb-8 max-w-2xl mx-auto">
-            Join hundreds of maritime companies already using Comovis to streamline their compliance operations.
+            Join our pilot program to streamline compliance, reduce port delays, and boost efficiency.
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
-            <Button size="lg" className="bg-white text-slate-900 hover:bg-slate-100 text-base px-6">
-              Book a Demo <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-            <Button size="lg" variant="outline" className="text-white border-white hover:bg-slate-800 text-base">
-              Start Free Trial
-            </Button>
+            <Link to="/signup">
+              <Button size="lg" className="bg-white text-slate-900 hover:bg-slate-100 text-base px-6">
+                Start Free Trial <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
           </div>
         </motion.div>
 
@@ -40,7 +41,7 @@ export default function CallToAction() {
             transition={{ duration: 0.5 }}
           >
             <div className="text-4xl font-bold text-slate-900 mb-2">40%</div>
-            <p className="text-xl font-medium text-slate-700">Reduction in Documentation Workload</p>
+            <p className="text-xl font-medium text-slate-700">Less Time on Documentation</p>
           </motion.div>
 
           <motion.div
@@ -51,7 +52,7 @@ export default function CallToAction() {
             transition={{ duration: 0.5, delay: 0.1 }}
           >
             <div className="text-4xl font-bold text-slate-900 mb-2">65%</div>
-            <p className="text-xl font-medium text-slate-700">Fewer Port State Control Deficiencies</p>
+            <p className="text-xl font-medium text-slate-700">Reduction in Port State Control Issues</p>
           </motion.div>
 
           <motion.div
@@ -62,7 +63,7 @@ export default function CallToAction() {
             transition={{ duration: 0.5, delay: 0.2 }}
           >
             <div className="text-4xl font-bold text-slate-900 mb-2">4-5x</div>
-            <p className="text-xl font-medium text-slate-700">Return on Investment</p>
+            <p className="text-xl font-medium text-slate-700">ROI for Your Fleet</p>
           </motion.div>
         </div>
       </div>

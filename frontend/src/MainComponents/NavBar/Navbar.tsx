@@ -99,7 +99,7 @@ const AppHeader: FC<AppHeaderProps> = ({
   }
 
   return (
-    <div className="flex items-center justify-between p-3 border-b bg-white/80 dark:bg-slate-900/80 backdrop-blur-md backdrop-saturate-150 sticky top-0 z-10 dark:border-slate-800">
+    <div className="flex items-center justify-between p-3 border-b bg-white dark:bg-slate-900 sticky top-0 z-10 dark:border-slate-800">
       {/* Left side - Logo/Sidebar toggle */}
       <div className="flex items-center">
         {!showSidePanel && (

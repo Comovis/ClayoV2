@@ -14,10 +14,11 @@ export default function LandingPage() {
    
       <Hero />
       <Features />
-      <HowItWorks />
       <InteractiveDemo />
-      <Testimonials />
-      <PricingSection />
+      <HowItWorks />
+      
+    
+   
       <CallToAction />
       <Footer />
     </div>

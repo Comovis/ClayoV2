@@ -45,6 +45,8 @@ import {
   SlidersHorizontal,
 } from "lucide-react"
 
+import BookDemoModal from "../../MainComponents/NavBar/BookDemoModal"
+
 export default function InteractiveDemo() {
   const [activeDemo, setActiveDemo] = useState("document-hub")
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
@@ -57,6 +59,7 @@ export default function InteractiveDemo() {
   const [teamMemberModalOpen, setTeamMemberModalOpen] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const uploadProgressRef = useRef(null)
+  const [isBookDemoOpen, setIsBookDemoOpen] = useState(false)
 
   // Simulate upload progress
   useEffect(() => {
@@ -877,10 +880,15 @@ function DocumentHubDemo({ onUploadClick, onDocumentView, viewMode, setViewMode,
       </div>
 
       <div className="mt-6 text-center">
-        <Button className="bg-slate-800 hover:bg-slate-700">
-          Book a Demo <ArrowRight className="ml-2 h-4 w-4" />
-        </Button>
+      <Button
+                size="lg"
+                className="bg-slate-800 hover:bg-slate-700 text-white text-base px-6"
+                onClick={() => setIsBookDemoOpen(true)}
+              >
+                Book a Demo <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
       </div>
+      
     </div>
   )
 }
@@ -1680,6 +1688,7 @@ function TeamMemberCard({ name, email, role, status, avatar, lastActive }) {
           )}
         </div>
       </div>
+      
     </div>
   )
 }
