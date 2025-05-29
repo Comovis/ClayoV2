@@ -30,44 +30,77 @@ import { UserProvider } from "./Auth/Contexts/UserContext"
 import PitchDeckAuth from "./MainPages/PitchDeck/PitchDeckAuth"
 
 // Google Analytics Configuration
-const GA_TRACKING_ID = "G-16JECJB6T"
+const GA_TRACKING_ID = "G-16JECJB6TS"
 
-// Initialize Google Analytics
+// Initialize Google Analytics with debug logging
 const initializeGoogleAnalytics = () => {
+  console.log("🔍 Initializing Google Analytics with ID:", GA_TRACKING_ID)
+
   // Create script tag for gtag
   const script = document.createElement("script")
   script.async = true
   script.src = `https://www.googletagmanager.com/gtag/js?id=${GA_TRACKING_ID}`
+
+  script.onload = () => {
+    console.log("✅ Google Analytics script loaded successfully")
+  }
+
+  script.onerror = () => {
+    console.error("❌ Failed to load Google Analytics script")
+  }
+
   document.head.appendChild(script)
 
-  // Initialize gtag
+  // Initialize gtag with debug logging
   window.dataLayer = window.dataLayer || []
   function gtag(...args: any[]) {
+    console.log("📊 GA Event:", args)
     window.dataLayer.push(args)
   }
   window.gtag = gtag
 
   gtag("js", new Date())
-  gtag("config", GA_TRACKING_ID)
+  gtag("config", GA_TRACKING_ID, {
+    debug_mode: true, // Enable debug mode
+    send_page_view: true,
+  })
+
+  console.log("🚀 Google Analytics initialized")
 }
 
-// Hook to track page views automatically
+// Hook to track page views automatically with debug logging
 const useAnalyticsTracking = () => {
   const location = useLocation()
 
   useEffect(() => {
+    console.log("📍 Page changed to:", location.pathname)
+
     // Initialize GA on first load
     if (!window.gtag) {
+      console.log("🔧 GA not initialized, initializing now...")
       initializeGoogleAnalytics()
     }
 
-    // Track page view
-    if (window.gtag) {
-      window.gtag("config", GA_TRACKING_ID, {
-        page_path: location.pathname + location.search,
-        page_title: document.title,
-      })
-    }
+    // Wait a bit for GA to initialize, then track page view
+    setTimeout(() => {
+      if (window.gtag) {
+        console.log("📊 Tracking page view:", location.pathname + location.search)
+        window.gtag("config", GA_TRACKING_ID, {
+          page_path: location.pathname + location.search,
+          page_title: document.title,
+          debug_mode: true,
+        })
+
+        // Also send a manual page_view event for debugging
+        window.gtag("event", "page_view", {
+          page_title: document.title,
+          page_location: window.location.href,
+          page_path: location.pathname + location.search,
+        })
+      } else {
+        console.error("❌ window.gtag is not available")
+      }
+    }, 100)
   }, [location])
 }
 
