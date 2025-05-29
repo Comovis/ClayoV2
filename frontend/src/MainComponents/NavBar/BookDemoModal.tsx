@@ -21,6 +21,10 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 
+// API Base URL Configuration
+const apiBaseUrl =
+  import.meta.env.MODE === "development" ? import.meta.env.VITE_DEVELOPMENT_URL : import.meta.env.VITE_API_URL
+
 interface BookDemoModalProps {
   isOpen: boolean
   onClose: () => void
@@ -119,15 +123,35 @@ const BookDemoModal: React.FC<BookDemoModalProps> = ({ isOpen, onClose }) => {
       // Get the effective country code (either selected or custom)
       const countryCode = getEffectiveCountryCode()
 
-      // Simulate form submission - replace with actual API call
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      // Here you would typically send the form data to your backend
-      console.log("Demo request submitted:", {
-        ...formData,
+      // Prepare the data to send
+      const demoData = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        company: formData.company,
+        phoneNumber: formData.phoneNumber,
         countryCode,
-        fullPhoneNumber: `${countryCode} ${formData.phoneNumber}`,
+        role: formData.role,
+        fleetSize: formData.fleetSize,
+        message: formData.message,
+      }
+
+      // Send to API
+      const response = await fetch(`${apiBaseUrl}/api/book-demo`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(demoData),
       })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to submit demo request")
+      }
+
+      console.log("Demo request submitted successfully:", result)
 
       // Reset form and close modal
       setFormData({
@@ -144,10 +168,11 @@ const BookDemoModal: React.FC<BookDemoModalProps> = ({ isOpen, onClose }) => {
       setIsCustomCode(false)
       onClose()
 
-      // You might want to show a success message here
+      // Show success message (you can implement this)
+      alert("Demo request submitted successfully! We will contact you soon.")
     } catch (error) {
       console.error("Error submitting demo request:", error)
-      // Handle error - show error message to user
+      alert("Failed to submit demo request. Please try again.")
     } finally {
       setIsSubmitting(false)
     }

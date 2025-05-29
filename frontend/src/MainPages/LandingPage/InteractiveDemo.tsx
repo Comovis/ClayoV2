@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import BookDemoModal from "../../MainComponents/NavBar/BookDemoModal"
 import {
   Ship,
   FileText,
@@ -42,10 +43,7 @@ import {
   ChevronDown,
   List,
   LayoutGrid,
-  SlidersHorizontal,
 } from "lucide-react"
-
-import BookDemoModal from "../../MainComponents/NavBar/BookDemoModal"
 
 export default function InteractiveDemo() {
   const [activeDemo, setActiveDemo] = useState("document-hub")
@@ -58,8 +56,8 @@ export default function InteractiveDemo() {
   const [showSuccessMessage, setShowSuccessMessage] = useState(false)
   const [teamMemberModalOpen, setTeamMemberModalOpen] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
-  const uploadProgressRef = useRef(null)
   const [isBookDemoOpen, setIsBookDemoOpen] = useState(false)
+  const uploadProgressRef = useRef(null)
 
   // Simulate upload progress
   useEffect(() => {
@@ -96,6 +94,10 @@ export default function InteractiveDemo() {
   const handleDocumentView = (doc) => {
     setSelectedDocument(doc)
     setDocumentViewOpen(true)
+  }
+
+  const handleBookDemoClick = () => {
+    setIsBookDemoOpen(true)
   }
 
   return (
@@ -180,11 +182,12 @@ export default function InteractiveDemo() {
                 viewMode={viewMode}
                 setViewMode={setViewMode}
                 showSuccessMessage={showSuccessMessage}
+                onBookDemoClick={handleBookDemoClick}
               />
             </TabsContent>
 
             <TabsContent value="port-prep" className="m-0">
-              <PortPrepDemo onUploadClick={() => setUploadModalOpen(true)} />
+              <PortPrepDemo onUploadClick={() => setUploadModalOpen(true)} onBookDemoClick={handleBookDemoClick} />
             </TabsContent>
 
             <TabsContent value="document-sharing" className="m-0">
@@ -193,15 +196,19 @@ export default function InteractiveDemo() {
                 shareStatus={shareStatus}
                 handleShare={handleShare}
                 setShareStatus={setShareStatus}
+                onBookDemoClick={handleBookDemoClick}
               />
             </TabsContent>
 
             <TabsContent value="fleet-management" className="m-0">
-              <FleetManagementDemo />
+              <FleetManagementDemo onBookDemoClick={handleBookDemoClick} />
             </TabsContent>
 
             <TabsContent value="team-management" className="m-0">
-              <TeamManagementDemo onAddMemberClick={() => setTeamMemberModalOpen(true)} />
+              <TeamManagementDemo
+                onAddMemberClick={() => setTeamMemberModalOpen(true)}
+                onBookDemoClick={handleBookDemoClick}
+              />
             </TabsContent>
           </div>
         </Tabs>
@@ -602,6 +609,9 @@ export default function InteractiveDemo() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Book Demo Modal */}
+      <BookDemoModal isOpen={isBookDemoOpen} onClose={() => setIsBookDemoOpen(false)} />
     </section>
   )
 }
@@ -632,7 +642,14 @@ function TabButton({ value, activeValue, icon, title, description }) {
   )
 }
 
-function DocumentHubDemo({ onUploadClick, onDocumentView, viewMode, setViewMode, showSuccessMessage }) {
+function DocumentHubDemo({
+  onUploadClick,
+  onDocumentView,
+  viewMode,
+  setViewMode,
+  showSuccessMessage,
+  onBookDemoClick,
+}) {
   const documents = [
     {
       id: "doc-1",
@@ -872,28 +889,21 @@ function DocumentHubDemo({ onUploadClick, onDocumentView, viewMode, setViewMode,
           )}
 
           <div className="mt-4 text-center">
-            <Button variant="outline" size="sm" className="text-slate-700 border-slate-300 hover:bg-slate-100">
-              View All Documents
-            </Button>
+        
           </div>
         </div>
       </div>
 
       <div className="mt-6 text-center">
-      <Button
-                size="lg"
-                className="bg-slate-800 hover:bg-slate-700 text-white text-base px-6"
-                onClick={() => setIsBookDemoOpen(true)}
-              >
-                Book a Demo <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
+        <Button className="bg-slate-800 hover:bg-slate-700" onClick={onBookDemoClick}>
+          Book a Demo <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
       </div>
-      
     </div>
   )
 }
 
-function PortPrepDemo({ onUploadClick }) {
+function PortPrepDemo({ onUploadClick, onBookDemoClick }) {
   return (
     <div>
       <h3 className="text-xl font-bold text-slate-900 mb-4">Port Preparation</h3>
@@ -1045,7 +1055,7 @@ function PortPrepDemo({ onUploadClick }) {
       </div>
 
       <div className="mt-6 text-center">
-        <Button className="bg-slate-800 hover:bg-slate-700">
+        <Button className="bg-slate-800 hover:bg-slate-700" onClick={onBookDemoClick}>
           Book a Demo <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
@@ -1053,7 +1063,7 @@ function PortPrepDemo({ onUploadClick }) {
   )
 }
 
-function DocumentSharingDemo({ onShareClick, shareStatus, handleShare, setShareStatus }) {
+function DocumentSharingDemo({ onShareClick, shareStatus, handleShare, setShareStatus, onBookDemoClick }) {
   return (
     <div>
       <h3 className="text-xl font-bold text-slate-900 mb-4">Document Sharing</h3>
@@ -1230,7 +1240,7 @@ function DocumentSharingDemo({ onShareClick, shareStatus, handleShare, setShareS
       </div>
 
       <div className="mt-6 text-center">
-        <Button className="bg-slate-800 hover:bg-slate-700">
+        <Button className="bg-slate-800 hover:bg-slate-700" onClick={onBookDemoClick}>
           Book a Demo <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
@@ -1238,7 +1248,7 @@ function DocumentSharingDemo({ onShareClick, shareStatus, handleShare, setShareS
   )
 }
 
-function FleetManagementDemo() {
+function FleetManagementDemo({ onBookDemoClick }) {
   return (
     <div>
       <h3 className="text-xl font-bold text-slate-900 mb-4">Fleet Management</h3>
@@ -1344,13 +1354,12 @@ function FleetManagementDemo() {
               <Plus className="h-4 w-4 mr-2" />
               Add Vessel
             </Button>
-          
           </div>
         </div>
       </div>
 
       <div className="mt-6 text-center">
-        <Button className="bg-slate-800 hover:bg-slate-700">
+        <Button className="bg-slate-800 hover:bg-slate-700" onClick={onBookDemoClick}>
           Book a Demo <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
@@ -1358,7 +1367,7 @@ function FleetManagementDemo() {
   )
 }
 
-function TeamManagementDemo({ onAddMemberClick }) {
+function TeamManagementDemo({ onAddMemberClick, onBookDemoClick }) {
   return (
     <div>
       <h3 className="text-xl font-bold text-slate-900 mb-4">Team Management</h3>
@@ -1484,7 +1493,7 @@ function TeamManagementDemo({ onAddMemberClick }) {
       </div>
 
       <div className="mt-6 text-center">
-        <Button className="bg-slate-800 hover:bg-slate-700">
+        <Button className="bg-slate-800 hover:bg-slate-700" onClick={onBookDemoClick}>
           Book a Demo <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
@@ -1688,7 +1697,6 @@ function TeamMemberCard({ name, email, role, status, avatar, lastActive }) {
           )}
         </div>
       </div>
-      
     </div>
   )
 }

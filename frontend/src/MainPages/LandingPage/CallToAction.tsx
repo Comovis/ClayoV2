@@ -1,4 +1,3 @@
-
 "use client"
 
 import { motion } from "framer-motion"
@@ -8,7 +7,7 @@ import { Link } from "react-router-dom"
 
 export default function CallToAction() {
   return (
-    <section className="py-24 bg-white">
+    <section id="call-to-action" className="py-24 bg-white">
       <div className="container mx-auto px-4">
         <motion.div
           className="bg-slate-900 rounded-2xl p-8 md:p-12 text-center"

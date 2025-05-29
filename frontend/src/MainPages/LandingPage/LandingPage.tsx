@@ -20,7 +20,7 @@ export default function LandingPage() {
     
    
       <CallToAction />
-      <Footer />
+    
     </div>
   )
 }

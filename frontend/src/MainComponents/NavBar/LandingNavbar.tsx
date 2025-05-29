@@ -1,8 +1,7 @@
 "use client"
 
-import { ChevronDown, Menu, X, Ship, FileText, MapPin } from "lucide-react"
+import { Menu, X } from "lucide-react"
 import { Link, useNavigate } from "react-router-dom"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import LogoBlack from "../../ReusableAssets/Logos/LogoBlack.svg"
 import { useState } from "react"
@@ -30,6 +29,15 @@ const LandingHeader = ({ user, logout }: LandingHeaderProps) => {
     navigate("/login")
   }
 
+  // Function to handle smooth scrolling to section
+  const handleScrollToSection = (sectionId: string) => {
+    const element = document.getElementById(sectionId)
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth" })
+    }
+    setMobileMenuOpen(false)
+  }
+
   return (
     <>
       <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white dark:bg-slate-900 dark:border-slate-800">
@@ -42,56 +50,26 @@ const LandingHeader = ({ user, logout }: LandingHeaderProps) => {
 
           {/* Desktop navigation */}
           <nav className="hidden md:flex items-center gap-8">
-            <DropdownMenu>
-              <DropdownMenuTrigger className="flex items-center text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors dark:text-slate-300 dark:hover:text-white">
-                Solutions <ChevronDown className="ml-1 h-4 w-4" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="center">
-                <DropdownMenuItem>
-                  <Link to="#document-hub" className="w-full flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Document Hub
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Link to="#port-intelligence" className="w-full flex items-center gap-2">
-                    <MapPin className="h-4 w-4" />
-                    Port Intelligence
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Link to="#fleet-management" className="w-full flex items-center gap-2">
-                    <Ship className="h-4 w-4" />
-                    Fleet Management
-                  </Link>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <button
+              onClick={() => handleScrollToSection("demo")}
+              className="text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors dark:text-slate-300 dark:hover:text-white"
+            >
+              Interactive Demo
+            </button>
 
-            <Link
-              to="#features"
+            <button
+              onClick={() => handleScrollToSection("how-it-works")}
               className="text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors dark:text-slate-300 dark:hover:text-white"
             >
-              Features
-            </Link>
-            <Link
-              to="#demo"
+              How Comovis Works
+            </button>
+
+            <button
+              onClick={() => handleScrollToSection("call-to-action")}
               className="text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors dark:text-slate-300 dark:hover:text-white"
             >
-              Demo
-            </Link>
-            <Link
-              to="#pricing"
-              className="text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors dark:text-slate-300 dark:hover:text-white"
-            >
-              Pricing
-            </Link>
-            <Link
-              to="#testimonials"
-              className="text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors dark:text-slate-300 dark:hover:text-white"
-            >
-              Testimonials
-            </Link>
+              Join Pilot Program
+            </button>
           </nav>
 
           <div className="hidden md:flex items-center gap-4">
@@ -126,59 +104,27 @@ const LandingHeader = ({ user, logout }: LandingHeaderProps) => {
         {mobileMenuOpen && (
           <div className="md:hidden py-4 px-4 bg-white dark:bg-slate-900 border-b dark:border-slate-800 absolute top-full left-0 right-0 z-50">
             <nav className="flex flex-col space-y-4">
-              <div className="border-b pb-2 dark:border-slate-800">
-                <p className="font-medium text-sm text-slate-500 dark:text-slate-400 mb-2">Solutions</p>
-                <Link
-                  to="#document-hub"
-                  className="block py-1 text-sm font-medium hover:text-slate-900 dark:hover:text-white transition-colors"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Document Hub
-                </Link>
-                <Link
-                  to="#port-intelligence"
-                  className="block py-1 text-sm font-medium hover:text-slate-900 dark:hover:text-white transition-colors"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Port Intelligence
-                </Link>
-                <Link
-                  to="#fleet-management"
-                  className="block py-1 text-sm font-medium hover:text-slate-900 dark:hover:text-white transition-colors"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Fleet Management
-                </Link>
-              </div>
+              <button
+                onClick={() => handleScrollToSection("demo")}
+                className="text-left text-sm font-medium hover:text-slate-900 dark:hover:text-white transition-colors"
+              >
+                Interactive Demo
+              </button>
 
-              <Link
-                to="#features"
+              <button
+                onClick={() => handleScrollToSection("how-it-works")}
                 className="text-sm font-medium hover:text-slate-900 dark:hover:text-white transition-colors"
-                onClick={() => setMobileMenuOpen(false)}
               >
-                Features
-              </Link>
-              <Link
-                to="#demo"
+                How Comovis Works
+              </button>
+
+              <button
+                onClick={() => handleScrollToSection("call-to-action")}
                 className="text-sm font-medium hover:text-slate-900 dark:hover:text-white transition-colors"
-                onClick={() => setMobileMenuOpen(false)}
               >
-                Demo
-              </Link>
-              <Link
-                to="#pricing"
-                className="text-sm font-medium hover:text-slate-900 dark:hover:text-white transition-colors"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Pricing
-              </Link>
-              <Link
-                to="#testimonials"
-                className="text-sm font-medium hover:text-slate-900 dark:hover:text-white transition-colors"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Testimonials
-              </Link>
+                Join Pilot Program
+              </button>
+
               {!user && (
                 <div className="pt-2 flex flex-col space-y-2">
                   <Button variant="ghost" className="w-full justify-start" onClick={handleLoginClick}>

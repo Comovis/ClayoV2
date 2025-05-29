@@ -40,6 +40,7 @@ const {
   handleDocumentDownload,
   handleCleanupTempFiles,
 } = require("./AppFeatures/DocumentHub/DocumentUploadsHandler")
+const { handleBookDemoRequest } = require('./Users/BookDemo');
 
 const { handleBatchDocumentDownload } = require("./AppFeatures/DocumentHub/BatchDownload")
 
@@ -304,6 +305,21 @@ app.post("/api/signup", authLimiter, async (req, res) => {
     })
   }
 })
+
+
+
+// POST /api/book-demo
+app.post("/api/book-demo", async (req, res) => {
+  try {
+    await handleBookDemoRequest(req, res);
+  } catch (error) {
+    console.error("Error booking demo:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to book demo"
+    });
+  }
+});
 
 // Add this to your existing routes in server.js
 app.post("/api/invite-signup", authLimiter, async (req, res) => {
