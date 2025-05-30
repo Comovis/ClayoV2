@@ -140,10 +140,10 @@ export default function HowItWorksEnhanced() {
                   description="Your documents are encrypted both in transit and at rest."
                 />
 
-                <SecurityFeature
+                 <SecurityFeature
                   icon={<Shield className="h-5 w-5 text-purple-400" />}
-                  title="ISO 27001 Certified"
-                  description="Our security practices meet international standards for information security."
+                  title="Robust Security Headers"
+                  description="Content Security Policy (CSP), HSTS, and anti-clickjacking measures protect against web vulnerabilities."
                 />
 
                 <SecurityFeature

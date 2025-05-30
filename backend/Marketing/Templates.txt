@@ -1,0 +1,41 @@
+
+Subject: Quick question—certificate expiry headaches?
+
+Hi [First Name],
+
+I’m Ivan, ex-Kpler (MarineTraffic) and now building tools to tackle maritime compliance—specifically, the chaos of tracking vessel certificates across fleets.
+
+When I spoke to [Competitor X]’s ops team last week, they admitted a $28k detention fee from an expired cert they missed in spreadsheets. Ouch.
+
+How’s your team handling this?
+
+Still manually checking expiry dates?
+
+Any close calls with Port State Control?
+
+*No pitch—just trading war stories. If you reply, I’ll share a cheat sheet of the most commonly overlooked certificates (based on 30+ fleet manager interviews).*
+
+Either way, thanks for your time—this industry runs on shared scars!
+
+Best,
+Ivan Gyimah
+Founder, Comovis | Ex-Kpler
+
+
+
+-------------------------
+
+
+Hi Ivan,
+
+I'm Ivan - formerly with Kpler where I worked on MarineTraffic products after the acquisition. Now I'm building tools to simplify maritime compliance.
+
+Lately, I've been talking to fleet managers about document tracking across vessels, and one pain point keeps coming up: expiring certificates and managing docs across fleets.
+
+How's your team handling it - spreadsheets, manual checks, or something else?
+
+No pitch - just genuinely curious. If you reply, I'll share anonymized insights from other managers. Either way, thanks for your time!
+
+Best,
+Ivan Gyimah
+Founder, Comovis | Ex-Kpler

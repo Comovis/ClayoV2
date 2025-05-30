@@ -207,8 +207,8 @@ function LiveDetentionPreventionDemo() {
               </div>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold text-green-400">{scenario.savings}</div>
-              <p className="text-slate-300 text-sm">Saved</p>
+            
+          
             </div>
           </div>
 

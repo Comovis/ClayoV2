@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { AlertCircle, Ship, Lock } from "lucide-react"
 import PitchDeck from "./PitchDeck"
 
-const PITCH_DECK_PASSWORD = "9033Asd123-"
+const PITCH_DECK_PASSWORD = "JoinOurCapTable2025-"
 
 export default function PitchDeckAuth() {
   const [password, setPassword] = useState("")

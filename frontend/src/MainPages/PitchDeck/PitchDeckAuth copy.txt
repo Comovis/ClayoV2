@@ -1,0 +1,17 @@
+1. The Scale of the Problem
+Every vessel requires 50+ certificates to operate legally (e.g., Safety Management Certificates, Class Certificates, Cargo Securing Manuals, IOPP Certificates).
+
+Port State Control (PSC) detentions cost $5k–$50k/day in delays, plus reputational damage.
+
+Example: A single expired firefighting equipment cert led to a 3-day detention for a bulk carrier in Rotterdam (2023).
+
+20% of detentions are due to documentation issues (Tokyo MoU 2022 Report).
+
+2. How Teams "Manage" It Today (Badly)
+Spreadsheets: Manually updated by junior staff. Prone to human error.
+
+Real quote: "We missed a Liferaft cert expiry because it was buried in row 87 of a shared Excel sheet." (Fleet manager, Greece)
+
+Email reminders: Sent by flag states/Class societies, but get lost in inboxes.
+
+Post-it notes: Literally. Some captains stick them on bridge walls.

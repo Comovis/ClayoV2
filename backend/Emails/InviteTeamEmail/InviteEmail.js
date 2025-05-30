@@ -58,7 +58,7 @@ function InvitationEmail(props) {
           Section,
           { style: { textAlign: "center", marginTop: "32px" } },
           React.createElement("img", {
-            src: "https://vvtzvlzhldqsvezfdfyd.supabase.co/storage/v1/object/public/media//COmvoisPNGLogoBlack.png",
+            src: "https://vvtzvlzhldqsvezfdfyd.supabase.co/storage/v1/object/public/media//LogoBlack.svg",
             width: "140",
             height: "130",
             alt: "Comovis",
