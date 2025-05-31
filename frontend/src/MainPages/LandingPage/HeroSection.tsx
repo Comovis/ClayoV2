@@ -11,7 +11,7 @@ export default function RefinedHero() {
   const [isBookDemoOpen, setIsBookDemoOpen] = useState(false)
 
   return (
-    <div className="relative overflow-hidden bg-gradient-to-b from-slate-50 to-white">
+    <div className="relative overflow-hidden bg-gradient-to-b from-slate-50 to-white min-h-screen">
       {/* Background pattern */}
       <div
         className="absolute inset-0 z-0 opacity-[0.03]"
@@ -21,42 +21,42 @@ export default function RefinedHero() {
         }}
       />
 
-      <div className="container mx-auto px-4 py-20 sm:py-28 relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20 md:py-28 relative z-10">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 items-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="max-w-2xl"
+            className="w-full max-w-2xl mx-auto lg:mx-0"
           >
             {/* Founder credibility */}
-            <div className="inline-flex items-center px-3 py-1 rounded-full bg-slate-100 text-slate-800 text-sm font-medium mb-6">
-              <span className="flex h-2 w-2 rounded-full bg-green-500 mr-2"></span>
-              Built by Maritime Professionals, for Maritime Professionals
+            <div className="inline-flex items-center px-3 py-1 rounded-full bg-slate-100 text-slate-800 text-sm font-medium mb-4 sm:mb-6 max-w-full">
+              <span className="flex h-2 w-2 rounded-full bg-green-500 mr-2 flex-shrink-0"></span>
+              <span className="truncate">Built by Maritime Professionals, for Maritime Professionals</span>
             </div>
 
             {/* Problem-focused headline */}
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-slate-900 mb-6 leading-tight">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold tracking-tight text-slate-900 mb-4 sm:mb-6 leading-tight break-words">
               Prevent Vessel Detentions with AI-Powered Compliance
             </h1>
 
             {/* Clear value proposition */}
-            <p className="text-xl text-slate-600 mb-8 leading-relaxed">
+            <p className="text-base sm:text-lg lg:text-xl text-slate-600 mb-6 sm:mb-8 leading-relaxed break-words">
               We use AI technology to help maritime operators avoid costly detentions and delays. Comovis securely
               organises all your maritime documents, tracks expiry dates, and provides real-time port
               intelligence—accessible to your entire team, onshore and offshore.
             </p>
 
             {/* Professional CTAs */}
-            <div className="flex flex-col sm:flex-row gap-4 mb-12">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-8 sm:mb-12 w-full">
               <Button
                 size="lg"
-                className="bg-slate-800 hover:bg-slate-700 text-white text-base px-6"
+                className="bg-slate-800 hover:bg-slate-700 text-white text-base px-6 w-full sm:w-auto flex-shrink-0"
                 onClick={() => setIsBookDemoOpen(true)}
               >
                 Book a Demo <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
-              <Link to="/signup">
+              <Link to="/signup" className="w-full sm:w-auto">
                 <Button
                   size="lg"
                   variant="outline"
@@ -68,41 +68,41 @@ export default function RefinedHero() {
             </div>
 
             {/* Solution-focused benefits */}
-            <div className="grid grid-cols-2 gap-6">
-              <div className="flex items-start">
-                <div className="bg-slate-100 p-2 rounded-lg mr-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 w-full">
+              <div className="flex items-start min-w-0">
+                <div className="bg-slate-100 p-2 rounded-lg mr-3 flex-shrink-0">
                   <Shield className="h-5 w-5 text-slate-700" />
                 </div>
-                <div>
-                  <h3 className="font-medium text-slate-900">Prevent Detentions</h3>
-                  <p className="text-sm text-slate-600">Avoid costly delays and fines</p>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-medium text-slate-900 break-words">Prevent Detentions</h3>
+                  <p className="text-sm text-slate-600 break-words">Avoid costly delays and fines</p>
                 </div>
               </div>
-              <div className="flex items-start">
-                <div className="bg-slate-100 p-2 rounded-lg mr-3">
+              <div className="flex items-start min-w-0">
+                <div className="bg-slate-100 p-2 rounded-lg mr-3 flex-shrink-0">
                   <FileCheck className="h-5 w-5 text-slate-700" />
                 </div>
-                <div>
-                  <h3 className="font-medium text-slate-900">Organise All Documents</h3>
-                  <p className="text-sm text-slate-600">Certificates, crew docs, port papers</p>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-medium text-slate-900 break-words">Organise All Documents</h3>
+                  <p className="text-sm text-slate-600 break-words">Certificates, crew docs, port papers</p>
                 </div>
               </div>
-              <div className="flex items-start">
-                <div className="bg-slate-100 p-2 rounded-lg mr-3">
+              <div className="flex items-start min-w-0">
+                <div className="bg-slate-100 p-2 rounded-lg mr-3 flex-shrink-0">
                   <Clock className="h-5 w-5 text-slate-700" />
                 </div>
-                <div>
-                  <h3 className="font-medium text-slate-900">Save Time</h3>
-                  <p className="text-sm text-slate-600">40% less documentation work</p>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-medium text-slate-900 break-words">Save Time</h3>
+                  <p className="text-sm text-slate-600 break-words">40% less documentation work</p>
                 </div>
               </div>
-              <div className="flex items-start">
-                <div className="bg-slate-100 p-2 rounded-lg mr-3">
+              <div className="flex items-start min-w-0">
+                <div className="bg-slate-100 p-2 rounded-lg mr-3 flex-shrink-0">
                   <Ship className="h-5 w-5 text-slate-700" />
                 </div>
-                <div>
-                  <h3 className="font-medium text-slate-900">Port Intelligence</h3>
-                  <p className="text-sm text-slate-600">Real-time requirements</p>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-medium text-slate-900 break-words">Port Intelligence</h3>
+                  <p className="text-sm text-slate-600 break-words">Real-time requirements</p>
                 </div>
               </div>
             </div>
@@ -112,7 +112,7 @@ export default function RefinedHero() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="relative hidden lg:block"
+            className="relative mt-8 lg:mt-0 w-full"
           >
             <LiveDetentionPreventionDemo />
           </motion.div>
@@ -180,9 +180,9 @@ function LiveDetentionPreventionDemo() {
   const currentStep = scenario.timeline[timelineStep]
 
   return (
-    <div className="relative mb-16">
+    <div className="relative mb-8 sm:mb-16 w-full">
       {/* Main Demo Container */}
-      <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl shadow-2xl p-6 text-white relative overflow-hidden mx-8 my-8">
+      <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl sm:rounded-2xl shadow-xl sm:shadow-2xl p-4 sm:p-6 text-white relative overflow-hidden mx-0 sm:mx-4 my-4 sm:my-8 w-full max-w-full">
         {/* Animated Background Pattern */}
         <div className="absolute inset-0 opacity-10">
           <div
@@ -195,20 +195,16 @@ function LiveDetentionPreventionDemo() {
         </div>
 
         {/* Header */}
-        <div className="relative z-10">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center">
-              <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center mr-3">
-                <Shield className="h-5 w-5 text-white" />
+        <div className="relative z-10 w-full">
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <div className="flex items-center min-w-0 flex-1">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-green-500 flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0">
+                <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
               </div>
-              <div>
-                <h3 className="font-bold text-white text-lg">Crisis Averted</h3>
-                <p className="text-slate-300 text-sm">Real-time prevention in action</p>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-bold text-white text-base sm:text-lg break-words">Crisis Averted</h3>
+                <p className="text-slate-300 text-xs sm:text-sm break-words">Real-time prevention in action</p>
               </div>
-            </div>
-            <div className="text-right">
-            
-          
             </div>
           </div>
 
@@ -217,17 +213,19 @@ function LiveDetentionPreventionDemo() {
             key={currentScenario}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-6"
+            className="mb-4 sm:mb-6 w-full"
           >
-            <h4 className="text-xl font-semibold text-white mb-1">{scenario.title}</h4>
-            <p className="text-slate-300 flex items-center">
-              <Ship className="h-4 w-4 mr-2" />
-              {scenario.vessel}
+            <h4 className="text-base sm:text-lg lg:text-xl font-semibold text-white mb-1 break-words">
+              {scenario.title}
+            </h4>
+            <p className="text-slate-300 flex items-center text-xs sm:text-sm break-words">
+              <Ship className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" />
+              <span className="truncate">{scenario.vessel}</span>
             </p>
           </motion.div>
 
           {/* Timeline */}
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3 w-full">
             {scenario.timeline.map((step, index) => (
               <motion.div
                 key={index}
@@ -238,7 +236,7 @@ function LiveDetentionPreventionDemo() {
                   scale: index === timelineStep ? 1.02 : 1,
                 }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
-                className={`flex items-center p-3 rounded-lg border transition-all duration-500 ${
+                className={`flex items-center p-2 sm:p-3 rounded-lg border transition-all duration-500 w-full min-w-0 ${
                   index <= timelineStep
                     ? step.status === "success"
                       ? "bg-green-500/20 border-green-400"
@@ -249,7 +247,7 @@ function LiveDetentionPreventionDemo() {
                 }`}
               >
                 <div
-                  className={`w-3 h-3 rounded-full mr-3 transition-all duration-500 ${
+                  className={`w-2 sm:w-3 h-2 sm:h-3 rounded-full mr-2 sm:mr-3 transition-all duration-500 flex-shrink-0 ${
                     index <= timelineStep
                       ? step.status === "success"
                         ? "bg-green-400 shadow-lg shadow-green-400/50"
@@ -259,20 +257,22 @@ function LiveDetentionPreventionDemo() {
                       : "bg-slate-500"
                   }`}
                 />
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-white font-medium text-sm">{step.event}</span>
-                    <span className="text-slate-400 text-xs">{step.time}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-white font-medium text-xs sm:text-sm break-words flex-1 mr-2">
+                      {step.event}
+                    </span>
+                    <span className="text-slate-400 text-xs hidden sm:inline flex-shrink-0">{step.time}</span>
                   </div>
                 </div>
                 {index === timelineStep && (
-                  <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="ml-2">
+                  <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="ml-1 sm:ml-2 flex-shrink-0">
                     {step.status === "success" ? (
-                      <CheckCircle className="h-4 w-4 text-green-400" />
+                      <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-green-400" />
                     ) : step.status === "warning" ? (
-                      <Clock className="h-4 w-4 text-yellow-400" />
+                      <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-400" />
                     ) : (
-                      <AlertTriangle className="h-4 w-4 text-red-400" />
+                      <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 text-red-400" />
                     )}
                   </motion.div>
                 )}
@@ -281,19 +281,19 @@ function LiveDetentionPreventionDemo() {
           </div>
 
           {/* Control */}
-          <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-700">
+          <div className="flex items-center justify-between mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-slate-700 w-full">
             <button
               onClick={() => setIsPlaying(!isPlaying)}
-              className="flex items-center text-slate-300 hover:text-white transition-colors"
+              className="flex items-center text-slate-300 hover:text-white transition-colors text-xs sm:text-sm"
             >
               {isPlaying ? (
                 <>
-                  <div className="w-2 h-2 bg-green-400 rounded-full mr-2 animate-pulse" />
+                  <div className="w-2 h-2 bg-green-400 rounded-full mr-2 animate-pulse flex-shrink-0" />
                   Live
                 </>
               ) : (
                 <>
-                  <div className="w-2 h-2 bg-slate-400 rounded-full mr-2" />
+                  <div className="w-2 h-2 bg-slate-400 rounded-full mr-2 flex-shrink-0" />
                   Paused
                 </>
               )}
@@ -320,9 +320,9 @@ function LiveDetentionPreventionDemo() {
           <motion.div
             initial={{ scale: 0, rotate: -180 }}
             animate={{ scale: 1, rotate: 0 }}
-            className="absolute -top-4 -right-4 bg-green-500 rounded-full p-3 shadow-xl"
+            className="absolute -top-2 -right-2 sm:-top-4 sm:-right-4 bg-green-500 rounded-full p-2 sm:p-3 shadow-xl"
           >
-            <CheckCircle className="h-6 w-6 text-white" />
+            <CheckCircle className="h-4 w-4 sm:h-6 sm:w-6 text-white" />
           </motion.div>
         )}
       </div>
@@ -331,11 +331,11 @@ function LiveDetentionPreventionDemo() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.7 }}
-        className="absolute -top-8 right-8 bg-white rounded-lg shadow-xl p-4 border border-slate-200 z-20"
+        className="absolute -top-2 sm:-top-4 lg:-top-8 right-2 sm:right-4 lg:right-8 bg-white rounded-lg shadow-xl p-2 sm:p-3 lg:p-4 border border-slate-200 z-20"
       >
         <div className="text-center">
-          <div className="text-2xl font-bold text-green-600">$760K</div>
-          <p className="text-slate-600 text-sm">Saved This Month</p>
+          <div className="text-lg sm:text-xl lg:text-2xl font-bold text-green-600">$760K</div>
+          <p className="text-slate-600 text-xs sm:text-sm">Saved This Month</p>
         </div>
       </motion.div>
     </div>

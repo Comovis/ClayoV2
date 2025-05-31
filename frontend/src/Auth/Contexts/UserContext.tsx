@@ -236,12 +236,15 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }
 
-  // Simple and robust logout function
+  // Updated logout function with 2-second delay for better UX
   const logout = async () => {
     // Set logging out state to true
     setIsLoggingOut(true)
 
     try {
+      // Add a 2-second delay for better UX
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+
       // Clear application state first for immediate UI feedback
       setUser(null)
       setCompany(null)

@@ -324,11 +324,11 @@ function AppContent() {
       {/* SEO metadata for all pages */}
       <SEOHead />
 
-      <div className="flex h-screen">
+      <div className="flex h-screen w-full max-w-full overflow-x-hidden">
         {/* Only show sidebar on known paths that are not landing pages, auth pages, or share pages */}
         {!isLandingPage && !isAuthPage && !isUnknownPath && !isSharePage && !isShowingLoadingScreen && <Sidebar />}
 
-        <div className="flex flex-col flex-1">
+        <div className="flex flex-col flex-1 min-w-0 max-w-full">
           {/* Conditionally render the appropriate header */}
           {isShowingLoadingScreen ? null : isLandingPage ? (
             <LandingHeader user={undefined} logout={undefined} />
@@ -346,7 +346,7 @@ function AppContent() {
           )}
 
           {/* Main content area */}
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 overflow-auto w-full max-w-full">
             <Routes>
               {/* Public routes */}
               <Route path="/" element={<LandingPage />} />
