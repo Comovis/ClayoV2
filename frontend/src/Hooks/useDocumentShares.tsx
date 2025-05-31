@@ -87,111 +87,97 @@ export interface AccessLog {
  * Helper function to get authenticated session and token
  */
 async function getAuthenticatedSession() {
+  console.log("Frontend: Getting authenticated session...")
+
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
 
   if (sessionError) {
+    console.error("Frontend: Session error:", sessionError)
     throw new Error("Authentication required. Please log in again.")
   }
 
   if (!sessionData.session) {
+    console.error("Frontend: No active session found")
     throw new Error("No active session found. Please log in again.")
   }
 
+  console.log("Frontend: Session retrieved successfully")
   return sessionData.session.access_token
 }
 
 /**
- * Helper function to make authenticated API calls with timeout
+ * Helper function to make authenticated API calls
  */
-async function makeAuthenticatedRequest(
-  endpoint: string,
-  options: RequestInit = {},
-  timeout = 10000,
-): Promise<Response> {
+async function makeAuthenticatedRequest(endpoint: string, options: RequestInit = {}): Promise<Response> {
+  console.log("Frontend: Making authenticated request to:", `${apiBaseUrl}${endpoint}`)
+  console.log("Frontend: Request options:", {
+    method: options.method || "GET",
+    headers: { ...options.headers, Authorization: "[REDACTED]" },
+    body: options.body ? "Present" : "None",
+  })
+
   const token = await getAuthenticatedSession()
 
-  // Create abort controller for timeout
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), timeout)
+  const response = await fetch(`${apiBaseUrl}${endpoint}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      ...options.headers,
+    },
+  })
 
-  try {
-    const response = await fetch(`${apiBaseUrl}${endpoint}`, {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-        ...options.headers,
-      },
-      signal: controller.signal,
-    })
-
-    clearTimeout(timeoutId)
-    return response
-  } catch (fetchError) {
-    clearTimeout(timeoutId)
-
-    if (fetchError.name === "AbortError") {
-      throw new Error("Request timed out. Please try again.")
-    } else {
-      throw fetchError
-    }
-  }
+  console.log("Frontend: Response received - Status:", response.status, "OK:", response.ok)
+  return response
 }
 
 /**
  * Helper function to make public API calls (no auth required)
  */
-async function makePublicRequest(endpoint: string, options: RequestInit = {}, timeout = 10000): Promise<Response> {
-  // Create abort controller for timeout
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), timeout)
+async function makePublicRequest(endpoint: string, options: RequestInit = {}): Promise<Response> {
+  console.log("Frontend: Making public request to:", `${apiBaseUrl}${endpoint}`)
+  console.log("Frontend: Request options:", {
+    method: options.method || "GET",
+    body: options.body ? "Present" : "None",
+  })
 
-  try {
-    const response = await fetch(`${apiBaseUrl}${endpoint}`, {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...options.headers,
-      },
-      signal: controller.signal,
-    })
+  const response = await fetch(`${apiBaseUrl}${endpoint}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  })
 
-    clearTimeout(timeoutId)
-    return response
-  } catch (fetchError) {
-    clearTimeout(timeoutId)
-
-    if (fetchError.name === "AbortError") {
-      throw new Error("Request timed out. Please try again.")
-    } else {
-      throw fetchError
-    }
-  }
+  console.log("Frontend: Public response received - Status:", response.status, "OK:", response.ok)
+  return response
 }
 
 /**
  * Creates a new document share
  */
 export async function createDocumentShare(shareData: DocumentShareRequest): Promise<DocumentShareResponse> {
+  console.log("Frontend: Creating document share with data:", shareData)
+
   try {
     const response = await makeAuthenticatedRequest("/api/document-shares", {
       method: "POST",
       body: JSON.stringify(shareData),
     })
 
-    const data = await response.json()
-
     if (!response.ok) {
-      throw new Error(data.error || "Failed to create document share")
+      const errorData = await response.json()
+      console.error("Frontend: Create share error response:", errorData)
+      throw new Error(errorData.error || `Request failed with status ${response.status}`)
     }
 
-    if (!data.success) {
-      throw new Error(data.error || "API returned unsuccessful response")
-    }
+    const data = await response.json()
+    console.log("Frontend: Document share created successfully:", data)
 
-    return data.shareDetails
+    // Backend now returns data directly (no success wrapper)
+    return data
   } catch (error) {
-    console.error("Error creating document share:", error)
+    console.error("Frontend: Error creating document share:", error)
     throw error
   }
 }
@@ -202,29 +188,31 @@ export async function createDocumentShare(shareData: DocumentShareRequest): Prom
 export async function sendShareEmail(
   shareId: string,
 ): Promise<{ success: boolean; totalSent: number; totalFailed: number }> {
+  console.log("Frontend: Sending share email for shareId:", shareId)
+
   try {
     const response = await makeAuthenticatedRequest("/api/send-document-share-email", {
       method: "POST",
       body: JSON.stringify({ shareId }),
     })
 
-    const data = await response.json()
-
     if (!response.ok) {
-      throw new Error(data.error || "Failed to send share emails")
+      const errorData = await response.json()
+      console.error("Frontend: Send email error response:", errorData)
+      throw new Error(errorData.error || `Request failed with status ${response.status}`)
     }
 
-    if (!data.success) {
-      throw new Error(data.error || "API returned unsuccessful response")
-    }
+    const data = await response.json()
+    console.log("Frontend: Share email sent successfully:", data)
 
+    // Handle the response format from the email service
     return {
-      success: data.success,
+      success: true,
       totalSent: data.totalSent || 0,
       totalFailed: data.totalFailed || 0,
     }
   } catch (error) {
-    console.error("Error sending share emails:", error)
+    console.error("Frontend: Error sending share emails:", error)
     throw error
   }
 }
@@ -233,30 +221,35 @@ export async function sendShareEmail(
  * Fetches a document share by token (public endpoint - no auth required)
  */
 export async function fetchShareByToken(token: string) {
+  console.log("Frontend: Fetching share by token:", token)
+
   try {
     const response = await makePublicRequest(`/api/document-shares/${token}`)
 
-    if (!response.ok) {
-      if (response.status === 404) {
-        return { notFound: true }
-      }
-      if (response.status === 410) {
-        const errorData = await response.json()
-        return { expired: true, shareInfo: errorData.shareInfo }
-      }
+    if (response.status === 404) {
+      console.log("Frontend: Share not found (404)")
+      return { notFound: true }
+    }
+
+    if (response.status === 410) {
+      console.log("Frontend: Share expired or revoked (410)")
       const errorData = await response.json()
-      throw new Error(errorData.error || "Failed to fetch share")
+      return { expired: true, shareInfo: errorData.shareInfo }
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      console.error("Frontend: Fetch share error response:", errorData)
+      throw new Error(errorData.error || `Request failed with status ${response.status}`)
     }
 
     const data = await response.json()
+    console.log("Frontend: Share fetched successfully:", data)
 
-    if (!data.success) {
-      throw new Error(data.error || "API returned unsuccessful response")
-    }
-
-    return data.shareData
+    // Backend returns data directly
+    return data
   } catch (error) {
-    console.error("Error fetching share by token:", error)
+    console.error("Frontend: Error fetching share by token:", error)
     throw error
   }
 }
@@ -265,6 +258,8 @@ export async function fetchShareByToken(token: string) {
  * Logs document access (public endpoint - no auth required)
  */
 export async function logDocumentAccess(shareId: string, documentId: string | null, action: string, email?: string) {
+  console.log("Frontend: Logging document access:", { shareId, documentId, action, email })
+
   try {
     const response = await makePublicRequest("/api/document-access-logs", {
       method: "POST",
@@ -278,13 +273,15 @@ export async function logDocumentAccess(shareId: string, documentId: string | nu
 
     if (!response.ok) {
       const errorData = await response.json()
-      throw new Error(errorData.error || "Failed to log document access")
+      console.error("Frontend: Log access error response:", errorData)
+      return { success: false }
     }
 
     const data = await response.json()
+    console.log("Frontend: Document access logged successfully:", data)
     return data
   } catch (error) {
-    console.error("Error logging document access:", error)
+    console.error("Frontend: Error logging document access:", error)
     // Don't throw here - we don't want to block the UI if logging fails
     return { success: false }
   }
@@ -294,6 +291,8 @@ export async function logDocumentAccess(shareId: string, documentId: string | nu
  * Fetches document shares for a user
  */
 export async function getDocumentShares(vesselId?: string): Promise<DocumentShare[]> {
+  console.log("Frontend: Fetching document shares for vesselId:", vesselId)
+
   try {
     let endpoint = "/api/document-shares"
     if (vesselId) {
@@ -302,20 +301,19 @@ export async function getDocumentShares(vesselId?: string): Promise<DocumentShar
 
     const response = await makeAuthenticatedRequest(endpoint)
 
-    const data = await response.json()
-
     if (!response.ok) {
-      throw new Error(data.error || "Failed to fetch document shares")
+      const errorData = await response.json()
+      console.error("Frontend: Get shares error response:", errorData)
+      throw new Error(errorData.error || `Request failed with status ${response.status}`)
     }
 
-    if (!data.success) {
-      throw new Error(data.error || "API returned unsuccessful response")
-    }
+    const data = await response.json()
+    console.log("Frontend: Document shares fetched successfully:", data)
 
-    // Ensure we return an array
-    return Array.isArray(data.shares) ? data.shares : []
+    // Backend returns array directly
+    return Array.isArray(data) ? data : []
   } catch (error) {
-    console.error("Error fetching document shares:", error)
+    console.error("Frontend: Error fetching document shares:", error)
     throw error
   }
 }
@@ -324,24 +322,26 @@ export async function getDocumentShares(vesselId?: string): Promise<DocumentShar
  * Revokes a document share
  */
 export async function revokeDocumentShare(shareId: string) {
+  console.log("Frontend: Revoking document share:", shareId)
+
   try {
     const response = await makeAuthenticatedRequest(`/api/document-shares/${shareId}/revoke`, {
       method: "POST",
     })
 
-    const data = await response.json()
-
     if (!response.ok) {
-      throw new Error(data.error || "Failed to revoke share")
+      const errorData = await response.json()
+      console.error("Frontend: Revoke share error response:", errorData)
+      throw new Error(errorData.error || `Request failed with status ${response.status}`)
     }
 
-    if (!data.success) {
-      throw new Error(data.error || "API returned unsuccessful response")
-    }
+    const data = await response.json()
+    console.log("Frontend: Document share revoked successfully:", data)
 
+    // Backend returns data directly
     return data
   } catch (error) {
-    console.error("Error revoking share:", error)
+    console.error("Frontend: Error revoking share:", error)
     throw error
   }
 }
@@ -350,25 +350,27 @@ export async function revokeDocumentShare(shareId: string) {
  * Extends the expiry date of a document share
  */
 export async function extendShareAccess(shareId: string, newExpiryDate: string) {
+  console.log("Frontend: Extending share access:", shareId, "to:", newExpiryDate)
+
   try {
     const response = await makeAuthenticatedRequest(`/api/document-shares/${shareId}/extend`, {
       method: "POST",
       body: JSON.stringify({ expiresAt: newExpiryDate }),
     })
 
-    const data = await response.json()
-
     if (!response.ok) {
-      throw new Error(data.error || "Failed to extend share access")
+      const errorData = await response.json()
+      console.error("Frontend: Extend access error response:", errorData)
+      throw new Error(errorData.error || `Request failed with status ${response.status}`)
     }
 
-    if (!data.success) {
-      throw new Error(data.error || "API returned unsuccessful response")
-    }
+    const data = await response.json()
+    console.log("Frontend: Share access extended successfully:", data)
 
+    // Backend returns data directly
     return data
   } catch (error) {
-    console.error("Error extending share access:", error)
+    console.error("Frontend: Error extending share access:", error)
     throw error
   }
 }
@@ -377,23 +379,24 @@ export async function extendShareAccess(shareId: string, newExpiryDate: string) 
  * Gets access logs for a specific share
  */
 export async function getShareAccessLogs(shareId: string): Promise<AccessLog[]> {
+  console.log("Frontend: Fetching access logs for share:", shareId)
+
   try {
     const response = await makeAuthenticatedRequest(`/api/document-shares/${shareId}/access-logs`)
 
-    const data = await response.json()
-
     if (!response.ok) {
-      throw new Error(data.error || "Failed to fetch access logs")
+      const errorData = await response.json()
+      console.error("Frontend: Get access logs error response:", errorData)
+      throw new Error(errorData.error || `Request failed with status ${response.status}`)
     }
 
-    if (!data.success) {
-      throw new Error(data.error || "API returned unsuccessful response")
-    }
+    const data = await response.json()
+    console.log("Frontend: Access logs fetched successfully:", data)
 
-    // Ensure we return an array
-    return Array.isArray(data.accessLogs) ? data.accessLogs : []
+    // Backend returns array directly
+    return Array.isArray(data) ? data : []
   } catch (error) {
-    console.error("Error fetching access logs:", error)
+    console.error("Frontend: Error fetching access logs:", error)
     throw error
   }
 }
@@ -402,25 +405,27 @@ export async function getShareAccessLogs(shareId: string): Promise<AccessLog[]> 
  * Batch operations for multiple shares
  */
 export async function batchRevokeShares(shareIds: string[]) {
+  console.log("Frontend: Batch revoking shares:", shareIds)
+
   try {
     const response = await makeAuthenticatedRequest("/api/document-shares/batch-revoke", {
       method: "POST",
       body: JSON.stringify({ shareIds }),
     })
 
-    const data = await response.json()
-
     if (!response.ok) {
-      throw new Error(data.error || "Failed to revoke shares")
+      const errorData = await response.json()
+      console.error("Frontend: Batch revoke error response:", errorData)
+      throw new Error(errorData.error || `Request failed with status ${response.status}`)
     }
 
-    if (!data.success) {
-      throw new Error(data.error || "API returned unsuccessful response")
-    }
+    const data = await response.json()
+    console.log("Frontend: Shares batch revoked successfully:", data)
 
+    // Backend returns data directly
     return data
   } catch (error) {
-    console.error("Error batch revoking shares:", error)
+    console.error("Frontend: Error batch revoking shares:", error)
     throw error
   }
 }
@@ -429,6 +434,8 @@ export async function batchRevokeShares(shareIds: string[]) {
  * Get sharing analytics/statistics
  */
 export async function getShareAnalytics(vesselId?: string, dateRange?: { from: string; to: string }) {
+  console.log("Frontend: Fetching share analytics:", { vesselId, dateRange })
+
   try {
     let endpoint = "/api/document-shares/analytics"
     const params = new URLSearchParams()
@@ -448,19 +455,19 @@ export async function getShareAnalytics(vesselId?: string, dateRange?: { from: s
 
     const response = await makeAuthenticatedRequest(endpoint)
 
-    const data = await response.json()
-
     if (!response.ok) {
-      throw new Error(data.error || "Failed to fetch share analytics")
+      const errorData = await response.json()
+      console.error("Frontend: Get analytics error response:", errorData)
+      throw new Error(errorData.error || `Request failed with status ${response.status}`)
     }
 
-    if (!data.success) {
-      throw new Error(data.error || "API returned unsuccessful response")
-    }
+    const data = await response.json()
+    console.log("Frontend: Share analytics fetched successfully:", data)
 
-    return data.analytics
+    // Backend returns data directly
+    return data
   } catch (error) {
-    console.error("Error fetching share analytics:", error)
+    console.error("Frontend: Error fetching share analytics:", error)
     throw error
   }
 }

@@ -44,7 +44,6 @@ const { handleBookDemoRequest } = require('./Users/BookDemo');
 
 const { handleBatchDocumentDownload } = require("./AppFeatures/DocumentHub/BatchDownload")
 
-
 const app = express()
 
 
@@ -538,6 +537,8 @@ app.post("/api/document-shares/:id/revoke", authenticateUser, async (req, res) =
     res.status(500).json({ error: "Failed to revoke document share" })
   }
 })
+
+
 
 app.post("/api/document-access-logs", async (req, res) => {
   try {

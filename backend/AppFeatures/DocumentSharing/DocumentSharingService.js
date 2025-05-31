@@ -2,7 +2,7 @@
 const { supabaseAdmin } = require("../../SupabaseClient")
 
 /**
- * Creates a new document share
+ * Creates a new document share with enhanced debugging
  * @param {Object} shareData - Data for the new share
  * @param {string} shareData.vesselId - ID of the vessel
  * @param {string[]} shareData.documentIds - Array of document IDs to share
@@ -15,50 +15,75 @@ const { supabaseAdmin } = require("../../SupabaseClient")
  */
 async function createDocumentShare(shareData, userId) {
   try {
-    // Add debugging logs
-    console.log("=== CREATE DOCUMENT SHARE DEBUG ===")
-    console.log("supabaseAdmin exists:", !!supabaseAdmin)
-    console.log("supabaseAdmin.from exists:", typeof supabaseAdmin?.from === "function")
+    console.log("=== CREATE DOCUMENT SHARE ===")
     console.log("shareData:", JSON.stringify(shareData, null, 2))
     console.log("userId:", userId)
 
     const { vesselId, documentIds, recipients, expiresAt, message, securityOptions } = shareData
 
-    // Validate required fields
+    // Validation
     if (!vesselId || !documentIds || !recipients || !expiresAt) {
-      return {
-        success: false,
-        error: "Missing required fields",
-      }
+      const missingFields = []
+      if (!vesselId) missingFields.push("vesselId")
+      if (!documentIds) missingFields.push("documentIds")
+      if (!recipients) missingFields.push("recipients")
+      if (!expiresAt) missingFields.push("expiresAt")
+
+      console.log("VALIDATION FAILED - Missing fields:", missingFields)
+      throw new Error(`Missing required fields: ${missingFields.join(", ")}`)
     }
 
-    // Generate a unique share token
-    const shareToken = generateShareToken()
+    if (!Array.isArray(documentIds) || documentIds.length === 0) {
+      throw new Error("documentIds must be a non-empty array")
+    }
 
-    // Create the share record in the database
-    const { data: share, error } = await supabaseAdmin
-      .from("document_shares")
-      .insert({
-        vessel_id: vesselId,
-        created_by: userId,
-        expires_at: expiresAt,
-        message: message || null,
-        security_options: securityOptions,
-        share_token: shareToken,
-        status: "active",
-      })
-      .select("id")
+    if (!Array.isArray(recipients) || recipients.length === 0) {
+      throw new Error("recipients must be a non-empty array")
+    }
+
+    // Verify vessel exists
+    const { data: vesselData, error: vesselError } = await supabaseAdmin
+      .from("vessels")
+      .select("id, name")
+      .eq("id", vesselId)
       .single()
 
-    if (error) {
-      console.error("Error creating document share:", error)
-      return {
-        success: false,
-        error: "Failed to create document share",
-      }
+    if (vesselError || !vesselData) {
+      throw new Error("Vessel not found")
     }
 
-    // Add documents to the share
+    // Verify documents exist
+    const { data: documentsData, error: documentsError } = await supabaseAdmin
+      .from("documents")
+      .select("id, title")
+      .in("id", documentIds)
+
+    if (documentsError || !documentsData || documentsData.length !== documentIds.length) {
+      throw new Error("Some documents not found")
+    }
+
+    // Generate share token
+    const shareToken = generateShareToken()
+
+    // Create share record
+    const shareRecord = {
+      vessel_id: vesselId,
+      created_by: userId,
+      expires_at: expiresAt,
+      message: message || null,
+      security_options: securityOptions,
+      share_token: shareToken,
+      status: "active",
+    }
+
+    const { data: share, error } = await supabaseAdmin.from("document_shares").insert(shareRecord).select("id").single()
+
+    if (error) {
+      console.error("Share creation failed:", error)
+      throw new Error("Failed to create document share")
+    }
+
+    // Add documents to share
     const shareDocuments = documentIds.map((docId) => ({
       share_id: share.id,
       document_id: docId,
@@ -67,14 +92,13 @@ async function createDocumentShare(shareData, userId) {
     const { error: docsError } = await supabaseAdmin.from("document_share_documents").insert(shareDocuments)
 
     if (docsError) {
-      console.error("Error adding documents to share:", docsError)
-      return {
-        success: false,
-        error: "Failed to add documents to share",
-      }
+      console.error("Adding documents failed:", docsError)
+      // Cleanup
+      await supabaseAdmin.from("document_shares").delete().eq("id", share.id)
+      throw new Error("Failed to add documents to share")
     }
 
-    // Add recipients to the share
+    // Add recipients to share
     const shareRecipients = recipients.map((recipient) => ({
       share_id: share.id,
       email: recipient.email,
@@ -85,36 +109,32 @@ async function createDocumentShare(shareData, userId) {
     const { error: recipientsError } = await supabaseAdmin.from("document_share_recipients").insert(shareRecipients)
 
     if (recipientsError) {
-      console.error("Error adding recipients to share:", recipientsError)
-      return {
-        success: false,
-        error: "Failed to add recipients to share",
-      }
+      console.error("Adding recipients failed:", recipientsError)
+      // Cleanup
+      await supabaseAdmin.from("document_share_documents").delete().eq("share_id", share.id)
+      await supabaseAdmin.from("document_shares").delete().eq("id", share.id)
+      throw new Error("Failed to add recipients to share")
     }
 
-    // Generate the share URL
+    // Generate share URL
     const baseUrl = process.env.NODE_ENV === "production" ? "https://comovis.co" : "http://localhost:1601"
     const shareUrl = `${baseUrl}/share/${shareToken}`
 
-    // Return the share details
+    console.log("Share created successfully:", share.id)
+
+    // Return the data directly (no wrapper)
     return {
-      success: true,
-      data: {
-        id: share.id,
-        shareToken,
-        shareUrl,
-        expiresAt,
-        createdAt: new Date().toISOString(),
-        recipients: recipients,
-        documents: documentIds,
-      },
+      id: share.id,
+      shareToken,
+      shareUrl,
+      expiresAt,
+      createdAt: new Date().toISOString(),
+      recipients: recipients,
+      documents: documentIds,
     }
   } catch (error) {
-    console.error("Error in document share creation:", error)
-    return {
-      success: false,
-      error: "Internal server error",
-    }
+    console.error("Error in createDocumentShare:", error)
+    throw error
   }
 }
 
@@ -127,7 +147,9 @@ async function createDocumentShare(shareData, userId) {
  */
 async function getShareByToken(token, ip, userAgent) {
   try {
-    // Get the share details
+    console.log("=== GET SHARE BY TOKEN ===")
+    console.log("token:", token)
+
     const { data: share, error } = await supabaseAdmin
       .from("document_shares")
       .select(`
@@ -184,43 +206,40 @@ async function getShareByToken(token, ip, userAgent) {
       .eq("share_token", token)
       .single()
 
-    if (error) {
-      console.error("Error fetching document share:", error)
-      return {
-        success: false,
-        error: "Share not found",
-      }
+    if (error || !share) {
+      throw new Error("Share not found")
     }
 
-    if (!share) {
-      return {
-        success: false,
-        error: "Share not found",
-      }
-    }
-
-    // Check if the share is expired or revoked
+    // Check if expired or revoked
     if (share.status === "revoked") {
-      return {
-        success: false,
-        error: "This share has been revoked",
-        status: 410,
-      }
+      const error = new Error("This share has been revoked")
+      error.status = 410
+      throw error
     }
 
     if (new Date(share.expires_at) < new Date()) {
-      // Update the share status to expired
       await supabaseAdmin.from("document_shares").update({ status: "expired" }).eq("id", share.id)
-
-      return {
-        success: false,
-        error: "This share has expired",
-        status: 410,
-      }
+      const error = new Error("This share has expired")
+      error.status = 410
+      throw error
     }
 
-    // Format the response
-    const formattedShare = {
+    // Log access
+    try {
+      await supabaseAdmin.from("document_access_logs").insert({
+        share_id: share.id,
+        document_id: null,
+        user_id: null,
+        action: "view_share",
+        ip_address: ip,
+        user_agent: userAgent,
+      })
+    } catch (logError) {
+      console.log("Failed to log access:", logError)
+    }
+
+    // Format response
+    return {
       id: share.id,
       vessel: {
         id: share.vessels.id,
@@ -243,27 +262,9 @@ async function getShareByToken(token, ip, userAgent) {
       security: share.security_options,
       status: share.status,
     }
-
-    // Log the access
-    await supabaseAdmin.from("document_access_logs").insert({
-      share_id: share.id,
-      document_id: null, // No specific document, viewing the share page
-      user_id: null, // Anonymous access
-      action: "view_share",
-      ip_address: ip,
-      user_agent: userAgent,
-    })
-
-    return {
-      success: true,
-      data: formattedShare,
-    }
   } catch (error) {
-    console.error("Error fetching document share:", error)
-    return {
-      success: false,
-      error: "Internal server error",
-    }
+    console.error("Error in getShareByToken:", error)
+    throw error
   }
 }
 
@@ -275,6 +276,9 @@ async function getShareByToken(token, ip, userAgent) {
  */
 async function getDocumentShares(userId, vesselId) {
   try {
+    console.log("=== GET DOCUMENT SHARES ===")
+    console.log("userId:", userId, "vesselId:", vesselId)
+
     let query = supabaseAdmin
       .from("document_shares")
       .select(`
@@ -309,19 +313,14 @@ async function getDocumentShares(userId, vesselId) {
     const { data, error } = await query
 
     if (error) {
-      console.error("Error fetching document shares:", error)
-      return {
-        success: false,
-        error: "Failed to fetch document shares",
-      }
+      throw new Error("Failed to fetch document shares")
     }
 
-    // Transform the data to match our frontend expectations
+    // Transform data
     const shares = (data || []).map((share) => {
       const documents = share.document_share_documents.map((doc) => doc.documents)
       const recipients = share.document_share_recipients
 
-      // Generate the share URL
       const baseUrl = process.env.NODE_ENV === "production" ? "https://comovis.co" : "http://localhost:1601"
       const shareUrl = `${baseUrl}/share/${share.share_token}`
 
@@ -342,16 +341,10 @@ async function getDocumentShares(userId, vesselId) {
       }
     })
 
-    return {
-      success: true,
-      data: shares,
-    }
+    return shares
   } catch (error) {
-    console.error("Error fetching document shares:", error)
-    return {
-      success: false,
-      error: "Internal server error",
-    }
+    console.error("Error in getDocumentShares:", error)
+    throw error
   }
 }
 
@@ -363,7 +356,10 @@ async function getDocumentShares(userId, vesselId) {
  */
 async function revokeDocumentShare(shareId, userId) {
   try {
-    // Check if the share belongs to the user
+    console.log("=== REVOKE DOCUMENT SHARE ===")
+    console.log("shareId:", shareId, "userId:", userId)
+
+    // Check ownership
     const { data: share, error: fetchError } = await supabaseAdmin
       .from("document_shares")
       .select("id, created_by")
@@ -371,40 +367,24 @@ async function revokeDocumentShare(shareId, userId) {
       .single()
 
     if (fetchError || !share) {
-      return {
-        success: false,
-        error: "Share not found",
-      }
+      throw new Error("Share not found")
     }
 
     if (share.created_by !== userId) {
-      return {
-        success: false,
-        error: "You do not have permission to revoke this share",
-      }
+      throw new Error("You do not have permission to revoke this share")
     }
 
-    // Revoke the share
+    // Revoke
     const { error } = await supabaseAdmin.from("document_shares").update({ status: "revoked" }).eq("id", shareId)
 
     if (error) {
-      console.error("Error revoking document share:", error)
-      return {
-        success: false,
-        error: "Failed to revoke document share",
-      }
+      throw new Error("Failed to revoke document share")
     }
 
-    return {
-      success: true,
-      message: "Share revoked successfully",
-    }
+    return { message: "Share revoked successfully" }
   } catch (error) {
-    console.error("Error revoking document share:", error)
-    return {
-      success: false,
-      error: "Internal server error",
-    }
+    console.error("Error in revokeDocumentShare:", error)
+    throw error
   }
 }
 
@@ -421,23 +401,21 @@ async function revokeDocumentShare(shareId, userId) {
  */
 async function logDocumentAccess(logData, ip, userAgent) {
   try {
+    console.log("=== LOG DOCUMENT ACCESS ===")
+    console.log("logData:", logData)
+
     const { shareId, documentId, action, email } = logData
 
-    // Validate required fields
     if (!shareId || !action) {
-      return {
-        success: false,
-        error: "Missing required fields",
-      }
+      throw new Error("Missing required fields")
     }
 
-    // Create the access log
     const { data, error } = await supabaseAdmin
       .from("document_access_logs")
       .insert({
         share_id: shareId,
         document_id: documentId || null,
-        user_id: null, // Anonymous access
+        user_id: null,
         user_email: email || null,
         action,
         ip_address: ip,
@@ -447,60 +425,44 @@ async function logDocumentAccess(logData, ip, userAgent) {
       .single()
 
     if (error) {
-      console.error("Error logging document access:", error)
-      return {
-        success: false,
-        error: "Failed to log document access",
-      }
+      throw new Error("Failed to log document access")
     }
 
-    return {
-      success: true,
-      id: data.id,
-    }
+    return { id: data.id }
   } catch (error) {
-    console.error("Error logging document access:", error)
-    return {
-      success: false,
-      error: "Internal server error",
-    }
+    console.error("Error in logDocumentAccess:", error)
+    throw error
   }
 }
 
 /**
- * Handles the API request to create a document share
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @returns {Promise<void>}
+ * API Handlers - These handle the Express requests/responses
  */
 async function handleCreateDocumentShare(req, res) {
   try {
+    console.log("=== API HANDLER: CREATE DOCUMENT SHARE ===")
+    console.log("Request body:", JSON.stringify(req.body, null, 2))
+
     const shareData = req.body
-    const userId = req.user.user_id
+    const userId = req.user?.user_id
 
     if (!userId) {
       return res.status(401).json({ error: "User ID not found in authenticated session" })
     }
 
+    // Call the service function
     const result = await createDocumentShare(shareData, userId)
 
-    if (!result.success) {
-      return res.status(400).json({ error: result.error })
-    }
+    console.log("Share created, returning 201 with data:", result)
 
-    return res.status(201).json(result.data)
+    // Return the data directly (frontend expects this format)
+    return res.status(201).json(result)
   } catch (error) {
     console.error("Error in handleCreateDocumentShare:", error)
-    return res.status(500).json({ error: "Internal server error" })
+    return res.status(400).json({ error: error.message })
   }
 }
 
-/**
- * Handles the API request to get a share by token
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @returns {Promise<void>}
- */
 async function handleGetShareByToken(req, res) {
   try {
     const { token } = req.params
@@ -508,25 +470,14 @@ async function handleGetShareByToken(req, res) {
     const userAgent = req.headers["user-agent"]
 
     const result = await getShareByToken(token, ip, userAgent)
-
-    if (!result.success) {
-      const statusCode = result.status || 404
-      return res.status(statusCode).json({ error: result.error })
-    }
-
-    return res.status(200).json(result.data)
+    return res.status(200).json(result)
   } catch (error) {
     console.error("Error in handleGetShareByToken:", error)
-    return res.status(500).json({ error: "Internal server error" })
+    const statusCode = error.status || 404
+    return res.status(statusCode).json({ error: error.message })
   }
 }
 
-/**
- * Handles the API request to get document shares for a user
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @returns {Promise<void>}
- */
 async function handleGetDocumentShares(req, res) {
   try {
     const { vesselId } = req.query
@@ -537,24 +488,13 @@ async function handleGetDocumentShares(req, res) {
     }
 
     const result = await getDocumentShares(userId, vesselId)
-
-    if (!result.success) {
-      return res.status(400).json({ error: result.error })
-    }
-
-    return res.status(200).json(result.data)
+    return res.status(200).json(result)
   } catch (error) {
     console.error("Error in handleGetDocumentShares:", error)
-    return res.status(500).json({ error: "Internal server error" })
+    return res.status(400).json({ error: error.message })
   }
 }
 
-/**
- * Handles the API request to revoke a document share
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @returns {Promise<void>}
- */
 async function handleRevokeDocumentShare(req, res) {
   try {
     const { id } = req.params
@@ -565,24 +505,13 @@ async function handleRevokeDocumentShare(req, res) {
     }
 
     const result = await revokeDocumentShare(id, userId)
-
-    if (!result.success) {
-      return res.status(400).json({ error: result.error })
-    }
-
-    return res.status(200).json({ success: true, message: result.message })
+    return res.status(200).json(result)
   } catch (error) {
     console.error("Error in handleRevokeDocumentShare:", error)
-    return res.status(500).json({ error: "Internal server error" })
+    return res.status(400).json({ error: error.message })
   }
 }
 
-/**
- * Handles the API request to log document access
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @returns {Promise<void>}
- */
 async function handleLogDocumentAccess(req, res) {
   try {
     const logData = req.body
@@ -590,15 +519,10 @@ async function handleLogDocumentAccess(req, res) {
     const userAgent = req.headers["user-agent"]
 
     const result = await logDocumentAccess(logData, ip, userAgent)
-
-    if (!result.success) {
-      return res.status(400).json({ error: result.error })
-    }
-
-    return res.status(201).json({ success: true, id: result.id })
+    return res.status(201).json(result)
   } catch (error) {
     console.error("Error in handleLogDocumentAccess:", error)
-    return res.status(500).json({ error: "Internal server error" })
+    return res.status(400).json({ error: error.message })
   }
 }
 

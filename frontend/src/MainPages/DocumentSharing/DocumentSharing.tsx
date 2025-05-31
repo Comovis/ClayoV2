@@ -1,6 +1,4 @@
 "use client"
-
-import React from "react"
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -88,6 +86,15 @@ export default function PortDocumentSharing() {
   const [shareResult, setShareResult] = useState(null)
   const [customExpiryDate, setCustomExpiryDate] = useState("")
 
+  // Add these state variables after the existing state declarations
+  const [customRecipients, setCustomRecipients] = useState([])
+  const [addRecipientDialogOpen, setAddRecipientDialogOpen] = useState(false)
+  const [newRecipientForm, setNewRecipientForm] = useState({
+    email: "",
+    name: "",
+    type: "other",
+  })
+
   // State for API integration
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
@@ -171,7 +178,6 @@ export default function PortDocumentSharing() {
       eta: "2025-05-20T08:00:00",
       etd: "2025-05-22T16:00:00",
       avatar: "SG",
-      requiredDocs: ["smc", "iopp", "registry", "loadline", "crew-list"],
       complianceStatus: "warning",
       agent: {
         id: "sg-agent",
@@ -192,7 +198,6 @@ export default function PortDocumentSharing() {
       eta: "2025-06-05T10:00:00",
       etd: "2025-06-07T18:00:00",
       avatar: "RT",
-      requiredDocs: ["smc", "iopp", "registry", "loadline", "crew-list", "ballast-plan"],
       complianceStatus: "compliant",
       agent: {
         id: "nl-agent",
@@ -213,7 +218,6 @@ export default function PortDocumentSharing() {
       eta: "2025-06-15T09:00:00",
       etd: "2025-06-17T14:00:00",
       avatar: "HK",
-      requiredDocs: ["smc", "iopp", "registry", "loadline", "crew-list"],
       complianceStatus: "non-compliant",
       agent: {
         id: "hk-agent",
@@ -377,6 +381,43 @@ export default function PortDocumentSharing() {
     return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString()
   }
 
+  // Add these functions after the existing helper functions
+  const handleAddRecipient = () => {
+    if (!newRecipientForm.email) {
+      setError("Email is required for new recipient")
+      return
+    }
+
+    // Check if email already exists
+    const emailExists = customRecipients.some((recipient) => recipient.email === newRecipientForm.email)
+    if (emailExists) {
+      setError("This email is already added as a recipient")
+      return
+    }
+
+    // Add the new recipient
+    const newRecipient = {
+      id: Date.now().toString(),
+      email: newRecipientForm.email,
+      name: newRecipientForm.name || newRecipientForm.email,
+      type: newRecipientForm.type,
+    }
+
+    setCustomRecipients([...customRecipients, newRecipient])
+
+    // Reset form and close dialog
+    setNewRecipientForm({ email: "", name: "", type: "other" })
+    setAddRecipientDialogOpen(false)
+    setSuccess("Recipient added successfully!")
+
+    // Clear success message after 3 seconds
+    setTimeout(() => setSuccess(""), 3000)
+  }
+
+  const handleRemoveRecipient = (recipientId) => {
+    setCustomRecipients(customRecipients.filter((recipient) => recipient.id !== recipientId))
+  }
+
   // Handle share action (with API integration)
   const handleShare = async () => {
     if (selectedVessel === "" || selectedDocuments.length === 0) {
@@ -407,6 +448,28 @@ export default function PortDocumentSharing() {
           name: port.agent.name,
           type: "agent",
         })
+      }
+
+      // Add custom recipients to the recipients array
+      customRecipients.forEach((customRecipient) => {
+        recipients.push({
+          email: customRecipient.email,
+          name: customRecipient.name,
+          type: customRecipient.type,
+        })
+      })
+
+      // Add a check to ensure we have at least one recipient, or add a default recipient if none selected
+      if (recipients.length === 0) {
+        // If no recipients are selected, add the port authority as default
+        recipients.push({
+          email: port.authority.email,
+          name: port.authority.name,
+          type: "port-authority",
+        })
+
+        // Log this for debugging
+        console.log("No recipients selected, adding default port authority recipient:", port.authority.name)
       }
 
       // Prepare the share data
@@ -643,7 +706,7 @@ export default function PortDocumentSharing() {
       name: port.name,
       country: port.country,
       eta: port.eta,
-      requiredDocsCount: port.requiredDocs.length,
+      requiredDocsCount: 0, //port.requiredDocs.length,
     }
   }
 
@@ -688,15 +751,10 @@ ${localStorage.getItem("userName") || "Comovis User"}`
     window.open(mailtoUrl, "_blank")
   }
 
-  // Initialize selected documents when port changes
-  React.useEffect(() => {
-    if (selectedPort) {
-      const port = getPort(selectedPort)
-      if (port) {
-        setSelectedDocuments(port.requiredDocs)
-      }
-    }
-  }, [selectedPort])
+  // Clear selected documents when vessel changes
+  useEffect(() => {
+    setSelectedDocuments([])
+  }, [selectedVessel])
 
   // Show authentication prompt if not authenticated (but allow demo mode)
   const showAuthPrompt = !isAuthenticated && activeTab === "history"
@@ -921,9 +979,44 @@ ${localStorage.getItem("userName") || "Comovis User"}`
                                   </Badge>
                                 </div>
 
+                                {/* Custom Recipients Display */}
+                                {customRecipients.length > 0 && (
+                                  <div className="mt-3 pt-3 border-t">
+                                    <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                                      Custom Recipients
+                                    </Label>
+                                    <div className="space-y-2">
+                                      {customRecipients.map((recipient) => (
+                                        <div key={recipient.id} className="flex items-center justify-between py-1">
+                                          <div className="flex items-center">
+                                            <Checkbox defaultChecked disabled />
+                                            <div className="ml-2">
+                                              <Label className="cursor-pointer">{recipient.name}</Label>
+                                              <p className="text-xs text-gray-500">{recipient.email}</p>
+                                            </div>
+                                          </div>
+                                          <div className="flex items-center">
+                                            <Badge className="mr-2" variant="outline">
+                                              {recipient.type}
+                                            </Badge>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={() => handleRemoveRecipient(recipient.id)}
+                                              className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
+                                            >
+                                              ×
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
                                 {/* Add New Recipient */}
                                 <div className="mt-3 pt-3 border-t">
-                                  <Dialog>
+                                  <Dialog open={addRecipientDialogOpen} onOpenChange={setAddRecipientDialogOpen}>
                                     <DialogTrigger asChild>
                                       <Button variant="outline" size="sm" className="w-full">
                                         <Plus className="h-4 w-4 mr-2" />
@@ -939,16 +1032,35 @@ ${localStorage.getItem("userName") || "Comovis User"}`
                                       </DialogHeader>
                                       <div className="space-y-4 py-4">
                                         <div className="space-y-2">
-                                          <Label htmlFor="recipient-email">Email</Label>
-                                          <Input id="recipient-email" placeholder="email@example.com" />
+                                          <Label htmlFor="recipient-email">Email *</Label>
+                                          <Input
+                                            id="recipient-email"
+                                            placeholder="email@example.com"
+                                            value={newRecipientForm.email}
+                                            onChange={(e) =>
+                                              setNewRecipientForm({ ...newRecipientForm, email: e.target.value })
+                                            }
+                                          />
                                         </div>
                                         <div className="space-y-2">
                                           <Label htmlFor="recipient-name">Name (Optional)</Label>
-                                          <Input id="recipient-name" placeholder="Recipient name" />
+                                          <Input
+                                            id="recipient-name"
+                                            placeholder="Recipient name"
+                                            value={newRecipientForm.name}
+                                            onChange={(e) =>
+                                              setNewRecipientForm({ ...newRecipientForm, name: e.target.value })
+                                            }
+                                          />
                                         </div>
                                         <div className="space-y-2">
                                           <Label htmlFor="recipient-type">Type</Label>
-                                          <Select defaultValue="other">
+                                          <Select
+                                            value={newRecipientForm.type}
+                                            onValueChange={(value) =>
+                                              setNewRecipientForm({ ...newRecipientForm, type: value })
+                                            }
+                                          >
                                             <SelectTrigger id="recipient-type">
                                               <SelectValue />
                                             </SelectTrigger>
@@ -961,8 +1073,11 @@ ${localStorage.getItem("userName") || "Comovis User"}`
                                           </Select>
                                         </div>
                                       </div>
-                                      <div className="flex justify-end">
-                                        <Button>Add Recipient</Button>
+                                      <div className="flex justify-end space-x-2">
+                                        <Button variant="outline" onClick={() => setAddRecipientDialogOpen(false)}>
+                                          Cancel
+                                        </Button>
+                                        <Button onClick={handleAddRecipient}>Add Recipient</Button>
                                       </div>
                                     </DialogContent>
                                   </Dialog>
@@ -1434,6 +1549,16 @@ ${localStorage.getItem("userName") || "Comovis User"}`
                             </Avatar>
                             <span className="text-sm">{getPort(selectedPort)?.agent.name}</span>
                           </div>
+                          {customRecipients.length > 0 && (
+                            <div className="flex items-center">
+                              <Avatar className="h-6 w-6 mr-2">
+                                <AvatarFallback className="bg-gray-200 text-gray-600 text-xs">
+                                  +{customRecipients.length}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="text-sm">+{customRecipients.length} custom recipients</span>
+                            </div>
+                          )}
                         </div>
                       </div>
 
