@@ -22,7 +22,6 @@ import {
   Plus,
   Ship,
   ExternalLink,
-  Bell,
   FileWarning,
   AlertTriangle,
   CheckSquare,
@@ -48,10 +47,17 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Progress } from "@/components/ui/progress"
 
-// Import the components
+
+
+
+// Import other components (keeping the same)
 import { RecipientPreview } from "./RecipientPreview"
-import { ShareHistoryTable } from "./ShareHistoryTable"
-import { ShareTemplateList } from "./ShareTemplateList"
+import { ShareHistoryTable } from "./Tabs/ShareHistoryTable"
+import { ShareTemplateList } from "./Tabs/ShareTemplateList"
+import ContactsManager from "./Tabs/ContactsTab"
+
+
+
 import { VesselSelector, type Vessel, type PortInfo } from "../../MainComponents/VesselSelector/VesselSelector"
 import { AccessLogsModal } from "../../MainComponents/AccessLogs/AccessLogs"
 import { useFetchVessels } from "../../Hooks/useFetchVessels"
@@ -71,7 +77,6 @@ export default function PortDocumentSharing() {
   const [securityOptions, setSecurityOptions] = useState({
     watermark: true,
     preventDownloads: false,
-    accessTracking: true,
     emailVerification: true,
   })
   const [accessDuration, setAccessDuration] = useState("7-days")
@@ -764,10 +769,6 @@ ${localStorage.getItem("userName") || "Comovis User"}`
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Port Document Sharing</h1>
         <div className="flex space-x-2">
-          <Button variant="outline" size="sm">
-            <Bell className="h-4 w-4 mr-2" />
-            Notifications
-          </Button>
           <Button variant="outline" size="sm" onClick={() => setAccessLogsOpen(true)}>
             <FileWarning className="h-4 w-4 mr-2" />
             Access Logs
@@ -820,6 +821,7 @@ ${localStorage.getItem("userName") || "Comovis User"}`
           <TabsTrigger value="upcoming">Upcoming Port Calls</TabsTrigger>
           <TabsTrigger value="history">Sharing History</TabsTrigger>
           <TabsTrigger value="templates">Document Templates</TabsTrigger>
+          <TabsTrigger value="contacts">Contacts</TabsTrigger>
         </TabsList>
 
         <TabsContent value="upcoming">
@@ -1211,17 +1213,6 @@ ${localStorage.getItem("userName") || "Comovis User"}`
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center">
                                     <Shield className="h-4 w-4 text-gray-500 mr-2" />
-                                    <Label className="cursor-pointer">Access Tracking</Label>
-                                  </div>
-                                  <Switch
-                                    checked={securityOptions.accessTracking}
-                                    onCheckedChange={() => toggleSecurityOption("accessTracking")}
-                                  />
-                                </div>
-
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center">
-                                    <Shield className="h-4 w-4 text-gray-500 mr-2" />
                                     <Label className="cursor-pointer">Email Verification</Label>
                                     <TooltipProvider>
                                       <Tooltip>
@@ -1583,14 +1574,6 @@ ${localStorage.getItem("userName") || "Comovis User"}`
                             <div className="flex items-center">
                               <Shield className="h-4 w-4 text-blue-500 mr-2" />
                               <span className="text-sm">Downloads prevented</span>
-
-                              <span className="text-sm">Downloads prevented</span>
-                            </div>
-                          )}
-                          {securityOptions.accessTracking && (
-                            <div className="flex items-center">
-                              <Shield className="h-4 w-4 text-blue-500 mr-2" />
-                              <span className="text-sm">Access tracking enabled</span>
                             </div>
                           )}
                           {securityOptions.emailVerification && (
@@ -1601,7 +1584,6 @@ ${localStorage.getItem("userName") || "Comovis User"}`
                           )}
                           {!securityOptions.watermark &&
                             !securityOptions.preventDownloads &&
-                            !securityOptions.accessTracking &&
                             !securityOptions.emailVerification && (
                               <div className="flex items-center">
                                 <span className="text-sm text-gray-500">No security options enabled</span>
@@ -1740,6 +1722,10 @@ ${localStorage.getItem("userName") || "Comovis User"}`
 
         <TabsContent value="templates">
           <ShareTemplateList />
+        </TabsContent>
+
+        <TabsContent value="contacts">
+          <ContactsManager selectedVessel={selectedVessel} vessels={vessels} />
         </TabsContent>
       </Tabs>
 

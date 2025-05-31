@@ -40,6 +40,15 @@ const {
   handleDocumentDownload,
   handleCleanupTempFiles,
 } = require("./AppFeatures/DocumentHub/DocumentUploadsHandler")
+
+const {
+  handleCreateContact,
+  handleGetVesselContacts,
+  handleUpdateContact,
+  handleDeleteContact,
+} = require("./AppFeatures/DocumentSharing/ContactsService")
+
+
 const { handleBookDemoRequest } = require('./Users/BookDemo');
 
 const { handleBatchDocumentDownload } = require("./AppFeatures/DocumentHub/BatchDownload")
@@ -620,6 +629,49 @@ app.post("/api/documents/batch-download", authenticateUser, async (req, res) => 
     })
   }
 })
+
+
+//Create contacts, save contacts, delete contacts
+
+
+
+// API endpoints
+app.post("/api/contacts", authenticateUser, async (req, res) => {
+  try {
+    await handleCreateContact(req, res)
+  } catch (error) {
+    console.error("Error creating contact:", error)
+    res.status(500).json({ error: "Failed to create contact" })
+  }
+})
+
+app.get("/api/vessels/:vesselId/contacts", authenticateUser, async (req, res) => {
+  try {
+    await handleGetVesselContacts(req, res)
+  } catch (error) {
+    console.error("Error fetching vessel contacts:", error)
+    res.status(500).json({ error: "Failed to fetch vessel contacts" })
+  }
+})
+
+app.put("/api/contacts/:contactId", authenticateUser, async (req, res) => {
+  try {
+    await handleUpdateContact(req, res)
+  } catch (error) {
+    console.error("Error updating contact:", error)
+    res.status(500).json({ error: "Failed to update contact" })
+  }
+})
+
+app.delete("/api/contacts/:contactId", authenticateUser, async (req, res) => {
+  try {
+    await handleDeleteContact(req, res)
+  } catch (error) {
+    console.error("Error deleting contact:", error)
+    res.status(500).json({ error: "Failed to delete contact" })
+  }
+})
+
 
 
 

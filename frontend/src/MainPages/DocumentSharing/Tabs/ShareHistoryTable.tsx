@@ -25,7 +25,7 @@ import {
 } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { revokeDocumentShare, sendShareEmail } from "../../Hooks/useDocumentShares"
+import { revokeDocumentShare, sendShareEmail } from "../../../Hooks/useDocumentShares"
 
 interface ShareHistoryTableProps {
   shares?: any[]

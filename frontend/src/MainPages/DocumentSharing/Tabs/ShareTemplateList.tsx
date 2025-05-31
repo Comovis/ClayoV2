@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { DocumentTemplates, type DocumentTemplate } from "../../MainComponents/DocumentTemplates/DocumentTemplatesModule"
+import { DocumentTemplates, type DocumentTemplate } from "../../../MainComponents/DocumentTemplates/DocumentTemplatesModule"
 
 export function ShareTemplateList() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(undefined)
