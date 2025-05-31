@@ -31,6 +31,7 @@ import {
   Calendar,
   AlertCircle,
   RefreshCw,
+  Users,
 } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Switch } from "@/components/ui/switch"
@@ -47,16 +48,11 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Progress } from "@/components/ui/progress"
 
-
-
-
 // Import other components (keeping the same)
 import { RecipientPreview } from "./RecipientPreview"
 import { ShareHistoryTable } from "./Tabs/ShareHistoryTable"
 import { ShareTemplateList } from "./Tabs/ShareTemplateList"
 import ContactsManager from "./Tabs/ContactsTab"
-
-
 
 import { VesselSelector, type Vessel, type PortInfo } from "../../MainComponents/VesselSelector/VesselSelector"
 import { AccessLogsModal } from "../../MainComponents/AccessLogs/AccessLogs"
@@ -439,22 +435,6 @@ export default function PortDocumentSharing() {
       const port = getPort(selectedPort)
       const recipients = []
 
-      if (document.getElementById("recipient-port-authority")?.checked) {
-        recipients.push({
-          email: port.authority.email,
-          name: port.authority.name,
-          type: "port-authority",
-        })
-      }
-
-      if (document.getElementById("recipient-agent")?.checked) {
-        recipients.push({
-          email: port.agent.email,
-          name: port.agent.name,
-          type: "agent",
-        })
-      }
-
       // Add custom recipients to the recipients array
       customRecipients.forEach((customRecipient) => {
         recipients.push({
@@ -464,17 +444,12 @@ export default function PortDocumentSharing() {
         })
       })
 
-      // Add a check to ensure we have at least one recipient, or add a default recipient if none selected
+      // Validation: ensure we have at least one recipient
       if (recipients.length === 0) {
-        // If no recipients are selected, add the port authority as default
-        recipients.push({
-          email: port.authority.email,
-          name: port.authority.name,
-          type: "port-authority",
-        })
-
-        // Log this for debugging
-        console.log("No recipients selected, adding default port authority recipient:", port.authority.name)
+        setError("Please add at least one recipient before sharing documents.")
+        setShareStatus(null)
+        setIsLoading(false)
+        return
       }
 
       // Prepare the share data
@@ -728,8 +703,8 @@ export default function PortDocumentSharing() {
     const port = getPort(selectedPort)
     if (!port) return
 
-    // Get recipient emails
-    const recipientEmails = [port.authority.email, port.agent.email].join(",")
+    // Get recipient emails from custom recipients
+    const recipientEmails = customRecipients.map((r) => r.email).join(",")
 
     // Create email subject
     const subject = `Port Documents for ${getVessel(selectedVessel)?.name} - ${port.name} Port Call`
@@ -764,6 +739,12 @@ ${localStorage.getItem("userName") || "Comovis User"}`
   // Show authentication prompt if not authenticated (but allow demo mode)
   const showAuthPrompt = !isAuthenticated && activeTab === "history"
 
+  // In the document-sharing.tsx file, add a console log when setting the selected vessel
+  const handleVesselChange = (vesselId: string) => {
+    console.log("Setting selected vessel to:", vesselId)
+    setSelectedVessel(vesselId)
+  }
+
   return (
     <div className="max-w-6xl mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
@@ -791,7 +772,7 @@ ${localStorage.getItem("userName") || "Comovis User"}`
       <VesselSelector
         vessels={vessels}
         selectedVessel={selectedVessel}
-        onVesselChange={setSelectedVessel}
+        onVesselChange={handleVesselChange}
         portInfo={getPortInfoForVesselSelector()}
         formatDate={formatDate}
         onToggleFavorite={handleToggleFavorite}
@@ -911,6 +892,60 @@ ${localStorage.getItem("userName") || "Comovis User"}`
                   <CardContent className="space-y-6">
                     {shareStatus === null && (
                       <>
+                        {/* Step-by-step guidance */}
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                          <div className="flex items-start">
+                            <Info className="h-5 w-5 text-blue-500 mr-2 mt-0.5 flex-shrink-0" />
+                            <div>
+                              <h4 className="text-sm font-medium text-blue-800 mb-1">Document Sharing Process</h4>
+                              <div className="text-sm text-blue-700 space-y-1">
+                                <div className="flex items-center">
+                                  <span
+                                    className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-medium mr-2 ${
+                                      customRecipients.length > 0 ? "bg-green-500 text-white" : "bg-blue-500 text-white"
+                                    }`}
+                                  >
+                                    1
+                                  </span>
+                                  <span className={customRecipients.length > 0 ? "text-green-700 font-medium" : ""}>
+                                    Add recipients who will receive the documents
+                                  </span>
+                                </div>
+                                <div className="flex items-center">
+                                  <span
+                                    className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-medium mr-2 ${
+                                      selectedDocuments.length > 0
+                                        ? "bg-green-500 text-white"
+                                        : "bg-gray-400 text-white"
+                                    }`}
+                                  >
+                                    2
+                                  </span>
+                                  <span
+                                    className={
+                                      selectedDocuments.length > 0 ? "text-green-700 font-medium" : "text-gray-600"
+                                    }
+                                  >
+                                    Select documents to share
+                                  </span>
+                                </div>
+                                <div className="flex items-center">
+                                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-medium mr-2 bg-gray-400 text-white">
+                                    3
+                                  </span>
+                                  <span className="text-gray-600">Configure security and access settings</span>
+                                </div>
+                                <div className="flex items-center">
+                                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-medium mr-2 bg-gray-400 text-white">
+                                    4
+                                  </span>
+                                  <span className="text-gray-600">Create and send secure sharing link</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
                         {/* Port Call Timeline */}
                         <div className="space-y-1.5">
                           <Label>Port Call Timeline</Label>
@@ -943,93 +978,50 @@ ${localStorage.getItem("userName") || "Comovis User"}`
                           </Card>
                         </div>
 
-                        {/* Recipients */}
+                        {/* Recipients Section with Enhanced Guidance */}
                         <div className="space-y-1.5">
-                          <Label>Recipients</Label>
-                          <Card>
+                          <div className="flex items-center justify-between">
+                            <Label className="flex items-center">
+                              Recipients
+                              {customRecipients.length === 0 && (
+                                <Badge
+                                  variant="outline"
+                                  className="ml-2 bg-yellow-50 text-yellow-700 border-yellow-300"
+                                >
+                                  Required
+                                </Badge>
+                              )}
+                            </Label>
+                            {customRecipients.length > 0 && (
+                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
+                                {customRecipients.length} recipient{customRecipients.length !== 1 ? "s" : ""} added
+                              </Badge>
+                            )}
+                          </div>
+
+                          <Card className={customRecipients.length === 0 ? "border-black-300 bg-yellow-50" : ""}>
                             <CardContent className="p-3">
-                              <div className="space-y-3">
-                                {/* Port Authority */}
-                                <div className="flex items-center justify-between py-1">
-                                  <div className="flex items-center">
-                                    <Checkbox id="recipient-port-authority" defaultChecked />
-                                    <div className="ml-2">
-                                      <Label htmlFor="recipient-port-authority" className="cursor-pointer">
-                                        {getPort(selectedPort)?.authority.name}
-                                      </Label>
-                                      <p className="text-xs text-gray-500">{getPort(selectedPort)?.authority.email}</p>
-                                    </div>
-                                  </div>
-                                  <Badge className="mr-2" variant="outline">
-                                    Port Authority
-                                  </Badge>
-                                </div>
-
-                                {/* Agent */}
-                                <div className="flex items-center justify-between py-1">
-                                  <div className="flex items-center">
-                                    <Checkbox id="recipient-agent" defaultChecked />
-                                    <div className="ml-2">
-                                      <Label htmlFor="recipient-agent" className="cursor-pointer">
-                                        {getPort(selectedPort)?.agent.name}
-                                      </Label>
-                                      <p className="text-xs text-gray-500">{getPort(selectedPort)?.agent.email}</p>
-                                    </div>
-                                  </div>
-                                  <Badge className="mr-2" variant="outline">
-                                    Agent
-                                  </Badge>
-                                </div>
-
-                                {/* Custom Recipients Display */}
-                                {customRecipients.length > 0 && (
-                                  <div className="mt-3 pt-3 border-t">
-                                    <Label className="text-sm font-medium text-gray-700 mb-2 block">
-                                      Custom Recipients
-                                    </Label>
-                                    <div className="space-y-2">
-                                      {customRecipients.map((recipient) => (
-                                        <div key={recipient.id} className="flex items-center justify-between py-1">
-                                          <div className="flex items-center">
-                                            <Checkbox defaultChecked disabled />
-                                            <div className="ml-2">
-                                              <Label className="cursor-pointer">{recipient.name}</Label>
-                                              <p className="text-xs text-gray-500">{recipient.email}</p>
-                                            </div>
-                                          </div>
-                                          <div className="flex items-center">
-                                            <Badge className="mr-2" variant="outline">
-                                              {recipient.type}
-                                            </Badge>
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={() => handleRemoveRecipient(recipient.id)}
-                                              className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
-                                            >
-                                              ×
-                                            </Button>
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Add New Recipient */}
-                                <div className="mt-3 pt-3 border-t">
+                              {customRecipients.length === 0 && (
+                                <div className="text-center py-6">
+                                  <Users className="h-12 w-12 text-black-500 mx-auto mb-3" />
+                                  <h3 className="text-lg font-medium text-black-800 mb-2">Add Recipients First</h3>
+                                  <p className="text-sm text-black-700 mb-4 max-w-md mx-auto">
+                                    Start by adding recipients who will receive the shared documents. You can add port
+                                    authorities, agents, or any custom contacts.
+                                  </p>
                                   <Dialog open={addRecipientDialogOpen} onOpenChange={setAddRecipientDialogOpen}>
                                     <DialogTrigger asChild>
-                                      <Button variant="outline" size="sm" className="w-full">
+                                      <Button className="bg-blue-600 hover:bg-yellow-700">
                                         <Plus className="h-4 w-4 mr-2" />
-                                        Add Recipient
+                                        Add Your First Recipient
                                       </Button>
                                     </DialogTrigger>
                                     <DialogContent>
                                       <DialogHeader>
                                         <DialogTitle>Add Recipient</DialogTitle>
                                         <DialogDescription>
-                                          Add a new recipient to share documents with
+                                          Add a recipient to share documents with. This could be a port authority,
+                                          agent, or any other contact.
                                         </DialogDescription>
                                       </DialogHeader>
                                       <div className="space-y-4 py-4">
@@ -1084,7 +1076,114 @@ ${localStorage.getItem("userName") || "Comovis User"}`
                                     </DialogContent>
                                   </Dialog>
                                 </div>
-                              </div>
+                              )}
+
+                              {customRecipients.length > 0 && (
+                                <div className="space-y-3">
+                                  <div className="space-y-2">
+                                    {customRecipients.map((recipient) => (
+                                      <div
+                                        key={recipient.id}
+                                        className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg"
+                                      >
+                                        <div className="flex items-center">
+                                          <Avatar className="h-8 w-8 mr-3">
+                                            <AvatarFallback className="bg-blue-100 text-blue-800 text-xs">
+                                              {recipient.name.charAt(0).toUpperCase()}
+                                            </AvatarFallback>
+                                          </Avatar>
+                                          <div>
+                                            <Label className="font-medium">{recipient.name}</Label>
+                                            <p className="text-xs text-gray-500">{recipient.email}</p>
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center">
+                                          <Badge className="mr-2" variant="outline">
+                                            {recipient.type}
+                                          </Badge>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleRemoveRecipient(recipient.id)}
+                                            className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
+                                          >
+                                            ×
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+
+                                  {/* Add More Recipients */}
+                                  <div className="pt-3 border-t">
+                                    <Dialog open={addRecipientDialogOpen} onOpenChange={setAddRecipientDialogOpen}>
+                                      <DialogTrigger asChild>
+                                        <Button variant="outline" size="sm" className="w-full">
+                                          <Plus className="h-4 w-4 mr-2" />
+                                          Add Another Recipient
+                                        </Button>
+                                      </DialogTrigger>
+                                      <DialogContent>
+                                        <DialogHeader>
+                                          <DialogTitle>Add Recipient</DialogTitle>
+                                          <DialogDescription>
+                                            Add another recipient to share documents with
+                                          </DialogDescription>
+                                        </DialogHeader>
+                                        <div className="space-y-4 py-4">
+                                          <div className="space-y-2">
+                                            <Label htmlFor="recipient-email">Email *</Label>
+                                            <Input
+                                              id="recipient-email"
+                                              placeholder="email@example.com"
+                                              value={newRecipientForm.email}
+                                              onChange={(e) =>
+                                                setNewRecipientForm({ ...newRecipientForm, email: e.target.value })
+                                              }
+                                            />
+                                          </div>
+                                          <div className="space-y-2">
+                                            <Label htmlFor="recipient-name">Name (Optional)</Label>
+                                            <Input
+                                              id="recipient-name"
+                                              placeholder="Recipient name"
+                                              value={newRecipientForm.name}
+                                              onChange={(e) =>
+                                                setNewRecipientForm({ ...newRecipientForm, name: e.target.value })
+                                              }
+                                            />
+                                          </div>
+                                          <div className="space-y-2">
+                                            <Label htmlFor="recipient-type">Type</Label>
+                                            <Select
+                                              value={newRecipientForm.type}
+                                              onValueChange={(value) =>
+                                                setNewRecipientForm({ ...newRecipientForm, type: value })
+                                              }
+                                            >
+                                              <SelectTrigger id="recipient-type">
+                                                <SelectValue />
+                                              </SelectTrigger>
+                                              <SelectContent>
+                                                <SelectItem value="port-authority">Port Authority</SelectItem>
+                                                <SelectItem value="agent">Agent</SelectItem>
+                                                <SelectItem value="charterer">Charterer</SelectItem>
+                                                <SelectItem value="other">Other</SelectItem>
+                                              </SelectContent>
+                                            </Select>
+                                          </div>
+                                        </div>
+                                        <div className="flex justify-end space-x-2">
+                                          <Button variant="outline" onClick={() => setAddRecipientDialogOpen(false)}>
+                                            Cancel
+                                          </Button>
+                                          <Button onClick={handleAddRecipient}>Add Recipient</Button>
+                                        </div>
+                                      </DialogContent>
+                                    </Dialog>
+                                  </div>
+                                </div>
+                              )}
                             </CardContent>
                           </Card>
                         </div>
@@ -1464,7 +1563,11 @@ ${localStorage.getItem("userName") || "Comovis User"}`
                           <Eye className="mr-2 h-4 w-4" />
                           Preview
                         </Button>
-                        <Button onClick={handleShare} disabled={selectedDocuments.length === 0 || isLoading}>
+                        <Button
+                          onClick={handleShare}
+                          disabled={selectedDocuments.length === 0 || customRecipients.length === 0 || isLoading}
+                          className={customRecipients.length === 0 ? "opacity-50 cursor-not-allowed" : ""}
+                        >
                           {isLoading ? (
                             <>
                               <div className="animate-spin mr-2 h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
@@ -1524,31 +1627,19 @@ ${localStorage.getItem("userName") || "Comovis User"}`
                       <div>
                         <h3 className="text-sm font-medium text-gray-500 mb-1">Recipients</h3>
                         <div className="space-y-2">
-                          <div className="flex items-center">
-                            <Avatar className="h-6 w-6 mr-2">
-                              <AvatarFallback className="bg-gray-200 text-gray-600 text-xs">
-                                {getPort(selectedPort)?.authority.name.charAt(0)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className="text-sm">{getPort(selectedPort)?.authority.name}</span>
-                          </div>
-                          <div className="flex items-center">
-                            <Avatar className="h-6 w-6 mr-2">
-                              <AvatarFallback className="bg-gray-200 text-gray-600 text-xs">
-                                {getPort(selectedPort)?.agent.name.charAt(0)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className="text-sm">{getPort(selectedPort)?.agent.name}</span>
-                          </div>
-                          {customRecipients.length > 0 && (
-                            <div className="flex items-center">
-                              <Avatar className="h-6 w-6 mr-2">
-                                <AvatarFallback className="bg-gray-200 text-gray-600 text-xs">
-                                  +{customRecipients.length}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span className="text-sm">+{customRecipients.length} custom recipients</span>
-                            </div>
+                          {customRecipients.length > 0 ? (
+                            customRecipients.map((recipient) => (
+                              <div key={recipient.id} className="flex items-center">
+                                <Avatar className="h-6 w-6 mr-2">
+                                  <AvatarFallback className="bg-gray-200 text-gray-600 text-xs">
+                                    {recipient.name.charAt(0).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span className="text-sm">{recipient.name}</span>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-sm text-gray-500 italic">No recipients added yet</div>
                           )}
                         </div>
                       </div>
