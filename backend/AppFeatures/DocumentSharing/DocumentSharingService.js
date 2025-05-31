@@ -224,18 +224,29 @@ async function getShareByToken(token, ip, userAgent) {
       throw error
     }
 
-    // Log access
+    // Log share access with NULL document_id (share-level action)
     try {
-      await supabaseAdmin.from("document_access_logs").insert({
+      console.log("Logging share access with NULL document_id...")
+
+      const logResult = await supabaseAdmin.from("document_access_logs").insert({
         share_id: share.id,
-        document_id: null,
+        document_id: null, // NULL for share-level actions
         user_id: null,
         action: "view_share",
-        ip_address: ip,
-        user_agent: userAgent,
+        timestamp: new Date().toISOString(), // Use 'timestamp' column
+        ip_address: ip || "unknown",
+        user_agent: userAgent || "unknown",
+        user_email: null,
       })
+
+      if (logResult.error) {
+        console.error("Access logging failed:", logResult.error)
+      } else {
+        console.log("Share access logged successfully")
+      }
     } catch (logError) {
-      console.log("Failed to log access:", logError)
+      console.error("Access logging exception:", logError)
+      // Don't throw - continue with the response
     }
 
     // Format response
@@ -389,10 +400,10 @@ async function revokeDocumentShare(shareId, userId) {
 }
 
 /**
- * Logs document access
+ * Logs document access with proper NULL handling for document_id
  * @param {Object} logData - Access log data
  * @param {string} logData.shareId - ID of the share
- * @param {string} logData.documentId - ID of the document (optional)
+ * @param {string} logData.documentId - ID of the document (can be null for share-level actions)
  * @param {string} logData.action - Action performed (view_share, view_document, download)
  * @param {string} logData.email - Email of the user (optional)
  * @param {string} ip - IP address of the requester
@@ -403,35 +414,62 @@ async function logDocumentAccess(logData, ip, userAgent) {
   try {
     console.log("=== LOG DOCUMENT ACCESS ===")
     console.log("logData:", logData)
+    console.log("ip:", ip)
+    console.log("userAgent:", userAgent)
 
     const { shareId, documentId, action, email } = logData
 
     if (!shareId || !action) {
-      throw new Error("Missing required fields")
+      console.log("Missing required fields - shareId:", shareId, "action:", action)
+      return { success: false, error: "Missing required fields: shareId and action are required" }
     }
 
-    const { data, error } = await supabaseAdmin
-      .from("document_access_logs")
-      .insert({
-        share_id: shareId,
-        document_id: documentId || null,
-        user_id: null,
-        user_email: email || null,
-        action,
-        ip_address: ip,
-        user_agent: userAgent,
-      })
-      .select("id")
-      .single()
+    // Prepare the log entry with correct column names
+    // documentId can be null for share-level actions like "view_share"
+    const logEntry = {
+      share_id: shareId,
+      document_id: documentId || null, // Allow NULL for share-level actions
+      user_id: null,
+      user_email: email || null,
+      action,
+      timestamp: new Date().toISOString(), // Use 'timestamp' column
+      ip_address: ip || "unknown",
+      user_agent: userAgent || "unknown",
+    }
+
+    console.log("Attempting to insert log entry:", JSON.stringify(logEntry, null, 2))
+
+    // Insert the log entry
+    const { data, error } = await supabaseAdmin.from("document_access_logs").insert(logEntry).select("id").single()
 
     if (error) {
-      throw new Error("Failed to log document access")
+      console.error("Database insertion error:", error)
+      console.error("Error details:", {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      })
+
+      return {
+        success: false,
+        error: `Database error: ${error.message} (Code: ${error.code})`,
+        message: "Access logging failed but operation continued",
+      }
     }
 
-    return { id: data.id }
+    console.log("Access logged successfully with ID:", data?.id)
+    return { success: true, id: data?.id || "success" }
   } catch (error) {
     console.error("Error in logDocumentAccess:", error)
-    throw error
+    console.error("Error stack:", error.stack)
+
+    // Don't throw the error - return a failure response instead
+    return {
+      success: false,
+      error: error.message,
+      message: "Access logging failed but operation continued",
+    }
   }
 }
 
@@ -514,15 +552,29 @@ async function handleRevokeDocumentShare(req, res) {
 
 async function handleLogDocumentAccess(req, res) {
   try {
+    console.log("=== API HANDLER: LOG DOCUMENT ACCESS ===")
+    console.log("Request body:", JSON.stringify(req.body, null, 2))
+    console.log("Request IP:", req.ip)
+    console.log("Request User-Agent:", req.headers["user-agent"])
+
     const logData = req.body
     const ip = req.ip
     const userAgent = req.headers["user-agent"]
 
     const result = await logDocumentAccess(logData, ip, userAgent)
+
+    console.log("Log access result:", result)
+
+    // Always return success status, even if logging failed
     return res.status(201).json(result)
   } catch (error) {
     console.error("Error in handleLogDocumentAccess:", error)
-    return res.status(400).json({ error: error.message })
+    // Return success even on error to not break the frontend
+    return res.status(201).json({
+      success: false,
+      error: error.message,
+      message: "Logging failed but request processed",
+    })
   }
 }
 
