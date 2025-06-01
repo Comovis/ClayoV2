@@ -166,10 +166,11 @@ interface DocumentPreviewProps {
   file?: File
   previewUrl?: string
   className?: string
+  fileName?: string
 }
 
 // Memoized Document Preview Component to prevent unnecessary re-renders and PDF flashing
-const DocumentPreview = memo<DocumentPreviewProps>(({ file, previewUrl, className = "" }) => {
+const DocumentPreview = memo<DocumentPreviewProps>(({ file, previewUrl, className = "", fileName }) => {
   const isPDF = file?.type === "application/pdf"
   const isImage = file?.type.startsWith("image/")
 
@@ -199,6 +200,21 @@ const DocumentPreview = memo<DocumentPreviewProps>(({ file, previewUrl, classNam
   }
 
   if (previewUrl) {
+    // Check if previewUrl is a PDF by URL extension or content type
+    const isPDFUrl =
+      previewUrl.toLowerCase().includes(".pdf") ||
+      previewUrl.toLowerCase().includes("pdf") ||
+      previewUrl.includes("application/pdf")
+
+    if (isPDFUrl) {
+      return (
+        <div className={className}>
+          <PDFViewer fileUrl={previewUrl} fileName={fileName || "document.pdf"} className="w-full" />
+        </div>
+      )
+    }
+
+    // For non-PDF URLs (images, etc.)
     return (
       <div
         className={`flex justify-center items-center bg-gray-50 rounded-lg border-2 border-gray-200 p-6 ${className}`}
@@ -227,3 +243,4 @@ const DocumentPreview = memo<DocumentPreviewProps>(({ file, previewUrl, classNam
 DocumentPreview.displayName = "DocumentPreview"
 
 export default DocumentPreview
+export { PDFViewer }

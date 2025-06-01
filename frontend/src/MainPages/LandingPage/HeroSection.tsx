@@ -36,13 +36,13 @@ export default function RefinedHero() {
             </div>
 
             {/* Problem-focused headline */}
-            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold tracking-tight text-slate-900 mb-4 sm:mb-6 leading-tight break-words">
-              Prevent Vessel Detentions with AI-Powered Compliance
+            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-4xl xl:text-5xl font-bold tracking-tight text-slate-900 mb-4 sm:mb-6 leading-tight break-words">
+              Prevent Vessel Detentions and Delays
             </h1>
 
             {/* Clear value proposition */}
             <p className="text-base sm:text-lg lg:text-xl text-slate-600 mb-6 sm:mb-8 leading-relaxed break-words">
-              We use AI technology to help maritime operators avoid costly detentions and delays. Comovis securely
+              We use AI technology to help maritime operators avoid costly detentions and delays at port calls. Comovis securely
               organises all your maritime documents, tracks expiry dates, and provides real-time port
               intelligence—accessible to your entire team, onshore and offshore.
             </p>
@@ -316,15 +316,7 @@ function LiveDetentionPreventionDemo() {
         </div>
 
         {/* Floating Success Indicator */}
-        {timelineStep === scenario.timeline.length - 1 && (
-          <motion.div
-            initial={{ scale: 0, rotate: -180 }}
-            animate={{ scale: 1, rotate: 0 }}
-            className="absolute -top-2 -right-2 sm:-top-4 sm:-right-4 bg-green-500 rounded-full p-2 sm:p-3 shadow-xl"
-          >
-            <CheckCircle className="h-4 w-4 sm:h-6 sm:w-6 text-white" />
-          </motion.div>
-        )}
+     
       </div>
 
       <motion.div
@@ -334,7 +326,7 @@ function LiveDetentionPreventionDemo() {
         className="absolute -top-2 sm:-top-4 lg:-top-8 right-2 sm:right-4 lg:right-8 bg-white rounded-lg shadow-xl p-2 sm:p-3 lg:p-4 border border-slate-200 z-20"
       >
         <div className="text-center">
-          <div className="text-lg sm:text-xl lg:text-2xl font-bold text-green-600">$760K</div>
+          <div className="text-lg sm:text-xl lg:text-2xl font-bold text-green-600">$560K</div>
           <p className="text-slate-600 text-xs sm:text-sm">Saved This Month</p>
         </div>
       </motion.div>

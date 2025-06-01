@@ -32,6 +32,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { fetchShareByToken, logDocumentAccess } from "../../../Hooks/useDocumentShares"
 import ExpiredShareView from "./ExpiredShareView"
+import DocumentPreview from "../../../MainComponents/UploadModal/PDFViewer"
 
 export default function DocumentSharingRecipientView() {
   const { token } = useParams<{ token: string }>()
@@ -157,6 +158,37 @@ export default function DocumentSharingRecipientView() {
   const trackDocumentDownload = (documentId: string) => {
     if (!shareInfo?.id || !documentId) return
     logDocumentAccess(shareInfo.id, documentId, "download", emailInput)
+  }
+
+  // Get document URL for preview
+  const getDocumentPreviewUrl = (document: any) => {
+    if (!document) return null
+
+    console.log("Document object:", document) // Debug log
+
+    // If document has a direct file URL or path
+    if (document.file_url) {
+      console.log("Using file_url:", document.file_url)
+      return document.file_url
+    }
+    if (document.file_path) {
+      console.log("Using file_path:", document.file_path)
+      return document.file_path
+    }
+    if (document.url) {
+      console.log("Using url:", document.url)
+      return document.url
+    }
+
+    // Construct URL from document ID or other properties
+    if (document.id) {
+      const constructedUrl = `/api/documents/${document.id}/preview`
+      console.log("Using constructed URL:", constructedUrl)
+      return constructedUrl
+    }
+
+    console.log("No valid URL found for document")
+    return null
   }
 
   // Loading state
@@ -514,31 +546,47 @@ export default function DocumentSharingRecipientView() {
                       <div className="bg-gray-100 rounded-md h-full flex flex-col items-center justify-center relative">
                         {/* Document Watermark */}
                         {shareInfo?.security?.watermarked && (
-                          <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none rotate-[-30deg] text-gray-500 text-2xl font-bold">
+                          <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none rotate-[-30deg] text-gray-500 text-2xl font-bold z-10">
                             CONFIDENTIAL - {shareInfo?.vessel?.name} - {new Date().toLocaleDateString()}
                           </div>
                         )}
 
-                        {/* Document Preview Placeholder */}
-                        <div className="w-full max-w-md aspect-[3/4] bg-white shadow-md rounded-md border flex flex-col">
-                          <div className="bg-gray-50 p-4 border-b">
-                            <h3 className="font-bold text-center">{currentDocument?.name}</h3>
+                        {/* Enhanced Document Preview with PDF Support */}
+                        {currentDocument ? (
+                          <div className="w-full h-full relative">
+                            {(() => {
+                              const previewUrl = getDocumentPreviewUrl(currentDocument)
+                              console.log("Preview URL being passed to DocumentPreview:", previewUrl)
+                              return (
+                                <DocumentPreview
+                                  previewUrl={previewUrl}
+                                  fileName={currentDocument.name}
+                                  className="w-full h-full"
+                                />
+                              )
+                            })()}
                           </div>
-                          <div className="flex-grow p-6 flex flex-col items-center justify-center">
-                            <img
-                              src="/placeholder.svg?height=400&width=300&text=Document+Preview"
-                              alt="Document preview"
-                              className="max-h-full object-contain"
-                            />
+                        ) : (
+                          <div className="w-full max-w-md aspect-[3/4] bg-white shadow-md rounded-md border flex flex-col">
+                            <div className="bg-gray-50 p-4 border-b">
+                              <h3 className="font-bold text-center">Select a document to preview</h3>
+                            </div>
+                            <div className="flex-grow p-6 flex flex-col items-center justify-center">
+                              <FileText className="h-16 w-16 text-gray-400 mb-4" />
+                              <p className="text-gray-500 text-center">
+                                Choose a document from the list to view its contents
+                              </p>
+                            </div>
                           </div>
-                          <div className="bg-gray-50 p-2 border-t flex justify-between items-center text-xs text-gray-500">
-                            <span>Page 1 of {currentDocument?.pages || 1}</span>
-                            <span>Valid until: {currentDocument?.expiryDate || "N/A"}</span>
-                          </div>
-                        </div>
+                        )}
 
                         <div className="absolute bottom-4 right-4 flex space-x-2">
-                          <Button size="sm" variant="outline" onClick={() => setFullScreenPreview(true)}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setFullScreenPreview(true)}
+                            disabled={!currentDocument}
+                          >
                             <Eye className="mr-2 h-4 w-4" />
                             Full Screen
                           </Button>
@@ -550,6 +598,7 @@ export default function DocumentSharingRecipientView() {
                                   trackDocumentDownload(currentDocument.id)
                                 }
                               }}
+                              disabled={!currentDocument}
                             >
                               <Download className="mr-2 h-4 w-4" />
                               Download
@@ -662,6 +711,7 @@ export default function DocumentSharingRecipientView() {
                           trackDocumentDownload(currentDocument.id)
                         }
                       }}
+                      disabled={!currentDocument}
                     >
                       <Download className="mr-2 h-4 w-4" />
                       Download
@@ -674,6 +724,7 @@ export default function DocumentSharingRecipientView() {
                         trackDocumentView(currentDocument.id)
                       }
                     }}
+                    disabled={!currentDocument}
                   >
                     <Eye className="mr-2 h-4 w-4" />
                     View
@@ -710,7 +761,7 @@ export default function DocumentSharingRecipientView() {
                 Security Information
               </Button>
               <Button variant="link" size="sm" className="text-gray-500">
-                About Comovis
+                Comovis
               </Button>
             </div>
           </div>
@@ -751,46 +802,65 @@ export default function DocumentSharingRecipientView() {
               </div>
             </div>
             <div className="flex-grow overflow-auto p-4 bg-gray-100">
-              <div className="bg-white shadow-md rounded-md max-w-4xl mx-auto p-8 min-h-[800px] relative">
+              <div className="bg-white shadow-md rounded-md max-w-4xl mx-auto min-h-[800px] relative">
                 {/* Document Watermark */}
                 {shareInfo?.security?.watermarked && (
-                  <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none rotate-[-30deg] text-gray-500 text-4xl font-bold">
+                  <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none rotate-[-30deg] text-gray-500 text-4xl font-bold z-10">
                     CONFIDENTIAL - {shareInfo?.vessel?.name} - {new Date().toLocaleDateString()}
                   </div>
                 )}
 
-                {/* Document Content Placeholder */}
-                <div className="flex flex-col items-center">
-                  <div className="text-center mb-8">
-                    <h1 className="text-2xl font-bold mb-2">{currentDocument?.name}</h1>
-                    <p className="text-gray-500">Issued by: {currentDocument?.issuer}</p>
-                    <div className="mt-2 flex justify-center space-x-4 text-sm">
-                      <span>Issue Date: {currentDocument?.issueDate}</span>
-                      <span>Expiry Date: {currentDocument?.expiryDate}</span>
-                    </div>
-                  </div>
-
-                  <img
-                    src="/placeholder.svg?height=600&width=800&text=Full+Document+Preview"
-                    alt="Document preview"
-                    className="max-h-full object-contain mb-8"
-                  />
-
-                  <div className="w-full max-w-md">
-                    <div className="border-t pt-4 mt-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm text-gray-500">Certificate Number:</p>
-                          <p className="font-medium">SMC-2023-12345</p>
+                {/* Full Screen Document Preview */}
+                {currentDocument ? (
+                  <div className="w-full h-full">
+                    {getDocumentPreviewUrl(currentDocument) ? (
+                      <DocumentPreview
+                        previewUrl={getDocumentPreviewUrl(currentDocument)}
+                        fileName={currentDocument.name}
+                        className="w-full h-full"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center p-8">
+                        <div className="text-center mb-8">
+                          <h1 className="text-2xl font-bold mb-2">{currentDocument?.name}</h1>
+                          <p className="text-gray-500">Issued by: {currentDocument?.issuer}</p>
+                          <div className="mt-2 flex justify-center space-x-4 text-sm">
+                            <span>Issue Date: {currentDocument?.issueDate}</span>
+                            <span>Expiry Date: {currentDocument?.expiryDate}</span>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm text-gray-500">Vessel IMO:</p>
-                          <p className="font-medium">{shareInfo?.vessel?.imo}</p>
+
+                        <img
+                          src="/placeholder.svg?height=600&width=800&text=Full+Document+Preview"
+                          alt="Document preview"
+                          className="max-h-full object-contain mb-8"
+                        />
+
+                        <div className="w-full max-w-md">
+                          <div className="border-t pt-4 mt-4">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <p className="text-sm text-gray-500">Certificate Number:</p>
+                                <p className="font-medium">SMC-2023-12345</p>
+                              </div>
+                              <div>
+                                <p className="text-sm text-gray-500">Vessel IMO:</p>
+                                <p className="font-medium">{shareInfo?.vessel?.imo}</p>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center text-gray-400">
+                      <FileText className="h-16 w-16 mx-auto mb-4" />
+                      <p className="text-lg">No document selected</p>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
             <div className="p-2 border-t bg-gray-50 flex justify-between items-center">
