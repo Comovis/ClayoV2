@@ -87,8 +87,8 @@ export default function EmailVerificationPage() {
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <img src={LogoBlack || "/placeholder.svg"} alt="Comovis Logo" className="h-8 mx-auto mb-4" />
-          <p className="text-gray-600">Streamline your maritime compliance and prevent vessel detentions</p>
+          <img src={LogoBlack || "/placeholder.svg"} alt="Comovis Logo" className="h-12 mx-auto mb-4" />
+       
         </div>
 
         <div className="bg-white p-8 rounded-lg shadow-md border border-gray-100">

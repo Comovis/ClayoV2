@@ -15,7 +15,7 @@ const {
   Button,
 } = require("@react-email/components")
 
-const resend = new Resend("re_fZygLEii_AHipNeWqXfWbtejMrVFLW7yG")
+const resend = new Resend("re_YkuriJ9C_HLQhKi8Bq1dtvtatwLhLKP4v")
 
 // Your Confirmation Email component
 function ConfirmationEmail(props) {
@@ -29,7 +29,7 @@ function ConfirmationEmail(props) {
       null,
       React.createElement("style", null, "@import url('https://fonts.googleapis.com/css2?family=Inter&display=swap');"),
     ),
-    React.createElement(Preview, null, "Confirm your Comovis account"),
+    React.createElement(Preview, null, "Confirm your Clayo account"),
     React.createElement(
       Body,
       { style: { backgroundColor: "white", fontFamily: "'Inter', sans-serif" } },
@@ -48,10 +48,10 @@ function ConfirmationEmail(props) {
           Section,
           { style: { textAlign: "center", marginTop: "32px" } },
           React.createElement("img", {
-            src: "https://vvtzvlzhldqsvezfdfyd.supabase.co/storage/v1/object/public/media//COmvoisPNGLogoBlack.png",
+            src: "https://clayo.co/logo-black.png", // Updated to Clayo logo
             width: "140",
-            height: "130",
-            alt: "Comovis",
+            height: "40",
+            alt: "Clayo",
             style: { margin: "auto" },
           }),
         ),
@@ -59,8 +59,9 @@ function ConfirmationEmail(props) {
           Heading,
           {
             style: {
-              color: "#333",
+              color: "#000000",
               fontSize: "24px",
+              fontWeight: "bold",
               textAlign: "center",
               margin: "30px auto 0 auto",
             },
@@ -71,14 +72,14 @@ function ConfirmationEmail(props) {
           Text,
           {
             style: {
-              color: "#333",
+              color: "#333333",
               fontSize: "16px",
               lineHeight: "24px",
               textAlign: "center",
               margin: "20px 0",
             },
           },
-          "Thank you for registering with Comovis. To complete your registration and access your maritime compliance dashboard, please confirm your email address by clicking the button below.",
+          "Thank you for registering with Clayo. To complete your registration and access your AI-powered customer service platform, please confirm your email address by clicking the button below.",
         ),
         React.createElement(
           Section,
@@ -89,14 +90,15 @@ function ConfirmationEmail(props) {
               href: confirmationLink,
               style: {
                 backgroundColor: "#000000",
-                borderRadius: "4px",
+                borderRadius: "6px",
                 color: "white",
                 fontSize: "14px",
+                fontWeight: "600",
                 textDecoration: "none",
                 textAlign: "center",
                 display: "inline-block",
-                padding: "10px 22px",
-                fontWeight: "bold",
+                padding: "12px 24px",
+                transition: "background-color 0.2s ease",
               },
             },
             "Confirm Email Address",
@@ -106,22 +108,49 @@ function ConfirmationEmail(props) {
           Text,
           {
             style: {
-              color: "#333",
-              fontSize: "16px",
-              lineHeight: "24px",
+              color: "#666666",
+              fontSize: "14px",
+              lineHeight: "20px",
               textAlign: "center",
               margin: "20px 0",
             },
           },
-          "If you did not create an account with Comovis, please disregard this email.",
+          "Once confirmed, you'll be able to:",
         ),
         React.createElement(
           Text,
           {
             style: {
-              color: "#333",
+              color: "#333333",
               fontSize: "14px",
-              lineHeight: "24px",
+              lineHeight: "20px",
+              textAlign: "left",
+              margin: "10px 0",
+              paddingLeft: "20px",
+            },
+          },
+          "• Set up your AI customer service agent\n• Configure multiple communication channels\n• Train your AI with your business knowledge\n• Start automating customer interactions 24/7",
+        ),
+        React.createElement(
+          Text,
+          {
+            style: {
+              color: "#666666",
+              fontSize: "14px",
+              lineHeight: "20px",
+              textAlign: "center",
+              margin: "20px 0",
+            },
+          },
+          "If you did not create an account with Clayo, please disregard this email.",
+        ),
+        React.createElement(
+          Text,
+          {
+            style: {
+              color: "#666666",
+              fontSize: "12px",
+              lineHeight: "18px",
               textAlign: "center",
               margin: "20px 0",
             },
@@ -133,11 +162,14 @@ function ConfirmationEmail(props) {
           {
             style: {
               color: "#0070f3",
-              fontSize: "14px",
-              lineHeight: "24px",
+              fontSize: "12px",
+              lineHeight: "18px",
               textAlign: "center",
               margin: "10px 0",
               wordBreak: "break-all",
+              padding: "8px",
+              backgroundColor: "#f8f9fa",
+              borderRadius: "4px",
             },
           },
           confirmationLink,
@@ -149,22 +181,24 @@ function ConfirmationEmail(props) {
             style: {
               color: "#666666",
               fontSize: "14px",
-              lineHeight: "24px",
+              lineHeight: "20px",
               textAlign: "center",
               fontStyle: "italic",
+              margin: "16px 0",
             },
           },
-          '"The pessimist complains about the wind; the optimist expects it to change; the realist adjusts the sails." – William Arthur Ward',
+          "\"The best customer service is if the customer doesn't need to call you, doesn't need to talk to you. It just works.\" – Jeff Bezos",
         ),
         React.createElement(Hr, { style: { border: "1px solid #eaeaea", margin: "26px 0", width: "100%" } }),
         React.createElement(
           Text,
           {
             style: {
-              color: "#666666",
+              color: "#999999",
               fontSize: "12px",
-              lineHeight: "24px",
+              lineHeight: "16px",
               textAlign: "center",
+              margin: "8px 0",
             },
           },
           "Please do not reply to this email as it is not monitored.",
@@ -173,13 +207,27 @@ function ConfirmationEmail(props) {
           Text,
           {
             style: {
-              color: "#666666",
+              color: "#999999",
               fontSize: "12px",
-              lineHeight: "24px",
+              lineHeight: "16px",
               textAlign: "center",
+              margin: "8px 0",
             },
           },
-          "Comovis, London, United Kingdom",
+          "Need help? Visit clayo.co/support or contact us at support@clayo.co",
+        ),
+        React.createElement(
+          Text,
+          {
+            style: {
+              color: "#999999",
+              fontSize: "12px",
+              lineHeight: "16px",
+              textAlign: "center",
+              margin: "8px 0",
+            },
+          },
+          "Clayo, London, United Kingdom",
         ),
       ),
     ),

@@ -44,7 +44,7 @@ const LandingHeader = ({ user, logout }: LandingHeaderProps) => {
         <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center gap-2">
             <Link to="/">
-              <img src={LogoBlack || "/placeholder.svg"} alt="Comovis Logo" className="h-6" />
+              <img src={LogoBlack || "/placeholder.svg"} alt="Comovis Logo" className="h-10" />
             </Link>
           </div>
 

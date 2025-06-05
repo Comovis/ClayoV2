@@ -9,25 +9,22 @@ import AppHeader from "./MainComponents/NavBar/Navbar"
 import LandingHeader from "./MainComponents/NavBar/LandingNavbar"
 import Sidebar from "./MainComponents/Sidebar/Sidebar"
 import "./App.css"
-import VesselsPage from "./MainPages/Vessels/VesselsPage"
-import DocumentHub from "./MainPages/DocumentHub/DocumentHub"
+import Analytics from "./MainPages/Analytics/Analytics"
 import ProtectedRoute from "./Auth/ProtectedRoute"
-import PortPreparation from "./MainPages/PortPrep/PortPrep"
-import DocumentSharing from "./MainPages/DocumentSharing/DocumentSharing"
-import PricingPage from "./MainPages/Pricing/PricingPage"
-import NotificationsPage from "./MainPages/Notifications/Notifications"
-import TeamPage from "./MainPages/TeamManagement/TeamManagement"
-import OnboardingPage from "./Auth/Onboarding/OnboardingPage"
-import LandingPage from "./MainPages/LandingPage/LandingPage"
-import DocumentSharingRecipientView from "./MainPages/DocumentSharing/RecipientSharePage/DocumentSharingRecipientView"
-import ExpiredShareView from "./MainPages/DocumentSharing/RecipientSharePage/ExpiredShareView"
 import SignupPage from "./Auth/Signup/SignupPage"
 import LoginPage from "./Auth/Login/LoginPage"
 import EmailVerificationPage from "./Auth/Signup/ConfirmEmail"
 import InvitationAccept from "./Auth/Signup/InvitationAccept"
 import UnauthorizedMessage from "./Auth/UnauthorisedMsg"
 import { UserProvider } from "./Auth/Contexts/UserContext"
-import PitchDeckAuth from "./MainPages/PitchDeck/PitchDeckAuth"
+import Conversations from "./MainPages/CustomerConversations/ConversationsPortal"
+import PricingPage from "./MainPages/Pricing/PricingPage"
+import TeamPage from "./MainPages/TeamManagement/TeamManagement"
+import OnboardingPage from "./Auth/Onboarding/OnboardingPage"
+import LandingPage from "./MainPages/LandingPage/LandingPage"
+import ChatWidgetConfig from "./MainPages/ConfigureChatWidget/SetupChatWidget"
+import AIAgentsPage from "./MainPages/AgentConfigTraining/AgentConfig" 
+
 
 // Google Analytics Configuration
 const GA_TRACKING_ID = "G-16JECJB6TS"
@@ -109,106 +106,78 @@ const getPageMetadata = (pathname: string) => {
   const pageMetadata: Record<string, { title: string; description: string }> = {
     // Landing and main pages
     "/": {
-      title: "Comovis - Prevent Vessel Detentions",
+      title: "Clayo - AI-Powered Customer Service Platform",
       description:
-        "AI-powered maritime compliance platform helping shipping companies prevent vessel detentions through intelligent document management and port preparation.",
+        "Transform your customer service with AI-powered conversations, automated responses, and intelligent customer support solutions.",
     },
 
     // Main application pages
     "/dashboard": {
-      title: "Fleet Compliance Dashboard | Comovis",
+      title: "Customer Service Dashboard | Clayo",
       description:
-        "Monitor your fleet compliance status, track vessel readiness, and get AI-powered insights to prevent detentions.",
+        "Monitor your customer conversations, AI performance, and support metrics with real-time analytics and insights.",
     },
-    "/fleet": {
-      title: "Vessel Fleet Management | Comovis",
+    "/conversations": {
+      title: "Customer Conversations | Clayo",
       description:
-        "Manage your vessel fleet, track compliance status, certificates, and ensure all ships meet port requirements.",
+        "Manage customer conversations across all channels with AI-powered assistance and automated responses.",
     },
-    "/document-hub": {
-      title: "Maritime Document Hub | Comovis",
+    "/agent-config": {
+      // Add this metadata
+      title: "AI Agent Training | Clayo",
+      description: "Train your AI customer service agent with custom knowledge, responses, and conversation flows.",
+    },
+    "/widget-config": {
+      title: "Chat Widget Setup | Clayo",
+      description: "Configure and customize your website chat widget for seamless customer interactions.",
+    },
+    "/analytics": {
+      title: "Customer Service Analytics | Clayo",
       description:
-        "Centralized document management for vessel certificates, crew documents, and maritime compliance paperwork.",
-    },
-    "/port-preparation": {
-      title: "Port Arrival Preparation | Comovis",
-      description:
-        "AI-powered port preparation tools to ensure your vessels meet all port state control requirements before arrival.",
-    },
-    "/document-sharing": {
-      title: "Secure Document Sharing | Comovis",
-      description:
-        "Securely share vessel documents with port authorities, agents, surveyors, and maritime stakeholders.",
-    },
-    "/notifications": {
-      title: "Maritime Compliance Alerts | Comovis",
-      description: "Stay updated with certificate expiry alerts, compliance notifications, and vessel status updates.",
+        "Analyze customer service performance, AI effectiveness, and conversation insights with detailed analytics.",
     },
     "/team": {
-      title: "Maritime Team Management | Comovis",
-      description:
-        "Manage your maritime operations team, assign vessel responsibilities, and control access permissions.",
+      title: "Team Management | Clayo",
+      description: "Manage your customer service team, assign roles, and collaborate on customer support operations.",
     },
     "/pricing": {
-      title: "Maritime Compliance Pricing | Comovis",
-      description: "Transparent pricing for maritime compliance management. Plans for single vessels to large fleets.",
+      title: "AI Customer Service Pricing | Clayo",
+      description: "Transparent pricing for AI-powered customer service. Plans for businesses of all sizes.",
     },
 
     // Authentication pages
     "/login": {
-      title: "Login to Maritime Platform | Comovis",
-      description: "Access your maritime compliance dashboard and manage your vessel fleet operations.",
+      title: "Login to AI Customer Service | Clayo",
+      description: "Access your AI-powered customer service dashboard and manage your support operations.",
     },
     "/signup": {
-      title: "Join Maritime Compliance Platform | Comovis",
-      description: "Start preventing vessel detentions with AI-powered maritime compliance management.",
+      title: "Join AI Customer Service Platform | Clayo",
+      description: "Start transforming your customer service with AI-powered conversations and automated support.",
     },
     "/onboarding": {
-      title: "Setup Your Maritime Operations | Comovis",
-      description: "Get started with Comovis - configure your fleet and begin maritime compliance management.",
+      title: "Setup Your AI Customer Service | Clayo",
+      description: "Get started with Clayo - configure your AI agent and begin automated customer support.",
     },
     "/confirm-email": {
-      title: "Verify Your Maritime Account | Comovis",
-      description: "Confirm your email address to access your maritime compliance platform.",
+      title: "Verify Your Customer Service Account | Clayo",
+      description: "Confirm your email address to access your AI-powered customer service platform.",
     },
     "/email-confirmed": {
-      title: "Account Verified | Comovis",
-      description: "Your maritime account has been verified. Access your compliance dashboard now.",
+      title: "Account Verified | Clayo",
+      description: "Your customer service account has been verified. Access your AI dashboard now.",
     },
     "/accept-invite": {
-      title: "Join Maritime Team | Comovis",
-      description: "Accept your team invitation and start collaborating on maritime compliance operations.",
+      title: "Join Customer Service Team | Clayo",
+      description: "Accept your team invitation and start collaborating on AI-powered customer support.",
     },
-
-    // Special pages
-    "/pitch-deck": {
-      title: "Investor Information | Comovis",
-      description: "Learn about Comovis' mission to revolutionize maritime compliance and prevent vessel detentions.",
-    },
-
-    // Document sharing pages (dynamic)
-    "/share": {
-      title: "Shared Maritime Document | Comovis",
-      description: "View shared vessel documents and maritime compliance information.",
-    },
-  }
-
-  // Handle dynamic share routes
-  if (pathname.startsWith("/share/")) {
-    if (pathname.includes("/expired/")) {
-      return {
-        title: "Document Link Expired | Comovis",
-        description: "This document sharing link has expired. Contact the sender for a new link.",
-      }
-    }
-    return pageMetadata["/share"]
   }
 
   // Return specific page metadata or default
   return (
     pageMetadata[pathname] || {
-      title: "Maritime Compliance Platform | Comovis",
-      description: "AI-powered maritime compliance platform helping shipping companies prevent vessel detentions.",
+      title: "AI Customer Service Platform | Clayo",
+      description:
+        "AI-powered customer service platform helping businesses automate support and improve customer satisfaction.",
     }
   )
 }
@@ -225,16 +194,16 @@ const SEOHead = () => {
       <meta property="og:title" content={title} />
       <meta property="og:description" content={description} />
       <meta property="og:type" content="website" />
-      <meta property="og:url" content={`https://comovis.com${location.pathname}`} />
+      <meta property="og:url" content={`https://clayo.co${location.pathname}`} />
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content={title} />
       <meta name="twitter:description" content={description} />
-      <link rel="canonical" href={`https://comovis.com${location.pathname}`} />
+      <link rel="canonical" href={`https://clayo.co${location.pathname}`} />
 
-      {/* Maritime-specific keywords */}
+      {/* AI Customer Service specific keywords */}
       <meta
         name="keywords"
-        content="maritime compliance, vessel detention prevention, port state control, ship certificates, maritime documents, fleet management, vessel compliance, shipping compliance, maritime AI"
+        content="AI customer service, automated support, customer conversations, AI chatbot, customer service platform, automated responses, AI agent, customer support automation, conversational AI"
       />
     </Helmet>
   )
@@ -262,7 +231,7 @@ function AppContent() {
   // Add this useEffect to monitor the loading flag
   useEffect(() => {
     const checkLoadingFlag = () => {
-      const loadingFlag = localStorage.getItem("comovis_showing_loading")
+      const loadingFlag = localStorage.getItem("clayo_showing_loading")
       setIsShowingLoadingScreen(loadingFlag === "true")
     }
 
@@ -284,11 +253,7 @@ function AppContent() {
     location.pathname === "/onboarding" ||
     location.pathname === "/confirm-email" ||
     location.pathname === "/email-confirmed" ||
-    location.pathname === "/accept-invite" ||
-    location.pathname === "/pitch-deck"
-
-  // Check if it's a share page (public document sharing)
-  const isSharePage = location.pathname.startsWith("/share/")
+    location.pathname === "/accept-invite"
 
   // Define all known paths in the application
   const knownPaths = useMemo(
@@ -301,20 +266,18 @@ function AppContent() {
       "/email-confirmed",
       "/onboarding",
       "/dashboard",
-      "/fleet",
-      "/document-hub",
-      "/port-preparation",
-      "/document-sharing",
+      "/conversations",
+      "/agent-config", // Make sure this is included
+      "/widget-config",
+      "/analytics",
       "/pricing",
       "/team",
-      "/notifications",
-      "/pitch-deck",
     ],
     [],
   )
 
-  // Check if current path is a known path or a share path
-  const isKnownPath = knownPaths.includes(location.pathname) || isSharePage
+  // Check if current path is a known path
+  const isKnownPath = knownPaths.includes(location.pathname)
 
   // If path is unknown, we should hide navbar, sidebar, and footer
   const isUnknownPath = !isKnownPath
@@ -325,14 +288,14 @@ function AppContent() {
       <SEOHead />
 
       <div className="flex h-screen w-full max-w-full overflow-x-hidden">
-        {/* Only show sidebar on known paths that are not landing pages, auth pages, or share pages */}
-        {!isLandingPage && !isAuthPage && !isUnknownPath && !isSharePage && !isShowingLoadingScreen && <Sidebar />}
+        {/* Only show sidebar on known paths that are not landing pages or auth pages */}
+        {!isLandingPage && !isAuthPage && !isUnknownPath && !isShowingLoadingScreen && <Sidebar />}
 
         <div className="flex flex-col flex-1 min-w-0 max-w-full">
           {/* Conditionally render the appropriate header */}
           {isShowingLoadingScreen ? null : isLandingPage ? (
             <LandingHeader user={undefined} logout={undefined} />
-          ) : isAuthPage || isUnknownPath || isSharePage ? null : (
+          ) : isAuthPage || isUnknownPath ? null : (
             <AppHeader
               activeTab={activeTab}
               setActiveTab={setActiveTab}
@@ -350,13 +313,6 @@ function AppContent() {
             <Routes>
               {/* Public routes */}
               <Route path="/" element={<LandingPage />} />
-
-              {/* Pitch deck route - password protected */}
-              <Route path="/pitch-deck" element={<PitchDeckAuth />} />
-
-              {/* Public document sharing routes - no authentication required */}
-              <Route path="/share/:token" element={<DocumentSharingRecipientView />} />
-              <Route path="/share/expired/:token" element={<ExpiredShareView />} />
 
               {/* Auth pages with redirect for authenticated users */}
               <Route
@@ -398,34 +354,34 @@ function AppContent() {
                 }
               />
               <Route
-                path="/fleet"
+                path="/agent-config"
                 element={
                   <ProtectedRoute>
-                    <VesselsPage />
+                    <AIAgentsPage />
                   </ProtectedRoute>
                 }
               />
               <Route
-                path="/document-hub"
+                path="/widget-config"
                 element={
                   <ProtectedRoute>
-                    <DocumentHub />
+                    <ChatWidgetConfig />
                   </ProtectedRoute>
                 }
               />
               <Route
-                path="/port-preparation"
+                path="/analytics"
                 element={
                   <ProtectedRoute>
-                    <PortPreparation />
+                    <Analytics />
                   </ProtectedRoute>
                 }
               />
               <Route
-                path="/document-sharing"
+                path="/conversations"
                 element={
                   <ProtectedRoute>
-                    <DocumentSharing />
+                    <Conversations />
                   </ProtectedRoute>
                 }
               />
@@ -445,22 +401,14 @@ function AppContent() {
                   </ProtectedRoute>
                 }
               />
-              <Route
-                path="/notifications"
-                element={
-                  <ProtectedRoute>
-                    <NotificationsPage />
-                  </ProtectedRoute>
-                }
-              />
 
               {/* Catch-all route for unauthorized access */}
               <Route path="*" element={<UnauthorizedMessage />} />
             </Routes>
           </div>
 
-          {/* Only show footer on known paths that are not auth pages or share pages */}
-          {!isAuthPage && !isUnknownPath && !isSharePage && !isShowingLoadingScreen && <Footer />}
+          {/* Only show footer on known paths that are not auth pages */}
+          {!isAuthPage && !isUnknownPath && !isShowingLoadingScreen && <Footer />}
         </div>
       </div>
     </>

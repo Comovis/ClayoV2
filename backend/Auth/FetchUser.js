@@ -1,9 +1,9 @@
 const { supabaseAdmin } = require("../SupabaseClient")
 
 /**
- * Fetches user data with extended company information
+ * Fetches user data with extended organization information
  * @param {string} userId - ID of the user to fetch
- * @returns {Promise<Object>} Result containing user and company data
+ * @returns {Promise<Object>} Result containing user and organization data
  */
 async function fetchUserData(userId) {
   try {
@@ -14,7 +14,7 @@ async function fetchUserData(userId) {
     // Fetch user data from users table
     const { data: userData, error: userError } = await supabaseAdmin
       .from("users")
-      .select("id, email, full_name, company_id, role, is_company_admin, onboarding_step, created_at, updated_at")
+      .select("id, email, full_name, organization_id, role, onboarding_step, is_active, created_at, updated_at")
       .eq("id", userId)
       .single()
 
@@ -23,34 +23,34 @@ async function fetchUserData(userId) {
       if (userError.code === "PGRST116") {
         throw new Error("User not found in database")
       }
-      
+
       throw new Error(`Failed to fetch user data: ${userError.message}`)
     }
 
-    // If user has a company, fetch company data
-    let companyData = null
-    if (userData.company_id) {
-      const { data: company, error: companyError } = await supabaseAdmin
-        .from("companies")
-        .select("id, name, company_type, vessel_count, operating_regions, onboarding_completed, created_at, updated_at")
-        .eq("id", userData.company_id)
+    // If user has an organization, fetch organization data
+    let organizationData = null
+    if (userData.organization_id) {
+      const { data: organization, error: organizationError } = await supabaseAdmin
+        .from("organizations")
+        .select("id, name, domain, settings, created_at, updated_at")
+        .eq("id", userData.organization_id)
         .single()
 
-      if (!companyError) {
-        companyData = company
+      if (!organizationError) {
+        organizationData = organization
       }
     }
 
-    // Return formatted user data with company if available
+    // Return formatted user data with organization if available
     return {
       success: true,
       user: userData,
-      company: companyData
+      organization: organizationData,
     }
   } catch (error) {
     return {
       success: false,
-      error: error.message || "Failed to fetch user data"
+      error: error.message || "Failed to fetch user data",
     }
   }
 }
@@ -66,18 +66,18 @@ async function handleFetchUserDataRequest(req, res) {
     // Verify authentication
     const authHeader = req.headers.authorization
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ 
-        success: false, 
-        error: "Unauthorized" 
+      return res.status(401).json({
+        success: false,
+        error: "Unauthorized",
       })
     }
 
     // Extract user ID from the authenticated user object
     const userId = req.user?.user_id
     if (!userId) {
-      return res.status(401).json({ 
-        success: false, 
-        error: "User ID not found in authenticated session" 
+      return res.status(401).json({
+        success: false,
+        error: "User ID not found in authenticated session",
       })
     }
 
@@ -87,15 +87,15 @@ async function handleFetchUserDataRequest(req, res) {
     if (!result.success) {
       // If user not found, return 404
       if (result.error === "User not found in database") {
-        return res.status(404).json({ 
-          success: false, 
-          error: "User not found" 
+        return res.status(404).json({
+          success: false,
+          error: "User not found",
         })
       }
-      
-      return res.status(400).json({ 
-        success: false, 
-        error: result.error 
+
+      return res.status(400).json({
+        success: false,
+        error: result.error,
       })
     }
 
@@ -103,17 +103,17 @@ async function handleFetchUserDataRequest(req, res) {
     return res.status(200).json({
       success: true,
       user: result.user,
-      company: result.company
+      organization: result.organization,
     })
   } catch (error) {
     return res.status(500).json({
       success: false,
-      error: "Internal server error"
+      error: "Internal server error",
     })
   }
 }
 
 module.exports = {
   fetchUserData,
-  handleFetchUserDataRequest
+  handleFetchUserDataRequest,
 }

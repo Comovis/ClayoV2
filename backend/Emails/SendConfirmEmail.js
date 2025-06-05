@@ -3,7 +3,7 @@ const React = require("react")
 const ConfirmationEmail = require("./ConfirmEmail")
 const { Resend } = require("resend")
 
-const resend = new Resend("re_fZygLEii_AHipNeWqXfWbtejMrVFLW7yG")
+const resend = new Resend("re_YkuriJ9C_HLQhKi8Bq1dtvtatwLhLKP4v")
 
 async function sendConfirmationEmail(recipientEmail, confirmationLink) {
   try {
@@ -12,9 +12,9 @@ async function sendConfirmationEmail(recipientEmail, confirmationLink) {
 
     console.log(`Sending Confirmation Email to ${recipientEmail}...`)
     const response = await resend.emails.send({
-      from: "Verify@comovis.co",
+      from: "verify@clayo.co",
       to: recipientEmail,
-      subject: "Confirm Your Comovis Account",
+      subject: "Confirm Your Clayo Account ✨",
       html: emailHtml,
     })
 

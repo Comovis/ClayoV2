@@ -1,65 +1,95 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
-  AlertTriangle,
-  CheckCircle,
-  AlertCircle,
-  Ship,
-  Calendar,
-  FileText,
+  MessageSquare,
+  Users,
+  TrendingUp,
   Clock,
-  MapPin,
-  Eye,
-  Share2,
-  Upload,
-  Shield,
+  Bot,
+  AlertCircle,
+  CheckCircle,
+  ArrowUpRight,
+  ArrowDownRight,
+  MoreHorizontal,
+  Plus,
+  Filter,
 } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
-import DocumentUploadModal from "../../MainComponents/UploadModal/UploadModal"
 import { useUser } from "../../Auth/Contexts/UserContext"
-import SystemInitializationLoading from "../../Auth/Login/LoadingWelcomePage"
+import { useNavigate } from "react-router-dom"
 
-export default function Dashboard({ hideSidebar = false }) {
-  const { isAuthenticated, isLoading, user, company } = useUser()
-  const [showInitialLoading, setShowInitialLoading] = useState(false)
+interface DashboardStats {
+  totalConversations: number
+  activeConversations: number
+  resolvedToday: number
+  avgResponseTime: string
+  customerSatisfaction: number
+  aiResolutionRate: number
+  totalLeads: number
+  qualifiedLeads: number
+}
 
-  console.log("Dashboard rendering with auth state:", { isAuthenticated, isLoading, user, company })
+interface RecentConversation {
+  id: string
+  customer: {
+    name: string
+    email: string
+    avatar?: string
+  }
+  subject: string
+  status: "active" | "pending" | "resolved"
+  lastMessage: string
+  lastMessageAt: string
+  channel: string
+  priority: number
+}
 
-  const [uploadModalOpen, setUploadModalOpen] = useState(false)
-  const [selectedVesselForUpload, setSelectedVesselForUpload] = useState<string | undefined>(undefined)
+interface RecentLead {
+  id: string
+  title: string
+  customer: string
+  value: number
+  status: string
+  probability: number
+  source: string
+  createdAt: string
+}
 
-  // Check for loading screen flag
+export default function NewDashboard() {
+  const { isAuthenticated, isLoading, user, organization } = useUser()
+  const navigate = useNavigate()
+
+  const [stats, setStats] = useState<DashboardStats>({
+    totalConversations: 0,
+    activeConversations: 0,
+    resolvedToday: 0,
+    avgResponseTime: "0m",
+    customerSatisfaction: 0,
+    aiResolutionRate: 0,
+    totalLeads: 0,
+    qualifiedLeads: 0,
+  })
+  const [recentConversations, setRecentConversations] = useState<RecentConversation[]>([])
+  const [recentLeads, setRecentLeads] = useState<RecentLead[]>([])
+  const [isDashboardLoading, setIsDashboardLoading] = useState(true)
+  const [timeRange, setTimeRange] = useState("7d")
+
+  console.log("NewDashboard rendering with auth state:", { isAuthenticated, isLoading, user, organization })
+
   useEffect(() => {
-    const shouldShowLoading = localStorage.getItem("comovis_showing_loading")
-    if (shouldShowLoading === "true" && isAuthenticated) {
-      console.log("🎬 Dashboard detected loading flag, showing loading screen...")
-      setShowInitialLoading(true)
+    if (isAuthenticated && user && organization) {
+      loadDashboardData()
     }
-  }, [isAuthenticated])
+  }, [isAuthenticated, user, organization, timeRange])
 
-  const handleLoadingComplete = () => {
-    console.log("🚢 Dashboard loading complete, clearing flag...")
-    localStorage.removeItem("comovis_showing_loading")
-    setShowInitialLoading(false)
-  }
-
-  // Handle upload completion
-  const handleUploadComplete = (documentData: any) => {
-    console.log("Document uploaded:", documentData)
-    setUploadModalOpen(false)
-  }
-
-  // Show loading screen if flag is set
-  if (showInitialLoading) {
-    console.log("🎬 Dashboard rendering loading screen")
-    return <SystemInitializationLoading onComplete={handleLoadingComplete} />
-  }
-
-  // Add conditional rendering based on loading state
+  // Handle loading state
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -71,15 +101,15 @@ export default function Dashboard({ hideSidebar = false }) {
     )
   }
 
-  // If not authenticated and not loading, this should be handled by ProtectedRoute
+  // Handle authentication
   if (!isAuthenticated && !isLoading) {
-    console.log("Dashboard: User not authenticated but somehow reached this component")
+    console.log("NewDashboard: User not authenticated")
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
           <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <p className="text-gray-600">You need to be logged in to view this page.</p>
-          <Button className="mt-4" onClick={() => (window.location.href = "/login")}>
+          <Button className="mt-4" onClick={() => navigate("/login")}>
             Go to Login
           </Button>
         </div>
@@ -87,548 +117,460 @@ export default function Dashboard({ hideSidebar = false }) {
     )
   }
 
-  return (
-    <div className="bg-gray-100">
-      {/* Main Content */}
-      <main className="p-6">
-        <div className="grid grid-cols-3 gap-6 mb-6">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium">Fleet Overview</h3>
-                <Badge className="bg-blue-100 text-blue-800">3 Vessels</Badge>
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>Compliance Score</span>
-                    <span className="font-medium">78%</span>
-                  </div>
-                  <Progress value={78} className="h-2" />
-                </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>Document Validity</span>
-                    <span className="font-medium">85%</span>
-                  </div>
-                  <Progress value={85} className="h-2" />
-                </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>Inspection Readiness</span>
-                    <span className="font-medium">65%</span>
-                  </div>
-                  <Progress value={65} className="h-2" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+  const loadDashboardData = async () => {
+    setIsDashboardLoading(true)
+    try {
+      console.log("Loading dashboard data for organization:", organization?.name)
 
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium">Document Status</h3>
-                <Button variant="outline" size="sm" onClick={() => (window.location.href = "/document-hub")}>
-                  <Eye className="h-4 w-4 mr-1" />
-                  View All
-                </Button>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-green-50 border border-green-100 rounded-md p-3 flex items-center">
-                  <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center mr-3">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Valid</p>
-                    <p className="text-2xl font-bold">28</p>
-                  </div>
-                </div>
-                <div className="bg-yellow-50 border border-yellow-100 rounded-md p-3 flex items-center">
-                  <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center mr-3">
-                    <Clock className="h-5 w-5 text-yellow-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Expiring Soon</p>
-                    <p className="text-2xl font-bold">6</p>
-                  </div>
-                </div>
-                <div className="bg-red-50 border border-red-100 rounded-md p-3 flex items-center">
-                  <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center mr-3">
-                    <AlertCircle className="h-5 w-5 text-red-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Expired</p>
-                    <p className="text-2xl font-bold">1</p>
-                  </div>
-                </div>
-                <div className="bg-gray-50 border border-gray-200 rounded-md p-3 flex items-center">
-                  <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-3">
-                    <AlertTriangle className="h-5 w-5 text-gray-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Missing</p>
-                    <p className="text-2xl font-bold">3</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+      // In a real app, these would be actual API calls using the user context
+      // For now, we'll use mock data but customize it based on the organization
+      const orgName = organization?.name || "Your Organization"
 
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium">Upcoming Port Calls</h3>
-                <Button variant="outline" size="sm" onClick={() => (window.location.href = "/port-preparation")}>
-                  <Calendar className="h-4 w-4 mr-1" />
-                  View All
-                </Button>
-              </div>
-              <div className="space-y-3">
-                <div
-                  className="flex items-center p-2 bg-blue-50 border border-blue-100 rounded-md cursor-pointer"
-                  onClick={() => (window.location.href = "/port-preparation")}
-                >
-                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-3">
-                    <MapPin className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex justify-between items-center">
-                      <p className="font-medium">Singapore</p>
-                      <Badge className="bg-yellow-100 text-yellow-800">Medium Risk</Badge>
-                    </div>
-                    <div className="flex items-center text-sm text-gray-500">
-                      <Ship className="h-3 w-3 mr-1" />
-                      <span>Humble Warrior</span>
-                      <span className="mx-1">•</span>
-                      <span>Nov 15, 2023</span>
-                    </div>
-                  </div>
-                </div>
+      setStats({
+        totalConversations: 1247,
+        activeConversations: 23,
+        resolvedToday: 45,
+        avgResponseTime: "2m 30s",
+        customerSatisfaction: 4.8,
+        aiResolutionRate: 78,
+        totalLeads: 156,
+        qualifiedLeads: 42,
+      })
 
-                <div className="flex items-center p-2 border rounded-md cursor-pointer">
-                  <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-3">
-                    <MapPin className="h-5 w-5 text-gray-600" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex justify-between items-center">
-                      <p className="font-medium">Shanghai</p>
-                      <Badge className="bg-green-100 text-green-800">Low Risk</Badge>
-                    </div>
-                    <div className="flex items-center text-sm text-gray-500">
-                      <Ship className="h-3 w-3 mr-1" />
-                      <span>Humble Warrior</span>
-                      <span className="mx-1">•</span>
-                      <span>Dec 5, 2023</span>
-                    </div>
-                  </div>
-                </div>
+      setRecentConversations([
+        {
+          id: "1",
+          customer: { name: "Sarah Johnson", email: "sarah@example.com" },
+          subject: "Billing question about subscription",
+          status: "active",
+          lastMessage: "I need help understanding my latest invoice...",
+          lastMessageAt: "2 minutes ago",
+          channel: "email",
+          priority: 2,
+        },
+        {
+          id: "2",
+          customer: { name: "Mike Chen", email: "mike@techcorp.com" },
+          subject: "Technical integration support",
+          status: "pending",
+          lastMessage: "The API is returning a 404 error when...",
+          lastMessageAt: "15 minutes ago",
+          channel: "chat",
+          priority: 3,
+        },
+        {
+          id: "3",
+          customer: { name: "Emma Davis", email: "emma@startup.io" },
+          subject: "Feature request discussion",
+          status: "resolved",
+          lastMessage: "Thank you for the detailed explanation!",
+          lastMessageAt: "1 hour ago",
+          channel: "email",
+          priority: 1,
+        },
+      ])
 
-                <div className="flex items-center p-2 border rounded-md cursor-pointer">
-                  <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-3">
-                    <MapPin className="h-5 w-5 text-gray-600" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex justify-between items-center">
-                      <p className="font-medium">Rotterdam</p>
-                      <Badge className="bg-green-100 text-green-800">Low Risk</Badge>
-                    </div>
-                    <div className="flex items-center text-sm text-gray-500">
-                      <Ship className="h-3 w-3 mr-1" />
-                      <span>Pacific Explorer</span>
-                      <span className="mx-1">•</span>
-                      <span>Nov 25, 2023</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="mb-6">
-          <h2 className="text-xl font-bold mb-4">Attention Required</h2>
-          <Card>
-            <CardContent className="p-0">
-              <div className="divide-y">
-                <div className="p-4 flex items-start">
-                  <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center mr-3 flex-shrink-0">
-                    <AlertCircle className="h-5 w-5 text-red-600" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="font-medium">Ship Security Plan Missing</h4>
-                        <p className="text-sm text-gray-600 mt-1">
-                          Humble Warrior is missing a required Ship Security Plan document. This is a common deficiency
-                          found during PSC inspections.
-                        </p>
-                      </div>
-                      <Badge className="bg-red-100 text-red-800">High Priority</Badge>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between">
-                      <div className="text-sm text-gray-500">
-                        <Ship className="h-3 w-3 inline mr-1" />
-                        Humble Warrior
-                        <span className="mx-1">•</span>
-                        <Calendar className="h-3 w-3 inline mx-1" />
-                        Required for Singapore (Nov 15)
-                      </div>
-                      <div>
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            setSelectedVesselForUpload("Humble Warrior")
-                            setUploadModalOpen(true)
-                          }}
-                        >
-                          Upload Document
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-4 flex items-start">
-                  <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center mr-3 flex-shrink-0">
-                    <Clock className="h-5 w-5 text-yellow-600" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="font-medium">Safety Management Certificate Expiring Soon</h4>
-                        <p className="text-sm text-gray-600 mt-1">
-                          Humble Warrior's Safety Management Certificate expires in 28 days (Nov 20, 2023), during the
-                          scheduled port stay in Singapore.
-                        </p>
-                      </div>
-                      <Badge className="bg-yellow-100 text-yellow-800">Medium Priority</Badge>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between">
-                      <div className="text-sm text-gray-500">
-                        <Ship className="h-3 w-3 inline mr-1" />
-                        Humble Warrior
-                        <span className="mx-1">•</span>
-                        <Calendar className="h-3 w-3 inline mx-1" />
-                        Expires Nov 20, 2023
-                      </div>
-                      <div>
-                        <Button size="sm" variant="outline" onClick={() => (window.location.href = "/document-hub")}>
-                          Start Renewal Process
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-4 flex items-start">
-                  <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center mr-3 flex-shrink-0">
-                    <AlertTriangle className="h-5 w-5 text-yellow-600" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="font-medium">Singapore PSC Inspection Preparation Required</h4>
-                        <p className="text-sm text-gray-600 mt-1">
-                          Humble Warrior has a medium risk of PSC inspection in Singapore. Current focus areas include
-                          fire safety systems and MARPOL Annex I compliance.
-                        </p>
-                      </div>
-                      <Badge className="bg-yellow-100 text-yellow-800">Medium Priority</Badge>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between">
-                      <div className="text-sm text-gray-500">
-                        <Ship className="h-3 w-3 inline mr-1" />
-                        Humble Warrior
-                        <span className="mx-1">•</span>
-                        <Calendar className="h-3 w-3 inline mx-1" />
-                        Singapore arrival Nov 15, 2023
-                      </div>
-                      <div>
-                        <Button size="sm" variant="outline" onClick={() => (window.location.href = "/compliance")}>
-                          Prepare for Inspection
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid grid-cols-2 gap-6">
-          <div>
-            <h2 className="text-xl font-bold mb-4">Vessel Overview</h2>
-            <Card>
-              <CardContent className="p-0">
-                <div className="divide-y">
-                  <VesselOverviewItem
-                    name="Humble Warrior"
-                    type="Crude Oil Tanker"
-                    flag="Panama"
-                    complianceScore={80}
-                    documentStatus={{
-                      valid: 12,
-                      expiringSoon: 3,
-                      expired: 0,
-                      missing: 1,
-                    }}
-                  />
-
-                  <VesselOverviewItem
-                    name="Pacific Explorer"
-                    type="Container Ship"
-                    flag="Singapore"
-                    complianceScore={92}
-                    documentStatus={{
-                      valid: 14,
-                      expiringSoon: 1,
-                      expired: 0,
-                      missing: 0,
-                    }}
-                  />
-
-                  <VesselOverviewItem
-                    name="Northern Star"
-                    type="Bulk Carrier"
-                    flag="Marshall Islands"
-                    complianceScore={65}
-                    documentStatus={{
-                      valid: 10,
-                      expiringSoon: 2,
-                      expired: 1,
-                      missing: 2,
-                    }}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div>
-            <h2 className="text-xl font-bold mb-4">Recent Activity</h2>
-            <Card>
-              <CardContent className="p-0">
-                <div className="divide-y">
-                  <ActivityItem
-                    icon={Upload}
-                    iconColor="text-green-500"
-                    iconBg="bg-green-100"
-                    title="Safety Equipment Certificate uploaded"
-                    description="Certificate uploaded for Pacific Explorer"
-                    timestamp="Today, 10:23 AM"
-                    user="Maria Rodriguez"
-                  />
-
-                  <ActivityItem
-                    icon={Share2}
-                    iconColor="text-blue-500"
-                    iconBg="bg-blue-100"
-                    title="Documents shared with Singapore MPA"
-                    description="4 documents shared for Humble Warrior"
-                    timestamp="Yesterday, 3:45 PM"
-                    user="John Smith"
-                  />
-
-                  <ActivityItem
-                    icon={AlertCircle}
-                    iconColor="text-yellow-500"
-                    iconBg="bg-yellow-100"
-                    title="Certificate expiry warning"
-                    description="IOPP Certificate expires in 45 days for Humble Warrior"
-                    timestamp="Yesterday, 11:30 AM"
-                    user="System"
-                  />
-
-                  <ActivityItem
-                    icon={Shield}
-                    iconColor="text-purple-500"
-                    iconBg="bg-purple-100"
-                    title="Deficiency prevention alert"
-                    description="Potential inconsistency detected in vessel particulars"
-                    timestamp="Oct 19, 2023"
-                    user="System"
-                  />
-
-                  <ActivityItem
-                    icon={MapPin}
-                    iconColor="text-blue-500"
-                    iconBg="bg-blue-100"
-                    title="New port call created"
-                    description="Singapore port call added for Humble Warrior"
-                    timestamp="Oct 18, 2023"
-                    user="Maria Rodriguez"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        <div className="mt-6">
-          <h2 className="text-xl font-bold mb-4">Quick Access</h2>
-          <div className="grid grid-cols-4 gap-4">
-            <QuickAccessCard
-              icon={FileText}
-              title="Document Hub"
-              description="Manage vessel certificates and documents"
-              link="/document-hub"
-              color="bg-blue-500"
-            />
-
-            <QuickAccessCard
-              icon={Shield}
-              title="Deficiency Prevention"
-              description="Identify and prevent potential PSC issues"
-              link="/compliance"
-              color="bg-purple-500"
-            />
-
-            <QuickAccessCard
-              icon={MapPin}
-              title="Port Preparation"
-              description="Prepare for upcoming port calls"
-              link="/port-preparation"
-              color="bg-green-500"
-            />
-
-            <QuickAccessCard
-              icon={Share2}
-              title="Document Sharing"
-              description="Securely share documents with stakeholders"
-              link="/document-sharing"
-              color="bg-orange-500"
-            />
-          </div>
-        </div>
-      </main>
-
-      {/* Document Upload Modal */}
-      <DocumentUploadModal
-        isOpen={uploadModalOpen}
-        onClose={() => setUploadModalOpen(false)}
-        initialVesselId={selectedVesselForUpload}
-        onUploadComplete={handleUploadComplete}
-      />
-    </div>
-  )
-}
-
-interface VesselOverviewItemProps {
-  name: string
-  type: string
-  flag: string
-  complianceScore: number
-  documentStatus: {
-    valid: number
-    expiringSoon: number
-    expired: number
-    missing: number
+      setRecentLeads([
+        {
+          id: "1",
+          title: "Enterprise Plan Upgrade",
+          customer: "TechCorp Inc.",
+          value: 25000,
+          status: "proposal",
+          probability: 75,
+          source: "website",
+          createdAt: "2 days ago",
+        },
+        {
+          id: "2",
+          title: "API Integration Project",
+          customer: "StartupXYZ",
+          value: 12000,
+          status: "negotiation",
+          probability: 60,
+          source: "referral",
+          createdAt: "5 days ago",
+        },
+        {
+          id: "3",
+          title: "Custom AI Training",
+          customer: "RetailCorp",
+          value: 8500,
+          status: "qualified",
+          probability: 40,
+          source: "demo",
+          createdAt: "1 week ago",
+        },
+      ])
+    } catch (error) {
+      console.error("Error loading dashboard data:", error)
+    } finally {
+      setIsDashboardLoading(false)
+    }
   }
-}
 
-function VesselOverviewItem({ name, type, flag, complianceScore, documentStatus }: VesselOverviewItemProps) {
-  let scoreColor = "bg-red-500"
-  if (complianceScore >= 90) scoreColor = "bg-green-500"
-  else if (complianceScore >= 70) scoreColor = "bg-yellow-500"
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "active":
+        return "bg-blue-100 text-blue-800"
+      case "pending":
+        return "bg-yellow-100 text-yellow-800"
+      case "resolved":
+        return "bg-green-100 text-green-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  const getPriorityIcon = (priority: number) => {
+    if (priority >= 3) return <AlertCircle className="h-4 w-4 text-red-500" />
+    if (priority === 2) return <Clock className="h-4 w-4 text-yellow-500" />
+    return <CheckCircle className="h-4 w-4 text-green-500" />
+  }
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount)
+  }
+
+  const handleNavigation = (path: string) => {
+    navigate(path)
+  }
 
   return (
-    <div className="p-4 flex items-center">
-      <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-3">
-        <Ship className="h-5 w-5 text-blue-600" />
+    <div className="max-w-7xl mx-auto p-6">
+      {/* Header with title and description */}
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <p className="text-gray-500">
+            Welcome back, {user?.full_name || user?.email}! Monitor your AI customer service performance for{" "}
+            {organization?.name || "your organization"}.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Select value={timeRange} onValueChange={setTimeRange}>
+            <SelectTrigger className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="24h">Last 24h</SelectItem>
+              <SelectItem value="7d">Last 7 days</SelectItem>
+              <SelectItem value="30d">Last 30 days</SelectItem>
+              <SelectItem value="90d">Last 90 days</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button onClick={() => handleNavigation("/conversations")}>
+            <Plus className="mr-2 h-4 w-4" />
+            New Conversation
+          </Button>
+        </div>
       </div>
-      <div className="flex-1">
-        <div className="flex justify-between items-center">
-          <h4 className="font-medium">{name}</h4>
-          <div className="flex items-center">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-gray-100 mr-2">
-              <span className="text-sm font-medium">{complianceScore}</span>
+
+      {/* Organization Info */}
+      {organization && (
+        <Card className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <Bot className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg">{organization.name}</CardTitle>
+                  <p className="text-sm text-gray-600">
+                    {organization.domain && `${organization.domain} • `}
+                    Plan: {organization.subscription_plan || "Starter"}
+                  </p>
+                </div>
+              </div>
+              <Badge className="bg-green-100 text-green-800">{organization.subscription_status || "Active"}</Badge>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => (window.location.href = "/document-hub")}>
-              <Eye className="h-4 w-4" />
-            </Button>
-          </div>
+          </CardHeader>
+        </Card>
+      )}
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-700">Total Conversations</CardTitle>
+            <MessageSquare className="h-4 w-4 text-gray-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {isDashboardLoading ? "..." : stats.totalConversations.toLocaleString()}
+            </div>
+            <p className="text-xs text-gray-600">
+              <span className="text-green-600 flex items-center">
+                <ArrowUpRight className="h-3 w-3 mr-1" />
+                +12% from last period
+              </span>
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-700">Active Now</CardTitle>
+            <Users className="h-4 w-4 text-gray-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{isDashboardLoading ? "..." : stats.activeConversations}</div>
+            <p className="text-xs text-gray-600">
+              <span className="text-blue-600">{stats.resolvedToday} resolved today</span>
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-700">Avg Response Time</CardTitle>
+            <Clock className="h-4 w-4 text-gray-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{isDashboardLoading ? "..." : stats.avgResponseTime}</div>
+            <p className="text-xs text-gray-600">
+              <span className="text-green-600 flex items-center">
+                <ArrowDownRight className="h-3 w-3 mr-1" />
+                -15% faster
+              </span>
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-700">AI Resolution Rate</CardTitle>
+            <Bot className="h-4 w-4 text-gray-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{isDashboardLoading ? "..." : `${stats.aiResolutionRate}%`}</div>
+            <p className="text-xs text-gray-600">
+              <span className="text-green-600 flex items-center">
+                <ArrowUpRight className="h-3 w-3 mr-1" />
+                +5% improvement
+              </span>
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Main Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Recent Conversations */}
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg">Recent Conversations</CardTitle>
+                  <CardDescription>Latest customer interactions across all channels</CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm">
+                    <Filter className="mr-2 h-4 w-4" />
+                    Filter
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => handleNavigation("/conversations")}>
+                    View All
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {isDashboardLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                  <p className="text-gray-600">Loading conversations...</p>
+                </div>
+              ) : (
+                recentConversations.map((conversation) => (
+                  <div
+                    key={conversation.id}
+                    className="flex items-start space-x-4 p-4 border rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                    onClick={() => handleNavigation(`/conversations/${conversation.id}`)}
+                  >
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={conversation.customer.avatar || "/placeholder.svg"} />
+                      <AvatarFallback className="bg-gray-200 text-gray-700">
+                        {conversation.customer.name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <h4 className="font-medium truncate">{conversation.customer.name}</h4>
+                          <Badge variant="outline" className="text-xs">
+                            {conversation.channel}
+                          </Badge>
+                          {getPriorityIcon(conversation.priority)}
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Badge className={getStatusColor(conversation.status)}>{conversation.status}</Badge>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem>View Details</DropdownMenuItem>
+                              <DropdownMenuItem>Assign Agent</DropdownMenuItem>
+                              <DropdownMenuItem>Mark as Priority</DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                      <p className="text-sm font-medium text-gray-900 mt-1">{conversation.subject}</p>
+                      <p className="text-sm text-gray-600 truncate">{conversation.lastMessage}</p>
+                      <p className="text-xs text-gray-500 mt-1">{conversation.lastMessageAt}</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
         </div>
-        <div className="flex items-center text-sm text-gray-500">
-          <span>{type}</span>
-          <span className="mx-1">•</span>
-          <span>{flag}</span>
-        </div>
-        <div className="flex space-x-2 mt-2">
-          <span className="inline-flex items-center text-xs text-green-700 bg-green-50 px-2 py-0.5 rounded">
-            <CheckCircle className="h-3 w-3 mr-1" /> {documentStatus.valid}
-          </span>
-          {documentStatus.expiringSoon > 0 && (
-            <span className="inline-flex items-center text-xs text-yellow-700 bg-yellow-50 px-2 py-0.5 rounded">
-              <Clock className="h-3 w-3 mr-1" /> {documentStatus.expiringSoon}
-            </span>
-          )}
-          {documentStatus.expired > 0 && (
-            <span className="inline-flex items-center text-xs text-red-700 bg-red-50 px-2 py-0.5 rounded">
-              <AlertCircle className="h-3 w-3 mr-1" /> {documentStatus.expired}
-            </span>
-          )}
-          {documentStatus.missing > 0 && (
-            <span className="inline-flex items-center text-xs text-gray-700 bg-gray-100 px-2 py-0.5 rounded">
-              <AlertTriangle className="h-3 w-3 mr-1" /> {documentStatus.missing}
-            </span>
-          )}
+
+        {/* Sidebar */}
+        <div className="space-y-6">
+          {/* Performance Metrics */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Performance</CardTitle>
+              <CardDescription>Key metrics and performance indicators</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {isDashboardLoading ? (
+                <div className="text-center py-4">
+                  <div className="animate-pulse space-y-3">
+                    <div className="h-4 bg-gray-200 rounded"></div>
+                    <div className="h-2 bg-gray-200 rounded"></div>
+                    <div className="h-4 bg-gray-200 rounded"></div>
+                    <div className="h-2 bg-gray-200 rounded"></div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="text-gray-700">Customer Satisfaction</span>
+                      <span className="font-medium">{stats.customerSatisfaction}/5.0</span>
+                    </div>
+                    <Progress value={(stats.customerSatisfaction / 5) * 100} className="h-2" />
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="text-gray-700">AI Resolution Rate</span>
+                      <span className="font-medium">{stats.aiResolutionRate}%</span>
+                    </div>
+                    <Progress value={stats.aiResolutionRate} className="h-2" />
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="text-gray-700">First Response Time</span>
+                      <span className="font-medium">Under 5min</span>
+                    </div>
+                    <Progress value={85} className="h-2" />
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Recent Leads */}
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg">Recent Leads</CardTitle>
+                  <CardDescription>Latest sales opportunities</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => handleNavigation("/leads")}>
+                  View All
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {isDashboardLoading ? (
+                <div className="text-center py-4">
+                  <div className="animate-pulse space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="p-3 border rounded-lg">
+                        <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                        <div className="h-3 bg-gray-200 rounded mb-2"></div>
+                        <div className="h-3 bg-gray-200 rounded"></div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                recentLeads.map((lead) => (
+                  <div
+                    key={lead.id}
+                    className="p-3 border rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                    onClick={() => handleNavigation(`/leads/${lead.id}`)}
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <h4 className="font-medium text-sm">{lead.title}</h4>
+                      <Badge variant="outline" className="text-xs">
+                        {lead.status}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-gray-600">{lead.customer}</p>
+                    <div className="flex justify-between items-center mt-2">
+                      <span className="font-medium text-green-600">{formatCurrency(lead.value)}</span>
+                      <span className="text-xs text-gray-500">{lead.probability}% likely</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Quick Actions */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Quick Actions</CardTitle>
+              <CardDescription>Common tasks and shortcuts</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Button
+                className="w-full justify-start"
+                variant="outline"
+                onClick={() => handleNavigation("/conversations/new")}
+              >
+                <MessageSquare className="mr-2 h-4 w-4" />
+                Start New Conversation
+              </Button>
+              <Button className="w-full justify-start" variant="outline" onClick={() => handleNavigation("/leads/new")}>
+                <Users className="mr-2 h-4 w-4" />
+                Add New Lead
+              </Button>
+              <Button
+                className="w-full justify-start"
+                variant="outline"
+                onClick={() => handleNavigation("/ai-training")}
+              >
+                <Bot className="mr-2 h-4 w-4" />
+                Train AI Assistant
+              </Button>
+              <Button className="w-full justify-start" variant="outline" onClick={() => handleNavigation("/analytics")}>
+                <TrendingUp className="mr-2 h-4 w-4" />
+                View Analytics
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
-    </div>
-  )
-}
-
-interface ActivityItemProps {
-  icon: any
-  iconColor: string
-  iconBg: string
-  title: string
-  description: string
-  timestamp: string
-  user: string
-}
-
-function ActivityItem({ icon: Icon, iconColor, iconBg, title, description, timestamp, user }: ActivityItemProps) {
-  return (
-    <div className="p-4 flex items-start">
-      <div className={`w-10 h-10 rounded-full ${iconBg} flex items-center justify-center mr-3 flex-shrink-0`}>
-        <Icon className={`h-5 w-5 ${iconColor}`} />
-      </div>
-      <div>
-        <h4 className="font-medium">{title}</h4>
-        <p className="text-sm text-gray-600">{description}</p>
-        <div className="flex items-center mt-1 text-xs text-gray-500">
-          <Clock className="h-3 w-3 mr-1" />
-          <span>{timestamp}</span>
-          <span className="mx-1">•</span>
-          <span>{user}</span>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-interface QuickAccessCardProps {
-  icon: any
-  title: string
-  description: string
-  link: string
-  color: string
-}
-
-function QuickAccessCard({ icon: Icon, title, description, link, color }: QuickAccessCardProps) {
-  return (
-    <div className="cursor-pointer" onClick={() => (window.location.href = link)}>
-      <Card className="hover:shadow-md transition-shadow h-full">
-        <CardContent className="p-6">
-          <div className={`w-12 h-12 rounded-lg ${color} text-white flex items-center justify-center mb-4`}>
-            <Icon className="h-6 w-6" />
-          </div>
-          <h3 className="font-medium mb-1">{title}</h3>
-          <p className="text-sm text-gray-500">{description}</p>
-        </CardContent>
-      </Card>
     </div>
   )
 }

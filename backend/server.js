@@ -6,11 +6,33 @@ const rateLimit = require("express-rate-limit")
 require("dotenv").config()
 const crypto = require("crypto")
 const { exec } = require("child_process")
+const { supabaseAdmin } = require("./SupabaseClient")
 
+// Import AI Customer Support service functions
+const {
+  uploadDocument,
+  addUrl,
+  addText,
+  getKnowledgeItems,
+  deleteKnowledgeItem,
+  getProcessingStatus,
+} = require("./AppFeatures/AgentTrainingCreation/FileKnowledgeService")
+
+const { createAgent, getAgents, updateAgent } = require("./AppFeatures/AgentTrainingCreation/AgentService")
+
+const { processMessage, createSession } = require("./AppFeatures/AgentTrainingCreation/ChatService")
 
 // Import your existing handlers
+const {
+  updateOrganizationOnboarding,
+  updateOnboardingStep,
+  getUserOnboardingStatus,
+} = require("./Auth/OnboardingService")
+
+
+
 const { sendUserConfirmationEmail, resendConfirmationEmail } = require("./Emails/EmailAuthLinkService")
-const { createUserWithCompany } = require("./Auth/SignupAuthService")
+const { createUserWithOrganization } = require("./Auth/SignupAuthService")
 const { authenticateUser } = require("./Auth/AuthenticateUser")
 const { createAndSendInvitation } = require("./Emails/InviteTeamEmail/InviteAuthService")
 const { handleCancelTeamInvitationRequest } = require("./Team/CancelTeamInvite")
@@ -21,60 +43,21 @@ const { handleFetchUserDataRequest } = require("./Users/FetchAuthenticatedUser")
 const { handleGetUserData } = require("./Users/GetUserData")
 const { handleSignIn } = require("./Auth/SignInAuthService")
 const { handleAcceptInvitationRequest } = require("./Team/AcceptInvitation")
-const { handleGetVesselsRequest } = require("./AppFeatures/Vessels/FetchVessels")
-const { handleAddVesselRequest } = require("./AppFeatures/Vessels/AddVessel")
-const { processDocumentShareEmails } = require("./Emails/ShareEmail/SendDocumentShareEmail")
-const {
-  handleCreateDocumentShare,
-  handleGetShareByToken,
-  handleGetDocumentShares,
-  handleRevokeDocumentShare,
-  handleLogDocumentAccess,
-} = require("./AppFeatures/DocumentSharing/DocumentSharingService")
-const {
-  handleDocumentUpload,
-  handleGetDocument,
-  handleGetVesselDocuments,
-  handleUpdateDocument,
-  handleArchiveDocument,
-  handleDocumentDownload,
-  handleCleanupTempFiles,
-} = require("./AppFeatures/DocumentHub/DocumentUploadsHandler")
-
-const {
-  handleCreateContact,
-  handleGetVesselContacts,
-  handleUpdateContact,
-  handleDeleteContact,
-} = require("./AppFeatures/DocumentSharing/ContactsService")
-
-
-const { handleBookDemoRequest } = require('./Users/BookDemo');
-
-const { handleBatchDocumentDownload } = require("./AppFeatures/DocumentHub/BatchDownload")
+const { handleBookDemoRequest } = require("./Users/BookDemo")
 
 const app = express()
 
-
-
-
-app.use(cors({
-  origin: [
-    'https://comovis.co',
-    'https://www.comovis.co',
-    'http://localhost:1601', 
-    
-  ],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
+app.use(
+  cors({
+    origin: ["https://clayo.co", "https://www.clayo.co", "http://localhost:1003"],
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }),
+)
 
 //Live
-
-
-const port = process.env.PORT || 2807
+const port = process.env.PORT || 2222
 
 // ===== SECURITY MIDDLEWARE =====
 
@@ -124,91 +107,599 @@ const authLimiter = rateLimit({
   skipSuccessfulRequests: true,
 })
 
-// ===== FILE UPLOAD SECURITY =====
-
-const storage = multer.memoryStorage()
+// ===== FILE UPLOAD CONFIGURATION =====
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 50 * 1024 * 1024, // 50MB limit
-    files: 1, // Only one file at a time
+    files: 1,
   },
-  // Removed file type restrictions as requested
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = [
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "text/plain",
+      "image/jpeg",
+      "image/png",
+    ]
+
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true)
+    } else {
+      cb(new Error("File type not allowed"), false)
+    }
+  },
 })
 
 // ===== BASIC MIDDLEWARE =====
 app.use(express.json({ limit: "10mb" }))
-app.use(cors())
 
-// ===== ENHANCED DOCUMENT SECURITY =====
-app.use("/api/documents", (req, res, next) => {
-  res.setHeader("X-Content-Type-Options", "nosniff")
-  res.setHeader("X-Frame-Options", "DENY")
-  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private")
-  res.setHeader("Pragma", "no-cache")
-  next()
+// ===== KNOWLEDGE BASE ENDPOINTS =====
+
+// Upload document to knowledge base
+app.post("/api/knowledge/upload", authenticateUser, upload.single("file"), async (req, res) => {
+  try {
+    const { agentId, category, title } = req.body
+    const organizationId = req.user.organization_id
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: "No file uploaded",
+      })
+    }
+
+    if (!organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: "Organization ID not found",
+      })
+    }
+
+    const result = await uploadDocument({
+      file: req.file,
+      organizationId,
+      agentId,
+      category,
+      title,
+      userId: req.user.user_id,
+    })
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: result.error,
+      })
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Document uploaded and queued for processing",
+      data: result.data,
+    })
+  } catch (error) {
+    console.error("Knowledge upload error:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to upload document",
+    })
+  }
 })
 
+// Add URL to knowledge base
+app.post("/api/knowledge/url", authenticateUser, async (req, res) => {
+  try {
+    const { url, agentId, category } = req.body
+    const organizationId = req.user.organization_id
 
+    if (!url) {
+      return res.status(400).json({
+        success: false,
+        error: "URL is required",
+      })
+    }
 
-// ===== GITHUB - WEBHOOK =====
-// Add GitHub webhook endpoint
-app.post('/github-webhook', express.json(), (req, res) => {
-  const secret = process.env.GITHUB_WEBHOOK_SECRET;
-  if (!secret) {
-    console.error('Webhook secret not set in environment variables');
-    return res.status(500).send('Server configuration error');
+    if (!organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: "Organization ID not found",
+      })
+    }
+
+    const result = await addUrl({
+      url,
+      organizationId,
+      agentId,
+      category,
+      userId: req.user.user_id,
+    })
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: result.error,
+      })
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "URL content added to knowledge base",
+      data: result.data,
+    })
+  } catch (error) {
+    console.error("Knowledge URL error:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to process URL",
+    })
   }
+})
 
-  const signature = `sha256=${crypto.createHmac('sha256', secret).update(JSON.stringify(req.body)).digest('hex')}`;
-  const githubSignature = req.headers['x-hub-signature-256'];
+// Add text content to knowledge base
+app.post("/api/knowledge/text", authenticateUser, async (req, res) => {
+  try {
+    const { title, content, agentId, category } = req.body
+    const organizationId = req.user.organization_id
 
-  if (!githubSignature || signature !== githubSignature) {
-    console.error('Unauthorized: Signature mismatch');
-    return res.status(401).send('Unauthorized');
+    if (!title || !content) {
+      return res.status(400).json({
+        success: false,
+        error: "Title and content are required",
+      })
+    }
+
+    if (!organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: "Organization ID not found",
+      })
+    }
+
+    const result = await addText({
+      title,
+      content,
+      organizationId,
+      agentId,
+      category,
+      userId: req.user.user_id,
+    })
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: result.error,
+      })
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Text content added to knowledge base",
+      data: result.data,
+    })
+  } catch (error) {
+    console.error("Knowledge text error:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to add text content",
+    })
   }
+})
 
-  console.log(`🚢 Received push event for ref: ${req.body.ref}`);
+// Get knowledge base items
+app.get("/api/knowledge", authenticateUser, async (req, res) => {
+  try {
+    const { agentId } = req.query
+    const organizationId = req.user.organization_id
 
-  if (req.body.ref === 'refs/heads/master') {
-    console.log('⚓ Starting Comovis deployment...');
-    
-    // Respond to GitHub IMMEDIATELY
-    res.status(200).send('Deployment initiated successfully');
-    
-    // Run deployment in background with setTimeout to ensure response is sent first
-    setTimeout(() => {
-      exec(
-        'cd /var/www/Comovis/backend && git pull origin master && npm install --production && pm2 reload Comovis',
-        (error, stdout, stderr) => {
-          if (error) {
-            console.error(`🚨 Deployment error: ${error.message}`);
-            console.error(`stderr: ${stderr}`);
-          } else {
-            console.log(`✅ Deployment completed successfully`);
-            console.log(`stdout: ${stdout}`);
-            if (stderr) console.log(`stderr: ${stderr}`);
-          }
-        }
-      );
-    }, 100); // Small delay to ensure response is sent
-    
-  } else {
-    res.status(200).send('Push event to non-master branch, no action taken');
+    if (!organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: "Organization ID not found",
+      })
+    }
+
+    const result = await getKnowledgeItems(organizationId, agentId)
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: result.error,
+      })
+    }
+
+    res.status(200).json({
+      success: true,
+      items: result.items,
+    })
+  } catch (error) {
+    console.error("Get knowledge error:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch knowledge base",
+    })
   }
-});
+})
 
-//thx
+// Get processing status
+app.get("/api/knowledge/status/:id", authenticateUser, async (req, res) => {
+  try {
+    const { id } = req.params
 
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        error: "Knowledge item ID is required",
+      })
+    }
 
+    const result = await getProcessingStatus(id)
 
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: result.error,
+      })
+    }
 
+    res.status(200).json({
+      success: true,
+      status: result.status,
+      metadata: result.metadata,
+    })
+  } catch (error) {
+    console.error("Get status error:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to get processing status",
+    })
+  }
+})
 
+// Delete knowledge item
+app.delete("/api/knowledge/:id", authenticateUser, async (req, res) => {
+  try {
+    const { id } = req.params
+    const organizationId = req.user.organization_id
 
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        error: "Knowledge item ID is required",
+      })
+    }
 
+    if (!organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: "Organization ID not found",
+      })
+    }
 
+    const result = await deleteKnowledgeItem(id, organizationId)
 
-// ===== AUTH & USER SETUP ROUTES =====
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: result.error,
+      })
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Knowledge item deleted successfully",
+    })
+  } catch (error) {
+    console.error("Delete knowledge error:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to delete knowledge item",
+    })
+  }
+})
+
+// ===== AI AGENT ENDPOINTS =====
+
+// Create new AI agent
+app.post("/api/agents", authenticateUser, async (req, res) => {
+  try {
+    const agentData = {
+      ...req.body,
+      organizationId: req.user.organization_id,
+      createdBy: req.user.user_id,
+    }
+
+    if (!agentData.name) {
+      return res.status(400).json({
+        success: false,
+        error: "Agent name is required",
+      })
+    }
+
+    const result = await createAgent(agentData)
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: result.error,
+      })
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "AI agent created successfully",
+      agent: result.agent,
+    })
+  } catch (error) {
+    console.error("Create agent error:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to create AI agent",
+    })
+  }
+})
+
+// Get AI agents for organization
+app.get("/api/agents", authenticateUser, async (req, res) => {
+  try {
+    const organizationId = req.user.organization_id
+
+    if (!organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: "Organization ID not found",
+      })
+    }
+
+    const result = await getAgents(organizationId)
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: result.error,
+      })
+    }
+
+    res.status(200).json({
+      success: true,
+      agents: result.agents,
+    })
+  } catch (error) {
+    console.error("Get agents error:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch AI agents",
+    })
+  }
+})
+
+// Update AI agent
+app.put("/api/agents/:id", authenticateUser, async (req, res) => {
+  try {
+    const { id } = req.params
+    const updateData = req.body
+    const organizationId = req.user.organization_id
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        error: "Agent ID is required",
+      })
+    }
+
+    if (!organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: "Organization ID not found",
+      })
+    }
+
+    const result = await updateAgent(id, updateData, organizationId)
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: result.error,
+      })
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "AI agent updated successfully",
+      agent: result.agent,
+    })
+  } catch (error) {
+    console.error("Update agent error:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to update AI agent",
+    })
+  }
+})
+
+// ===== CHAT ENDPOINTS =====
+
+// Create new chat session
+app.post("/api/chat/session", authenticateUser, async (req, res) => {
+  try {
+    const { agentId, customerId } = req.body
+    const organizationId = req.user.organization_id
+
+    if (!agentId) {
+      return res.status(400).json({
+        success: false,
+        error: "Agent ID is required",
+      })
+    }
+
+    if (!organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: "Organization ID not found",
+      })
+    }
+
+    const result = await createSession({
+      agentId,
+      customerId,
+      organizationId,
+    })
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: result.error,
+      })
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Chat session created successfully",
+      session: result.session,
+    })
+  } catch (error) {
+    console.error("Create session error:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to create chat session",
+    })
+  }
+})
+
+// Handle chat messages with streaming (your proven approach)
+app.post("/api/chat/message", authenticateUser, async (req, res) => {
+  try {
+    const { message, sessionId, agentId } = req.body
+    const organizationId = req.user.organization_id
+
+    if (!message || !sessionId || !agentId) {
+      return res.status(400).json({
+        success: false,
+        error: "Message, session ID, and agent ID are required",
+      })
+    }
+
+    if (!organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: "Organization ID not found",
+      })
+    }
+
+    // Set up SSE for streaming response (your proven pattern)
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "Cache-Control",
+    })
+
+    const onChunk = (chunk) => {
+      res.write(`data: ${JSON.stringify({ type: "chunk", content: chunk })}\n\n`)
+    }
+
+    const result = await processMessage({
+      message,
+      sessionId,
+      agentId,
+      organizationId,
+      onChunk,
+    })
+
+    res.write(`data: ${JSON.stringify({ type: "complete", result })}\n\n`)
+    res.end()
+  } catch (error) {
+    console.error("Chat message error:", error)
+    res.write(`data: ${JSON.stringify({ type: "error", error: error.message })}\n\n`)
+    res.end()
+  }
+})
+
+// ===== PUBLIC CHAT ENDPOINT (for customer-facing chat widget) =====
+
+// Public chat endpoint (no authentication required for customers)
+app.post("/api/public/chat/message", async (req, res) => {
+  try {
+    const { message, sessionId, agentId, organizationId } = req.body
+
+    if (!message || !sessionId || !agentId || !organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: "Message, session ID, agent ID, and organization ID are required",
+      })
+    }
+
+    // Set up SSE for streaming response
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "Cache-Control",
+    })
+
+    const onChunk = (chunk) => {
+      res.write(`data: ${JSON.stringify({ type: "chunk", content: chunk })}\n\n`)
+    }
+
+    const result = await processMessage({
+      message,
+      sessionId,
+      agentId,
+      organizationId,
+      onChunk,
+    })
+
+    res.write(`data: ${JSON.stringify({ type: "complete", result })}\n\n`)
+    res.end()
+  } catch (error) {
+    console.error("Public chat error:", error)
+    res.write(`data: ${JSON.stringify({ type: "error", error: error.message })}\n\n`)
+    res.end()
+  }
+})
+
+// Public session creation (for customer-facing chat widget)
+app.post("/api/public/chat/session", async (req, res) => {
+  try {
+    const { agentId, organizationId, customerId } = req.body
+
+    if (!agentId || !organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: "Agent ID and organization ID are required",
+      })
+    }
+
+    const result = await createSession({
+      agentId,
+      customerId: customerId || null,
+      organizationId,
+    })
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: result.error,
+      })
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Chat session created successfully",
+      session: result.session,
+    })
+  } catch (error) {
+    console.error("Public session creation error:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to create chat session",
+    })
+  }
+})
+
+// ===== YOUR EXISTING ENDPOINTS =====
 
 app.post("/api/send-confirmation-email", authLimiter, async (req, res) => {
   try {
@@ -230,8 +721,6 @@ app.post("/api/send-confirmation-email", authLimiter, async (req, res) => {
     res.status(500).json({ error: "Failed to send confirmation email" })
   }
 })
-
-
 
 app.post("/api/resend-confirmation-email", authLimiter, async (req, res) => {
   try {
@@ -267,6 +756,7 @@ app.post("/api/signin", authLimiter, async (req, res) => {
   }
 })
 
+// Updated signup endpoint to match your style
 app.post("/api/signup", authLimiter, async (req, res) => {
   try {
     const { email, password, fullName, companyName } = req.body
@@ -280,8 +770,8 @@ app.post("/api/signup", authLimiter, async (req, res) => {
       })
     }
 
-    // Create user and company
-    const result = await createUserWithCompany({
+    // Create user and organization (updated function name)
+    const result = await createUserWithOrganization({
       email,
       password,
       fullName,
@@ -295,12 +785,12 @@ app.post("/api/signup", authLimiter, async (req, res) => {
       console.warn(`User created but confirmation email failed: ${emailResult.error}`)
     }
 
-    // Return success response
+    // Return success response (updated to use 'organization' instead of 'company')
     res.status(200).json({
       success: true,
       message: "Account created successfully",
       user: result.user,
-      company: result.company,
+      organization: result.organization, // Updated from 'company' to 'organization'
       emailSent: emailResult.success,
     })
   } catch (error) {
@@ -314,20 +804,18 @@ app.post("/api/signup", authLimiter, async (req, res) => {
   }
 })
 
-
-
 // POST /api/book-demo
 app.post("/api/book-demo", async (req, res) => {
   try {
-    await handleBookDemoRequest(req, res);
+    await handleBookDemoRequest(req, res)
   } catch (error) {
-    console.error("Error booking demo:", error);
+    console.error("Error booking demo:", error)
     res.status(500).json({
       success: false,
-      error: "Failed to book demo"
-    });
+      error: "Failed to book demo",
+    })
   }
-});
+})
 
 // Add this to your existing routes in server.js
 app.post("/api/invite-signup", authLimiter, async (req, res) => {
@@ -452,231 +940,106 @@ app.get("/api/auth/current-user", authenticateUser, async (req, res) => {
   }
 })
 
-// ===== FEATURES MAIN APP API ENDPOINTS =====
-
-// GET endpoint for fetching vessels with query parameters
-app.get("/api/get-vessels", authenticateUser, async (req, res) => {
+// Simple auth middleware - just get user ID
+const getUser = async (req, res, next) => {
   try {
-    await handleGetVesselsRequest(req, res)
+    const token = req.headers.authorization?.split(" ")[1]
+
+    if (!token) {
+      return res.status(401).json({ success: false, error: "No token" })
+    }
+
+    const {
+      data: { user },
+      error,
+    } = await supabaseAdmin.auth.getUser(token)
+
+    if (error || !user) {
+      return res.status(401).json({ success: false, error: "Invalid token" })
+    }
+
+    // Get user from database
+    const { data: userData } = await supabaseAdmin.from("users").select("*").eq("email", user.email).single()
+
+    if (!userData) {
+      return res.status(401).json({ success: false, error: "User not found" })
+    }
+
+    req.userId = userData.id
+    req.organizationId = userData.organization_id
+    next()
   } catch (error) {
-    console.error("Error fetching vessels:", error)
-    res.status(500).json({ error: "Failed to fetch vessels" })
+    res.status(401).json({ success: false, error: "Auth failed" })
   }
-})
+}
 
-app.post("/api/add-vessel", authenticateUser, async (req, res) => {
+// Get onboarding status
+app.get("/api/get-onboarding-status", getUser, async (req, res) => {
   try {
-    await handleAddVesselRequest(req, res)
-  } catch (error) {
-    console.error("Error adding vessel:", error)
-    res.status(500).json({ error: "Failed to add vessel" })
-  }
-})
+    // Get organization data
+    const { data: org } = await supabaseAdmin.from("organizations").select("*").eq("id", req.organizationId).single()
 
-// Share Documents //
-app.post("/api/send-document-share-email", authenticateUser, async (req, res) => {
-  try {
-    const { shareId } = req.body
+    // Get user data
+    const { data: user } = await supabaseAdmin.from("users").select("*").eq("id", req.userId).single()
 
-    // Validate required fields
-    if (!shareId) {
-      return res.status(400).json({ error: "Share ID is required" })
-    }
-
-    // Get user ID from the authenticated user object
-    const userId = req.user.user_id
-
-    // If somehow the user ID is missing, return an error
-    if (!userId) {
-      return res.status(401).json({ error: "User ID not found in authenticated session" })
-    }
-
-    // Process and send the emails
-    const result = await processDocumentShareEmails(shareId, userId)
-
-    if (!result.success) {
-      return res.status(400).json({ error: result.error })
-    }
-
-    // Return success response
-    return res.status(200).json({
-      message: "Document share emails sent",
-      totalSent: result.totalSent,
-      totalFailed: result.totalFailed,
+    res.json({
+      success: true,
+      currentStep: user?.onboarding_step || "company",
+      isCompleted: user?.onboarding_step === "completed",
+      organization: org,
+      integrations: [],
     })
   } catch (error) {
-    console.error("Error sending document share emails:", error)
-    return res.status(500).json({ error: "Failed to send document share emails" })
+    res.status(500).json({ success: false, error: error.message })
   }
 })
 
-// Document Sharing Endpoints
-app.post("/api/document-shares", authenticateUser, async (req, res) => {
+// Update onboarding step
+app.post("/api/update-onboarding-step", getUser, async (req, res) => {
   try {
-    await handleCreateDocumentShare(req, res)
+    const { step, data } = req.body
+
+    // Update organization settings
+    const currentSettings = {}
+    const updatedSettings = { ...currentSettings, ...data }
+
+    await supabaseAdmin.from("organizations").update({ settings: updatedSettings }).eq("id", req.organizationId)
+
+    // Update user step
+    await supabaseAdmin.from("users").update({ onboarding_step: step }).eq("id", req.userId)
+
+    res.json({ success: true })
   } catch (error) {
-    console.error("Error creating document share:", error)
-    res.status(500).json({ error: "Failed to create document share" })
+    res.status(500).json({ success: false, error: error.message })
   }
 })
 
-app.get("/api/document-shares/:token", async (req, res) => {
+// Complete onboarding
+app.post("/api/complete-onboarding", getUser, async (req, res) => {
   try {
-    await handleGetShareByToken(req, res)
+    const data = req.body
+
+    // Update organization
+    await supabaseAdmin
+      .from("organizations")
+      .update({
+        name: data.companyName,
+        domain: data.website,
+        settings: { ...data, onboarding_completed: true },
+      })
+      .eq("id", req.organizationId)
+
+    // Update user
+    await supabaseAdmin.from("users").update({ onboarding_step: "completed" }).eq("id", req.userId)
+
+    res.json({ success: true })
   } catch (error) {
-    console.error("Error fetching document share:", error)
-    res.status(500).json({ error: "Failed to fetch document share" })
+    res.status(500).json({ success: false, error: error.message })
   }
 })
-
-app.get("/api/document-shares", authenticateUser, async (req, res) => {
-  try {
-    await handleGetDocumentShares(req, res)
-  } catch (error) {
-    console.error("Error fetching document shares:", error)
-    res.status(500).json({ error: "Failed to fetch document shares" })
-  }
-})
-
-app.post("/api/document-shares/:id/revoke", authenticateUser, async (req, res) => {
-  try {
-    await handleRevokeDocumentShare(req, res)
-  } catch (error) {
-    console.error("Error revoking document share:", error)
-    res.status(500).json({ error: "Failed to revoke document share" })
-  }
-})
-
-
-
-app.post("/api/document-access-logs", async (req, res) => {
-  try {
-    await handleLogDocumentAccess(req, res)
-  } catch (error) {
-    console.error("Error logging document access:", error)
-    res.status(500).json({ error: "Failed to log document access" })
-  }
-})
-
-// Document Hub endpoints
-app.post("/api/documents/upload", authenticateUser, upload.single("file"), async (req, res) => {
-  try {
-    await handleDocumentUpload(req, res)
-  } catch (error) {
-    console.error("Error uploading document:", error)
-    res.status(500).json({ error: "Failed to upload document" })
-  }
-})
-
-// Get a document by ID
-app.get("/api/documents/:id", authenticateUser, async (req, res) => {
-  try {
-    await handleGetDocument(req, res)
-  } catch (error) {
-    console.error("Error retrieving document:", error)
-    res.status(500).json({ error: "Failed to retrieve document" })
-  }
-})
-
-// Get all documents for a vessel
-app.get("/api/documents/vessel/:vesselId", authenticateUser, async (req, res) => {
-  try {
-    await handleGetVesselDocuments(req, res)
-  } catch (error) {
-    console.error("Error retrieving vessel documents:", error)
-    res.status(500).json({ error: "Failed to retrieve vessel documents" })
-  }
-})
-
-// Update a document
-app.put("/api/documents/:id", authenticateUser, async (req, res) => {
-  try {
-    await handleUpdateDocument(req, res)
-  } catch (error) {
-    console.error("Error updating document:", error)
-    res.status(500).json({ error: "Failed to update document" })
-  }
-})
-
-// Archive a document (soft delete)
-app.delete("/api/documents/:id", authenticateUser, async (req, res) => {
-  try {
-    await handleArchiveDocument(req, res)
-  } catch (error) {
-    console.error("Error archiving document:", error)
-    res.status(500).json({ error: "Failed to archive document" })
-  }
-})
-
-// Generate a download URL for a document
-app.get("/api/documents/:id/download", authenticateUser, async (req, res) => {
-  try {
-    await handleDocumentDownload(req, res)
-  } catch (error) {
-    console.error("Error generating document download URL:", error)
-    res.status(500).json({ error: "Failed to generate document download URL" })
-  }
-})
-
-app.post("/api/documents/batch-download", authenticateUser, async (req, res) => {
-  try {
-    await handleBatchDocumentDownload(req, res)
-  } catch (error) {
-    console.error("Error generating batch download URLs:", error)
-    res.status(500).json({
-      success: false,
-      error: "Failed to generate batch download URLs",
-    })
-  }
-})
-
-
-//Create contacts, save contacts, delete contacts
-
-
-
-// API endpoints
-app.post("/api/contacts", authenticateUser, async (req, res) => {
-  try {
-    await handleCreateContact(req, res)
-  } catch (error) {
-    console.error("Error creating contact:", error)
-    res.status(500).json({ error: "Failed to create contact" })
-  }
-})
-
-app.get("/api/vessels/:vesselId/contacts", authenticateUser, async (req, res) => {
-  try {
-    await handleGetVesselContacts(req, res)
-  } catch (error) {
-    console.error("Error fetching vessel contacts:", error)
-    res.status(500).json({ error: "Failed to fetch vessel contacts" })
-  }
-})
-
-app.put("/api/contacts/:contactId", authenticateUser, async (req, res) => {
-  try {
-    await handleUpdateContact(req, res)
-  } catch (error) {
-    console.error("Error updating contact:", error)
-    res.status(500).json({ error: "Failed to update contact" })
-  }
-})
-
-app.delete("/api/contacts/:contactId", authenticateUser, async (req, res) => {
-  try {
-    await handleDeleteContact(req, res)
-  } catch (error) {
-    console.error("Error deleting contact:", error)
-    res.status(500).json({ error: "Failed to delete contact" })
-  }
-})
-
-
-
 
 // Start server
 app.listen(port, "0.0.0.0", () => {
-  console.log(`🚢 Comovis V2 backend is running securely on port ${port}`)
-  console.log(`🔒 Security features enabled: HTTPS enforcement, rate limiting for auth`)
+  console.log(`🚢 AI Customer Support backend is running securely on port ${port}`)
+  console.log(`🤖 AI endpoints enabled: Knowledge Base, Agents, Chat`)
 })

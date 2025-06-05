@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Link, useLocation } from "react-router-dom"
-import { BarChart3, Ship, FileText, MapPin, Share2, Bell, Users } from "lucide-react"
+import { BarChart3, MessageSquare, Bot, Monitor, TrendingUp, Users } from "lucide-react"
 
 import IconComovisBlack from "../../ReusableAssets/Logos/IconComovisBlack.svg"
 import LogoBlack from "../../ReusableAssets/Logos/LogoBlack.svg"
@@ -55,31 +55,31 @@ export default function Sidebar() {
             collapsed={!isSidebarExpanded}
           />
           <NavItem
-            href="/fleet"
-            icon={Ship}
-            label="Fleet"
-            active={location.pathname === "/fleet"}
+            href="/conversations"
+            icon={MessageSquare}
+            label="Conversations"
+            active={location.pathname === "/conversations"}
             collapsed={!isSidebarExpanded}
           />
           <NavItem
-            href="/document-hub"
-            icon={FileText}
-            label="Document Hub"
-            active={location.pathname === "/document-hub"}
+            href="/agent-config"
+            icon={Bot}
+            label="AI Agent Training"
+            active={location.pathname === "/agent-config"}
             collapsed={!isSidebarExpanded}
           />
           <NavItem
-            href="/port-preparation"
-            icon={MapPin}
-            label="Port Preparation"
-            active={location.pathname === "/port-preparation"}
+            href="/widget-config"
+            icon={Monitor}
+            label="Chat Widget"
+            active={location.pathname === "/widget-config"}
             collapsed={!isSidebarExpanded}
           />
           <NavItem
-            href="/document-sharing"
-            icon={Share2}
-            label="Document Sharing"
-            active={location.pathname === "/document-sharing"}
+            href="/analytics"
+            icon={TrendingUp}
+            label="Analytics"
+            active={location.pathname === "/analytics"}
             collapsed={!isSidebarExpanded}
           />
           <NavItem
@@ -87,13 +87,6 @@ export default function Sidebar() {
             icon={Users}
             label="Team Management"
             active={location.pathname === "/team"}
-            collapsed={!isSidebarExpanded}
-          />
-          <NavItem
-            href="/notifications"
-            icon={Bell}
-            label="Notifications"
-            active={location.pathname === "/notifications"}
             collapsed={!isSidebarExpanded}
           />
         </nav>

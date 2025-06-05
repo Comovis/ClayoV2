@@ -19,8 +19,8 @@ async function sendUserConfirmationEmail(email) {
     
     // Set the redirect URL based on environment
     const redirectUrl = isDevelopment 
-      ? 'http://localhost:1601/confirm-email'
-      : 'https://comovis.co/confirm-email';
+      ? 'http://localhost:1003/confirm-email'
+      : 'https://clay.co/confirm-email';
     
     console.log(`Using redirect URL: ${redirectUrl} (${isDevelopment ? 'development' : 'production'} mode)`);
     

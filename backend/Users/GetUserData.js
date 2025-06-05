@@ -18,9 +18,9 @@ async function getUserData(userId, email) {
       email,
       full_name,
       role,
-      is_company_admin,
-      company_id,
+      organization_id,
       onboarding_step,
+      is_active,
       created_at,
       updated_at
     `)
@@ -78,19 +78,19 @@ async function handleGetUserData(req, res) {
     // If no specific user is requested, return the requesting user's data
     if (!userId && !email) {
       const result = await getUserData(requestingUserId, null)
-      
+
       if (!result.success) {
         return res.status(400).json({ error: result.error })
       }
-      
+
       return res.status(200).json({ success: true, data: result.data })
     }
 
     // Check if the user has permission to access this data
-    // First, get the requesting user's role and company
+    // First, get the requesting user's role and organization
     const { data: requestingUser, error: userError } = await supabaseAdmin
       .from("users")
-      .select("role, is_company_admin, company_id")
+      .select("role, organization_id")
       .eq("id", requestingUserId)
       .single()
 
@@ -101,30 +101,30 @@ async function handleGetUserData(req, res) {
     // If the user is requesting their own data, allow it
     if (userId === requestingUserId || (email && requestingUser.email === email)) {
       const result = await getUserData(userId, email)
-      
+
       if (!result.success) {
         return res.status(400).json({ error: result.error })
       }
-      
+
       return res.status(200).json({ success: true, data: result.data })
     }
 
     // For other users' data, check permissions
+    const isOwner = requestingUser.role === "owner"
     const isAdmin = requestingUser.role === "admin"
-    const isCompanyAdmin = requestingUser.is_company_admin
 
-    // If not an admin of any kind, deny access to other users' data
-    if (!isAdmin && !isCompanyAdmin) {
+    // If not an admin or owner, deny access to other users' data
+    if (!isOwner && !isAdmin) {
       return res.status(403).json({ error: "You don't have permission to access this user's data" })
     }
 
     // All permission checks passed, get the user data
     const result = await getUserData(userId, email)
-    
+
     if (!result.success) {
       return res.status(400).json({ error: result.error })
     }
-    
+
     return res.status(200).json({ success: true, data: result.data })
   } catch (error) {
     console.error("Error in handleGetUserData:", error)

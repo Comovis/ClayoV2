@@ -9,26 +9,27 @@ import { supabase } from "../../Auth/SupabaseAuth"
 const apiBaseUrl =
   import.meta.env.MODE === "development" ? import.meta.env.VITE_DEVELOPMENT_URL : import.meta.env.VITE_API_URL
 
-// Define types for user data based on your actual database schema
+// Define types for user data based on current database schema
 interface User {
   id: string
   email: string
   full_name: string
-  company_id: string | null
+  organization_id: string
   role: string
-  is_company_admin: boolean
   onboarding_step: string
+  is_active: boolean
   created_at: string
   updated_at: string
 }
 
-interface Company {
+interface Organization {
   id: string
   name: string
-  company_type: string | null
-  vessel_count: number | null
-  operating_regions: string[] | null
-  onboarding_completed: boolean
+  domain: string | null
+  logo_url: string | null
+  settings: Record<string, any>
+  subscription_plan: string
+  subscription_status: string
   created_at: string
   updated_at: string
 }
@@ -37,11 +38,11 @@ interface UserContextType {
   // Authentication state
   isAuthenticated: boolean
   isLoading: boolean
-  isLoggingOut: boolean // New state to track logout process
+  isLoggingOut: boolean
 
   // User data
   user: User | null
-  company: Company | null
+  organization: Organization | null
 
   // Authentication functions
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
@@ -65,7 +66,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [isLoggingOut, setIsLoggingOut] = useState<boolean>(false)
   const [user, setUser] = useState<User | null>(null)
-  const [company, setCompany] = useState<Company | null>(null)
+  const [organization, setOrganization] = useState<Organization | null>(null)
 
   // Initialize auth state
   useEffect(() => {
@@ -94,7 +95,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else {
           setIsAuthenticated(false)
           setUser(null)
-          setCompany(null)
+          setOrganization(null)
         }
       } catch (error) {
         console.error("Error initializing auth:", error)
@@ -113,7 +114,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else if (event === "SIGNED_OUT") {
         setIsAuthenticated(false)
         setUser(null)
-        setCompany(null)
+        setOrganization(null)
         localStorage.removeItem("userId")
       }
     })
@@ -161,9 +162,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Store user ID in localStorage for backup
         localStorage.setItem("userId", data.user.id)
 
-        // Set the user and company data
+        // Set the user and organization data
         setUser(data.user)
-        setCompany(data.company || null)
+        setOrganization(data.organization || null)
       } else {
         throw new Error("Failed to fetch user data")
       }
@@ -236,18 +237,18 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }
 
-  // Updated logout function with 2-second delay for better UX
+  // Updated logout function with better UX
   const logout = async () => {
     // Set logging out state to true
     setIsLoggingOut(true)
 
     try {
-      // Add a 2-second delay for better UX
-      await new Promise((resolve) => setTimeout(resolve, 3000))
+      // Add a delay for better UX
+      await new Promise((resolve) => setTimeout(resolve, 2000))
 
       // Clear application state first for immediate UI feedback
       setUser(null)
-      setCompany(null)
+      setOrganization(null)
       setIsAuthenticated(false)
 
       // Sign out from Supabase with global scope to sign out from all devices
@@ -338,7 +339,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isLoading,
     isLoggingOut,
     user,
-    company,
+    organization,
     login,
     signup,
     logout,
