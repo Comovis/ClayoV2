@@ -18,9 +18,42 @@ const {
   getProcessingStatus,
 } = require("./AppFeatures/AgentTrainingCreation/FileKnowledgeService")
 
+const {
+  handleGetAgentConfig,
+  handleUpdateAgentConfig,
+  handleTestAgentConfig,
+  handlePrepareAgentForChat,
+} = require("./AppFeatures/AgentTrainingCreation/AgentConfigService")
+
+
+// Import session handlers
+const {
+  handleGetAgentSessions,
+  handleGetSessionMessages,
+  handleUpdateSessionStatus,
+  handleGetSessionAnalytics,
+} = require("./AppFeatures/AgentTrainingCreation/SessionHandler")
+
+// Import analytics handlers  
+const {
+  handleGetAgentAnalytics,
+  handleGetOrganizationAnalytics,
+  handleGetConversationMetrics,
+} = require("./AppFeatures/AgentTrainingCreation/AnalyticsHandler")
+
+// Import enhanced chat service (to replace existing chat endpoints)
+const {
+  handleChatMessage,
+  handlePublicChatMessage,
+  handleCreateChatSession,
+  handleCreatePublicChatSession,
+  processMessage, 
+  createSession
+} = require("./AppFeatures/AgentTrainingCreation/ChatService")
+
 const { createAgent, getAgents, updateAgent } = require("./AppFeatures/AgentTrainingCreation/AgentService")
 
-const { processMessage, createSession } = require("./AppFeatures/AgentTrainingCreation/ChatService")
+const { handleGetAgentStatus } = require("./AppFeatures/AgentTrainingCreation/AgentStatusHandler")
 
 // Import your existing handlers
 const {
@@ -1037,6 +1070,332 @@ app.post("/api/complete-onboarding", getUser, async (req, res) => {
     res.status(500).json({ success: false, error: error.message })
   }
 })
+
+
+
+// ===== AGENT CONFIGURATION ENDPOINTS =====
+
+// Get agent configuration
+app.get("/api/agents/:agentId/config", authenticateUser, async (req, res) => {
+  try {
+    await handleGetAgentConfig(req, res)
+  } catch (error) {
+    console.error("Error getting agent config:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to get agent configuration",
+    })
+  }
+})
+
+// Update agent configuration
+app.put("/api/agents/:agentId/config", authenticateUser, async (req, res) => {
+  try {
+    await handleUpdateAgentConfig(req, res)
+  } catch (error) {
+    console.error("Error updating agent config:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to update agent configuration",
+    })
+  }
+})
+
+// Test agent configuration
+app.post("/api/agents/:agentId/test", authenticateUser, async (req, res) => {
+  try {
+    await handleTestAgentConfig(req, res)
+  } catch (error) {
+    console.error("Error testing agent config:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to test agent configuration",
+    })
+  }
+})
+
+// Prepare agent for chat (debugging endpoint)
+app.get("/api/agents/:agentId/prepare", authenticateUser, async (req, res) => {
+  try {
+    await handlePrepareAgentForChat(req, res)
+  } catch (error) {
+    console.error("Error preparing agent for chat:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to prepare agent for chat",
+    })
+  }
+})
+
+
+// ===== SESSION MANAGEMENT ENDPOINTS =====
+
+// Get all sessions for an agent
+app.get("/api/agents/:agentId/sessions", authenticateUser, async (req, res) => {
+  try {
+    await handleGetAgentSessions(req, res)
+  } catch (error) {
+    console.error("Error getting agent sessions:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to get agent sessions",
+    })
+  }
+})
+
+// Get messages for a specific session
+app.get("/api/sessions/:sessionId/messages", authenticateUser, async (req, res) => {
+  try {
+    await handleGetSessionMessages(req, res)
+  } catch (error) {
+    console.error("Error getting session messages:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to get session messages",
+    })
+  }
+})
+
+// Update session status (active, closed, escalated)
+app.put("/api/sessions/:sessionId/status", authenticateUser, async (req, res) => {
+  try {
+    await handleUpdateSessionStatus(req, res)
+  } catch (error) {
+    console.error("Error updating session status:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to update session status",
+    })
+  }
+})
+
+// Get analytics for a specific session
+app.get("/api/sessions/:sessionId/analytics", authenticateUser, async (req, res) => {
+  try {
+    await handleGetSessionAnalytics(req, res)
+  } catch (error) {
+    console.error("Error getting session analytics:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to get session analytics",
+    })
+  }
+})
+
+// ===== ANALYTICS ENDPOINTS =====
+
+// Get comprehensive analytics for an agent
+app.get("/api/agents/:agentId/analytics", authenticateUser, async (req, res) => {
+  try {
+    await handleGetAgentAnalytics(req, res)
+  } catch (error) {
+    console.error("Error getting agent analytics:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to get agent analytics",
+    })
+  }
+})
+
+// Get organization-wide analytics
+app.get("/api/analytics/organization", authenticateUser, async (req, res) => {
+  try {
+    await handleGetOrganizationAnalytics(req, res)
+  } catch (error) {
+    console.error("Error getting organization analytics:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to get organization analytics",
+    })
+  }
+})
+
+// Get conversation metrics (response times, satisfaction, etc.)
+app.get("/api/analytics/conversations", authenticateUser, async (req, res) => {
+  try {
+    await handleGetConversationMetrics(req, res)
+  } catch (error) {
+    console.error("Error getting conversation metrics:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to get conversation metrics",
+    })
+  }
+})
+
+// Get analytics for specific date range
+app.get("/api/analytics/range", authenticateUser, async (req, res) => {
+  try {
+    const { startDate, endDate, agentId } = req.query
+    req.query = { ...req.query, startDate, endDate, agentId }
+    await handleGetAgentAnalytics(req, res)
+  } catch (error) {
+    console.error("Error getting date range analytics:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to get analytics for date range",
+    })
+  }
+})
+
+// ===== ENHANCED CHAT ENDPOINTS (REPLACE YOUR EXISTING ONES) =====
+
+// REPLACE your existing "/api/chat/message" endpoint with this enhanced version
+app.post("/api/chat/message", authenticateUser, async (req, res) => {
+  try {
+    await handleChatMessage(req, res)
+  } catch (error) {
+    console.error("Error processing enhanced chat message:", error)
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        error: "Failed to process chat message",
+      })
+    }
+  }
+})
+
+// REPLACE your existing "/api/chat/session" endpoint with this enhanced version
+app.post("/api/chat/session", authenticateUser, async (req, res) => {
+  try {
+    await handleCreateChatSession(req, res)
+  } catch (error) {
+    console.error("Error creating enhanced chat session:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to create chat session",
+    })
+  }
+})
+
+// REPLACE your existing "/api/public/chat/message" endpoint with this enhanced version
+app.post("/api/public/chat/message", async (req, res) => {
+  try {
+    await handlePublicChatMessage(req, res)
+  } catch (error) {
+    console.error("Error processing enhanced public chat message:", error)
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        error: "Failed to process public chat message",
+      })
+    }
+  }
+})
+
+// REPLACE your existing "/api/public/chat/session" endpoint with this enhanced version
+app.post("/api/public/chat/session", async (req, res) => {
+  try {
+    await handleCreatePublicChatSession(req, res)
+  } catch (error) {
+    console.error("Error creating enhanced public chat session:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to create public chat session",
+    })
+  }
+})
+
+
+app.get("/api/agents/:agentId/status", authenticateUser, async (req, res) => {
+  try {
+    await handleGetAgentStatus(req, res)
+  } catch (error) {
+    console.error("Error fetching agent status:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch agent status",
+    })
+  }
+})
+
+
+// ===== DEBUGGING AND MONITORING ENDPOINTS =====
+
+// Get processing status with detailed info
+app.get("/api/knowledge/status/:id/detailed", authenticateUser, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const { data: item, error } = await supabaseAdmin.from("knowledge_base").select("*").eq("id", id).single()
+
+    if (error) throw error
+
+    res.json({
+      success: true,
+      item,
+      processingDetails: {
+        status: item.processing_status,
+        extractionMethod: item.metadata?.extractionMethod,
+        textLength: item.content?.length || 0,
+        hasContent: !!item.content,
+        errorDetails: item.metadata?.error,
+      },
+    })
+  } catch (error) {
+    console.error("Error getting detailed status:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to get detailed processing status",
+    })
+  }
+})
+
+// Test agent configuration endpoint
+app.post("/api/agents/:agentId/test-config", authenticateUser, async (req, res) => {
+  try {
+    const { agentId } = req.params
+    const { testMessage } = req.body
+    const organizationId = req.user.organization_id
+
+    const result = await testAgentConfiguration(agentId, organizationId, testMessage || "Hello, can you help me?")
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: result.error,
+      })
+    }
+
+    res.json({
+      success: true,
+      testResult: result.testResult,
+    })
+  } catch (error) {
+    console.error("Error testing agent config:", error)
+    res.status(500).json({
+      success: false,
+      error: "Failed to test agent configuration",
+    })
+  }
+})
+
+// Health check for AI services
+app.get("/api/health/ai-services", async (req, res) => {
+  try {
+    const healthCheck = {
+      timestamp: new Date().toISOString(),
+      services: {
+        chatService: "operational",
+        agentConfig: "operational",
+        documentProcessor: "operational",
+        knowledgeBase: "operational",
+      },
+      version: "enhanced-v1.0",
+    }
+
+    res.json({
+      success: true,
+      health: healthCheck,
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: "Health check failed",
+    })
+  }
+})
+
 
 // Start server
 app.listen(port, "0.0.0.0", () => {

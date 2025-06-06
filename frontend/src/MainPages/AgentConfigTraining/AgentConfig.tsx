@@ -1,6 +1,4 @@
 "use client"
-
-import { DialogFooter } from "@/components/ui/dialog"
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { useAgents } from "../../Hooks/useAgents"
@@ -8,17 +6,31 @@ import { useKnowledgeBase } from "../../Hooks/useKnowledgeBase"
 import { useUser } from "../../Auth/Contexts/UserContext"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { Progress } from "@/components/ui/progress"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import CreateAgentModal from "./AgentModal"
+
+// Import your new hooks with corrected paths
+import { useAgentConfig } from "../../Hooks/useAgentsConfig"
+import { useAgentSessions } from "../../Hooks/useAgentSessions"
+import { useAgentAnalytics } from "../../Hooks/useAgentAnalytics"
+import { useAgentStatus } from "../../Hooks/useAgentStatusHook"
+
 import {
   Bot,
   Plus,
@@ -27,24 +39,25 @@ import {
   Link,
   Trash2,
   Edit3,
-  Save,
   Brain,
   MessageSquare,
-  Sparkles,
   Globe,
-  Clock,
-  Target,
-  TrendingUp,
   Eye,
   Loader2,
   BookOpen,
-  Lightbulb,
-  Volume2,
   Check,
   AlertCircle,
+  BarChart3,
+  Save,
+  Lightbulb,
+  Volume2,
+  Sparkles,
+  Activity,
+  Clock,
+  TrendingUp,
 } from "lucide-react"
 
-export default function AIAgentsPage() {
+export default function UpdatedEnhancedAIAgentsPage() {
   const { isLoading: userLoading } = useUser()
   const { agents, fetchAgents, isLoading: agentsLoading, error: agentsError } = useAgents()
   const {
@@ -62,6 +75,12 @@ export default function AIAgentsPage() {
     clearMessages,
   } = useKnowledgeBase()
 
+  // Use all your new hooks
+  const { updateAgentConfig, isLoading, error, success, clearMessages: clearConfigMessages } = useAgentConfig()
+  const { sessions, getAgentSessions, updateSessionStatus, isLoading: sessionsLoading } = useAgentSessions()
+  const { analytics, getAgentAnalytics, isLoading: analyticsLoading } = useAgentAnalytics()
+  const { agentStatus, getAgentStatus, isLoading: statusLoading } = useAgentStatus()
+
   const [selectedAgent, setSelectedAgent] = useState<string>("")
   const [activeTab, setActiveTab] = useState("knowledge")
   const [showUrlDialog, setShowUrlDialog] = useState(false)
@@ -77,7 +96,138 @@ export default function AIAgentsPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [itemToDelete, setItemToDelete] = useState<string | null>(null)
 
-  // Fetch agents on component mount, but wait for user context to load
+  // Form state for personality tab
+  const [formData, setFormData] = useState({
+    name: "",
+    personality: "friendly",
+    language: "en",
+    responseLength: "medium",
+    formalityLevel: "balanced",
+    customInstructions: "",
+    temperature: 0.7,
+    maxTokens: 300,
+    model: "gpt-4o-mini",
+    capabilities: [],
+  })
+
+  // Template state
+  const [templates, setTemplates] = useState({
+    greeting: "Hello! I'm here to help you today. How can I assist you?",
+    escalation: "I'd like to connect you with a human agent who can better assist you with this request.",
+    closing: "Thank you for contacting us today! Is there anything else I can help you with?",
+  })
+
+  const [hasChanges, setHasChanges] = useState(false)
+
+  // Enhanced file validation
+  const validateFile = (file: File): { isValid: boolean; error?: string } => {
+    console.log("🔍 Validating file:", {
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      lastModified: file.lastModified,
+    })
+
+    // Check file size (50MB limit)
+    const maxSize = 50 * 1024 * 1024 // 50MB
+    if (file.size > maxSize) {
+      return {
+        isValid: false,
+        error: `File size (${(file.size / 1024 / 1024).toFixed(1)}MB) exceeds 50MB limit`,
+      }
+    }
+
+    // Check file type
+    const allowedTypes = [
+      "application/pdf",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/msword",
+      "text/plain",
+    ]
+
+    if (!allowedTypes.includes(file.type)) {
+      return {
+        isValid: false,
+        error: `File type ${file.type} is not supported. Please use PDF, DOC, DOCX, or TXT files.`,
+      }
+    }
+
+    // Additional PDF validation
+    if (file.type === "application/pdf") {
+      if (file.size === 0) {
+        return {
+          isValid: false,
+          error: "PDF file appears to be empty",
+        }
+      }
+    }
+
+    return { isValid: true }
+  }
+
+  // Enhanced file upload handler with better error handling
+  const handleFileUpload = async (files: FileList) => {
+    console.log("📁 Starting file upload process...")
+    console.log("Files to upload:", files.length)
+
+    if (!files || files.length === 0) {
+      console.warn("No files provided")
+      return
+    }
+
+    if (!selectedAgent) {
+      console.error("No agent selected")
+      alert("Please select an agent first")
+      return
+    }
+
+    // Clear any previous errors
+    clearMessages()
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      console.log(`\n📄 Processing file ${i + 1}/${files.length}: ${file.name}`)
+
+      // Validate file before upload
+      const validation = validateFile(file)
+      if (!validation.isValid) {
+        console.error("❌ File validation failed:", validation.error)
+        alert(`File validation failed: ${validation.error}`)
+        continue
+      }
+
+      console.log("✅ File validation passed")
+
+      try {
+        console.log("🚀 Starting upload for:", file.name)
+        console.log("Upload details:", {
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size,
+          agentId: selectedAgent,
+        })
+
+        const result = await uploadDocument(file, {
+          title: file.name,
+          category: "General",
+          agentId: selectedAgent,
+        })
+
+        if (result) {
+          console.log("✅ Upload successful for:", file.name)
+        } else {
+          console.error("❌ Upload failed for:", file.name)
+        }
+      } catch (error) {
+        console.error("❌ Upload error for", file.name, ":", error)
+        // Don't break the loop, continue with next file
+      }
+    }
+
+    console.log("📁 File upload process completed")
+  }
+
+  // Load agents on component mount
   useEffect(() => {
     if (!userLoading) {
       console.log("User context loaded, fetching agents...")
@@ -85,20 +235,80 @@ export default function AIAgentsPage() {
     }
   }, [fetchAgents, userLoading])
 
-  // Set first agent as selected when agents load
+  // Auto-select first agent
   useEffect(() => {
     if (agents.length > 0 && !selectedAgent) {
       setSelectedAgent(agents[0].id)
     }
   }, [agents, selectedAgent])
 
-  // Fetch knowledge items when selected agent changes, but wait for user context
+  // Load knowledge items and agent data when agent changes
   useEffect(() => {
     if (selectedAgent && !userLoading) {
-      console.log("Fetching knowledge items for agent:", selectedAgent)
+      console.log("Fetching data for agent:", selectedAgent)
       fetchKnowledgeItems(selectedAgent)
+      getAgentSessions(selectedAgent)
+      getAgentAnalytics(selectedAgent)
+      getAgentStatus(selectedAgent)
+
+      // Update form data with current agent
+      const currentAgent = agents.find((agent) => agent.id === selectedAgent)
+      if (currentAgent) {
+        setFormData({
+          name: currentAgent.name || "",
+          personality: currentAgent.personality || "friendly",
+          language: currentAgent.language || "en",
+          responseLength: currentAgent.settings?.responseLength || "medium",
+          formalityLevel: currentAgent.settings?.formalityLevel || "balanced",
+          customInstructions: currentAgent.settings?.customInstructions || "",
+          temperature: currentAgent.settings?.temperature || 0.7,
+          maxTokens: currentAgent.settings?.maxTokens || 300,
+          model: currentAgent.settings?.model || "gpt-4o-mini",
+          capabilities: currentAgent.capabilities || [],
+        })
+
+        setTemplates({
+          greeting:
+            currentAgent.response_templates?.greeting || "Hello! I'm here to help you today. How can I assist you?",
+          escalation:
+            currentAgent.response_templates?.escalation ||
+            "I'd like to connect you with a human agent who can better assist you with this request.",
+          closing:
+            currentAgent.response_templates?.closing ||
+            "Thank you for contacting us today! Is there anything else I can help you with?",
+        })
+      }
     }
-  }, [selectedAgent, fetchKnowledgeItems, userLoading])
+  }, [selectedAgent, fetchKnowledgeItems, userLoading, agents, getAgentSessions, getAgentAnalytics, getAgentStatus])
+
+  // Track changes
+  useEffect(() => {
+    const currentAgent = agents.find((agent) => agent.id === selectedAgent)
+    if (!currentAgent) return
+
+    const hasFormChanges = Object.keys(formData).some((key) => {
+      if (key === "capabilities") {
+        return JSON.stringify(formData[key]) !== JSON.stringify(currentAgent[key] || [])
+      }
+      if (
+        key === "customInstructions" ||
+        key === "responseLength" ||
+        key === "formalityLevel" ||
+        key === "temperature" ||
+        key === "maxTokens" ||
+        key === "model"
+      ) {
+        return formData[key] !== (currentAgent.settings?.[key] || "")
+      }
+      return formData[key] !== (currentAgent[key] || "")
+    })
+
+    const hasTemplateChanges = Object.keys(templates).some(
+      (key) => templates[key] !== (currentAgent.response_templates?.[key] || ""),
+    )
+
+    setHasChanges(hasFormChanges || hasTemplateChanges)
+  }, [formData, templates, agents, selectedAgent])
 
   const currentAgent = agents.find((agent) => agent.id === selectedAgent)
 
@@ -114,20 +324,7 @@ export default function AIAgentsPage() {
   const handleCreateAgent = (createdAgent: any) => {
     setSelectedAgent(createdAgent.id)
     setActiveTab("knowledge")
-    // Refresh agents list
     fetchAgents()
-  }
-
-  const handleFileUpload = async (files: FileList) => {
-    if (files && files.length > 0 && selectedAgent) {
-      for (const file of Array.from(files)) {
-        await uploadDocument(file, {
-          title: file.name,
-          category: "General",
-          agentId: selectedAgent,
-        })
-      }
-    }
   }
 
   const handleDrag = (e: React.DragEvent) => {
@@ -145,6 +342,7 @@ export default function AIAgentsPage() {
     e.stopPropagation()
     setDragActive(false)
 
+    console.log("📂 Files dropped")
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleFileUpload(e.dataTransfer.files)
     }
@@ -193,6 +391,48 @@ export default function AIAgentsPage() {
     }
   }
 
+  const handleInputChange = (field: string, value: any) => {
+    setFormData((prev) => ({ ...prev, [field]: value }))
+    clearConfigMessages()
+  }
+
+  const handleTemplateChange = (template: string, value: string) => {
+    setTemplates((prev) => ({ ...prev, [template]: value }))
+    clearConfigMessages()
+  }
+
+  const handleCapabilityToggle = (capability: string, enabled: boolean) => {
+    setFormData((prev) => ({
+      ...prev,
+      capabilities: enabled ? [...prev.capabilities, capability] : prev.capabilities.filter((c) => c !== capability),
+    }))
+    clearConfigMessages()
+  }
+
+  const handleSave = async () => {
+    const configToSave = {
+      name: formData.name,
+      personality: formData.personality,
+      language: formData.language,
+      capabilities: formData.capabilities,
+      response_templates: templates,
+      settings: {
+        responseLength: formData.responseLength,
+        formalityLevel: formData.formalityLevel,
+        customInstructions: formData.customInstructions,
+        temperature: formData.temperature,
+        maxTokens: formData.maxTokens,
+        model: formData.model,
+      },
+    }
+
+    const success = await updateAgentConfig(currentAgent.id, configToSave)
+    if (success) {
+      setHasChanges(false)
+      fetchAgents()
+    }
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "active":
@@ -233,7 +473,15 @@ export default function AIAgentsPage() {
     return (bytes / (1024 * 1024)).toFixed(1) + " MB"
   }
 
-  // Show loading state while user context is loading
+  const availableCapabilities = [
+    "Customer Support",
+    "Product Information",
+    "Order Management",
+    "Technical Support",
+    "Billing Inquiries",
+    "General Questions",
+  ]
+
   if (userLoading) {
     return (
       <div className="max-w-7xl mx-auto p-6">
@@ -253,13 +501,19 @@ export default function AIAgentsPage() {
           <h1 className="text-2xl font-bold">AI Agent Training</h1>
           <p className="text-gray-500">Configure and train your AI assistants for customer service</p>
         </div>
-        <Button onClick={() => setShowCreateAgentModal(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create New Agent
-        </Button>
+        <div className="flex items-center space-x-2">
+          <Button variant="outline" onClick={() => (window.location.href = "/conversations")}>
+            <MessageSquare className="mr-2 h-4 w-4" />
+            View Conversations
+          </Button>
+          <Button onClick={() => setShowCreateAgentModal(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create New Agent
+          </Button>
+        </div>
       </div>
 
-      {/* Error Messages */}
+      {/* Enhanced Error Messages */}
       {agentsError && (
         <Alert variant="destructive" className="mb-6">
           <AlertCircle className="h-4 w-4" />
@@ -270,7 +524,15 @@ export default function AIAgentsPage() {
       {knowledgeError && (
         <Alert variant="destructive" className="mb-6">
           <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{knowledgeError}</AlertDescription>
+          <AlertDescription>
+            <div>
+              <p className="font-medium">Upload Error:</p>
+              <p>{knowledgeError}</p>
+              <p className="text-xs mt-1">
+                If this is a PDF extraction error, please try a different PDF or contact support.
+              </p>
+            </div>
+          </AlertDescription>
         </Alert>
       )}
 
@@ -278,6 +540,20 @@ export default function AIAgentsPage() {
         <Alert className="bg-green-50 border-green-200 mb-6">
           <Check className="h-4 w-4 text-green-600" />
           <AlertDescription className="text-green-800">{knowledgeSuccess}</AlertDescription>
+        </Alert>
+      )}
+
+      {error && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {success && (
+        <Alert className="bg-green-50 border-green-200 mb-6">
+          <Check className="h-4 w-4 text-green-600" />
+          <AlertDescription className="text-green-800">{success}</AlertDescription>
         </Alert>
       )}
 
@@ -336,31 +612,44 @@ export default function AIAgentsPage() {
         {/* Agent Configuration */}
         <div className="lg:col-span-3">
           {currentAgent ? (
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="knowledge">Knowledge Base</TabsTrigger>
-                <TabsTrigger value="personality">Personality</TabsTrigger>
-                <TabsTrigger value="templates">Templates</TabsTrigger>
-                <TabsTrigger value="analytics">Analytics</TabsTrigger>
-              </TabsList>
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg">{currentAgent.name}</CardTitle>
+                    <CardDescription>Manage knowledge base and agent configuration</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Tabs value={activeTab} onValueChange={setActiveTab}>
+                  <TabsList className="grid w-full grid-cols-4">
+                    <TabsTrigger value="knowledge">
+                      <Brain className="mr-2 h-4 w-4" />
+                      Knowledge Base
+                    </TabsTrigger>
+                    <TabsTrigger value="personality">
+                      <Lightbulb className="mr-2 h-4 w-4" />
+                      Personality
+                    </TabsTrigger>
+                    <TabsTrigger value="templates">
+                      <MessageSquare className="mr-2 h-4 w-4" />
+                      Templates
+                    </TabsTrigger>
+                    <TabsTrigger value="analytics">
+                      <BarChart3 className="mr-2 h-4 w-4" />
+                      Analytics
+                    </TabsTrigger>
+                  </TabsList>
 
-              {/* Knowledge Base Tab */}
-              <TabsContent value="knowledge" className="space-y-6">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg flex items-center">
-                      <Brain className="mr-2 h-5 w-5" />
-                      AI Training & Knowledge Base
-                    </CardTitle>
-                    <CardDescription>Train your AI with your business information</CardDescription>
-                  </CardHeader>
-                  <CardContent>
+                  {/* Knowledge Base Tab */}
+                  <TabsContent value="knowledge" className="space-y-6">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      {/* Upload Section */}
+                      {/* Enhanced Upload Section */}
                       <div className="space-y-4">
                         <h3 className="font-semibold">Add Knowledge Sources</h3>
 
-                        {/* Document Upload */}
+                        {/* Enhanced Document Upload */}
                         <div
                           className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
                             dragActive ? "border-blue-500 bg-blue-50" : "border-blue-300 hover:bg-blue-50"
@@ -377,6 +666,7 @@ export default function AIAgentsPage() {
                           <p className="font-medium mb-2">{dragActive ? "Drop files here" : "Upload Documents"}</p>
                           <p className="text-sm text-gray-600 mb-3">Drag & drop files or click to browse</p>
                           <p className="text-xs text-gray-500">PDF, DOC, TXT files (max 50MB)</p>
+                          <p className="text-xs text-blue-600 mt-1">Enhanced PDF processing with fallback extraction</p>
                           <input
                             type="file"
                             ref={fileInputRef}
@@ -387,7 +677,6 @@ export default function AIAgentsPage() {
                           />
                         </div>
 
-                        {/* URL Input */}
                         <div className="border-2 border-dashed border-green-300 rounded-lg p-6 text-center">
                           <Globe className="h-8 w-8 mx-auto mb-3 text-gray-500" />
                           <p className="font-medium mb-2">Add Website URLs</p>
@@ -398,7 +687,6 @@ export default function AIAgentsPage() {
                           </Button>
                         </div>
 
-                        {/* Text Input */}
                         <div className="border-2 border-dashed border-purple-300 rounded-lg p-6 text-center">
                           <MessageSquare className="h-8 w-8 mx-auto mb-3 text-gray-500" />
                           <p className="font-medium mb-2">Add Text Content</p>
@@ -409,7 +697,7 @@ export default function AIAgentsPage() {
                           </Button>
                         </div>
 
-                        {/* Upload Progress */}
+                        {/* Enhanced Upload Progress */}
                         {isUploading && (
                           <Alert className="border-blue-200 bg-blue-50">
                             <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
@@ -417,7 +705,7 @@ export default function AIAgentsPage() {
                               <div className="space-y-2">
                                 <p className="font-medium">Processing document...</p>
                                 <Progress value={uploadProgress} className="h-2" />
-                                <p className="text-sm">Uploading and indexing your content</p>
+                                <p className="text-sm">Uploading and extracting text using enhanced PDF processing</p>
                               </div>
                             </AlertDescription>
                           </Alert>
@@ -516,243 +804,440 @@ export default function AIAgentsPage() {
                         )}
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
+                  </TabsContent>
 
-              {/* Other tabs remain the same but with real agent data */}
-              <TabsContent value="personality" className="space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-lg flex items-center">
-                        <Lightbulb className="mr-2 h-5 w-5" />
-                        Personality & Behavior
-                      </CardTitle>
-                      <CardDescription>Define how your AI agent communicates</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      <div className="space-y-2">
-                        <Label htmlFor="agentName">Agent Name</Label>
-                        <Input id="agentName" defaultValue={currentAgent.name} />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="personality">Personality Type</Label>
-                        <Select defaultValue={currentAgent.personality}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="friendly">Friendly & Casual</SelectItem>
-                            <SelectItem value="professional">Professional & Formal</SelectItem>
-                            <SelectItem value="helpful">Helpful & Supportive</SelectItem>
-                            <SelectItem value="enthusiastic">Enthusiastic & Energetic</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="language">Primary Language</Label>
-                        <Select defaultValue={currentAgent.language}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="en">English</SelectItem>
-                            <SelectItem value="es">Spanish</SelectItem>
-                            <SelectItem value="fr">French</SelectItem>
-                            <SelectItem value="de">German</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="instructions">Custom Instructions</Label>
-                        <Textarea
-                          id="instructions"
-                          placeholder="Additional instructions for how the AI should behave..."
-                          className="min-h-[100px]"
-                        />
-                      </div>
-
-                      <div className="space-y-4">
-                        <Label>Capabilities</Label>
-                        {currentAgent.capabilities.map((capability) => (
-                          <div key={capability} className="flex items-center justify-between">
-                            <span className="text-sm">{capability}</span>
-                            <Switch defaultChecked />
+                  {/* Personality Tab */}
+                  <TabsContent value="personality" className="space-y-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Personality & Behavior */}
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-lg flex items-center">
+                            <Lightbulb className="mr-2 h-5 w-5" />
+                            Personality & Behavior
+                          </CardTitle>
+                          <CardDescription>Define how your AI agent communicates</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                          <div className="space-y-2">
+                            <Label htmlFor="agentName">Agent Name</Label>
+                            <Input
+                              id="agentName"
+                              value={formData.name}
+                              onChange={(e) => handleInputChange("name", e.target.value)}
+                            />
                           </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
 
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-lg flex items-center">
-                        <Volume2 className="mr-2 h-5 w-5" />
-                        Voice & Tone Settings
-                      </CardTitle>
-                      <CardDescription>Configure how your agent sounds</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      <div className="space-y-2">
-                        <Label>Response Length</Label>
-                        <Select defaultValue="medium">
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="short">Short & Concise</SelectItem>
-                            <SelectItem value="medium">Medium Length</SelectItem>
-                            <SelectItem value="long">Detailed & Thorough</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="personality">Personality Type</Label>
+                            <Select
+                              value={formData.personality}
+                              onValueChange={(value) => handleInputChange("personality", value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="friendly">Friendly & Casual</SelectItem>
+                                <SelectItem value="professional">Professional & Formal</SelectItem>
+                                <SelectItem value="helpful">Helpful & Supportive</SelectItem>
+                                <SelectItem value="enthusiastic">Enthusiastic & Energetic</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
 
-                      <div className="space-y-2">
-                        <Label>Formality Level</Label>
-                        <Select defaultValue="balanced">
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="casual">Very Casual</SelectItem>
-                            <SelectItem value="balanced">Balanced</SelectItem>
-                            <SelectItem value="formal">Very Formal</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="language">Primary Language</Label>
+                            <Select
+                              value={formData.language}
+                              onValueChange={(value) => handleInputChange("language", value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="en">English</SelectItem>
+                                <SelectItem value="es">Spanish</SelectItem>
+                                <SelectItem value="fr">French</SelectItem>
+                                <SelectItem value="de">German</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
 
-                      <Alert className="border-blue-200 bg-blue-50">
-                        <Sparkles className="h-4 w-4 text-blue-600" />
-                        <AlertDescription className="text-blue-800">
-                          <p className="font-medium">AI Personality Preview</p>
-                          <p className="text-sm mt-1">{currentAgent.response_templates.greeting}</p>
-                        </AlertDescription>
-                      </Alert>
-                    </CardContent>
-                  </Card>
-                </div>
-              </TabsContent>
+                          <div className="space-y-2">
+                            <Label htmlFor="instructions">Custom Instructions</Label>
+                            <Textarea
+                              id="instructions"
+                              placeholder="Additional instructions for how the AI should behave..."
+                              className="min-h-[100px]"
+                              value={formData.customInstructions}
+                              onChange={(e) => handleInputChange("customInstructions", e.target.value)}
+                            />
+                          </div>
 
-              <TabsContent value="templates" className="space-y-6">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg flex items-center">
-                      <MessageSquare className="mr-2 h-5 w-5" />
-                      Response Templates
-                    </CardTitle>
-                    <CardDescription>Customize how your AI responds to common scenarios</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="greeting">Greeting Message</Label>
-                      <Textarea
-                        id="greeting"
-                        defaultValue={currentAgent.response_templates.greeting}
-                        className="min-h-[80px]"
-                      />
-                      <p className="text-xs text-gray-500">This message is shown when a conversation starts</p>
+                          <div className="space-y-4">
+                            <Label>Capabilities</Label>
+                            {availableCapabilities.map((capability) => (
+                              <div key={capability} className="flex items-center justify-between">
+                                <span className="text-sm">{capability}</span>
+                                <Switch
+                                  checked={formData.capabilities.includes(capability)}
+                                  onCheckedChange={(checked) => handleCapabilityToggle(capability, checked)}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {/* Voice & Tone Settings */}
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-lg flex items-center">
+                            <Volume2 className="mr-2 h-5 w-5" />
+                            Voice & Tone Settings
+                          </CardTitle>
+                          <CardDescription>Configure how your agent sounds and responds</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                          <div className="space-y-2">
+                            <Label>Response Length</Label>
+                            <Select
+                              value={formData.responseLength}
+                              onValueChange={(value) => handleInputChange("responseLength", value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="short">Short & Concise</SelectItem>
+                                <SelectItem value="medium">Medium Length</SelectItem>
+                                <SelectItem value="long">Detailed & Thorough</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>Formality Level</Label>
+                            <Select
+                              value={formData.formalityLevel}
+                              onValueChange={(value) => handleInputChange("formalityLevel", value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="casual">Very Casual</SelectItem>
+                                <SelectItem value="balanced">Balanced</SelectItem>
+                                <SelectItem value="formal">Very Formal</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>AI Model</Label>
+                            <Select value={formData.model} onValueChange={(value) => handleInputChange("model", value)}>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="gpt-4o-mini">GPT-4o Mini (Fast)</SelectItem>
+                                <SelectItem value="gpt-4o">GPT-4o (Balanced)</SelectItem>
+                                <SelectItem value="gpt-4">GPT-4 (Advanced)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>Creativity Level (Temperature: {formData.temperature})</Label>
+                            <input
+                              type="range"
+                              min="0"
+                              max="1"
+                              step="0.1"
+                              value={formData.temperature}
+                              onChange={(e) => handleInputChange("temperature", Number.parseFloat(e.target.value))}
+                              className="w-full"
+                            />
+                            <div className="flex justify-between text-xs text-gray-500">
+                              <span>Conservative</span>
+                              <span>Creative</span>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>Max Response Length (Tokens: {formData.maxTokens})</Label>
+                            <input
+                              type="range"
+                              min="50"
+                              max="1000"
+                              step="50"
+                              value={formData.maxTokens}
+                              onChange={(e) => handleInputChange("maxTokens", Number.parseInt(e.target.value))}
+                              className="w-full"
+                            />
+                            <div className="flex justify-between text-xs text-gray-500">
+                              <span>Short</span>
+                              <span>Long</span>
+                            </div>
+                          </div>
+
+                          <Alert className="border-blue-200 bg-blue-50">
+                            <Sparkles className="h-4 w-4 text-blue-600" />
+                            <AlertDescription className="text-blue-800">
+                              <p className="font-medium">Configuration Preview</p>
+                              <p className="text-sm mt-1">
+                                {formData.personality} personality, {formData.responseLength} responses,{" "}
+                                {formData.formalityLevel} tone using {formData.model}
+                              </p>
+                            </AlertDescription>
+                          </Alert>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </TabsContent>
+
+                  {/* Templates Tab */}
+                  <TabsContent value="templates" className="space-y-6">
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-lg flex items-center">
+                          <MessageSquare className="mr-2 h-5 w-5" />
+                          Response Templates
+                        </CardTitle>
+                        <CardDescription>
+                          Customize how your AI responds to common scenarios. These templates will be used automatically
+                          in appropriate situations.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-6">
+                        <div className="space-y-2">
+                          <Label htmlFor="greeting">Greeting Message</Label>
+                          <Textarea
+                            id="greeting"
+                            value={templates.greeting}
+                            onChange={(e) => handleTemplateChange("greeting", e.target.value)}
+                            className="min-h-[80px]"
+                            placeholder="Enter the message shown when a conversation starts..."
+                          />
+                          <p className="text-xs text-gray-500">
+                            This message is shown when a conversation starts. Keep it welcoming and helpful.
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="escalation">Escalation Message</Label>
+                          <Textarea
+                            id="escalation"
+                            value={templates.escalation}
+                            onChange={(e) => handleTemplateChange("escalation", e.target.value)}
+                            className="min-h-[80px]"
+                            placeholder="Enter the message used when transferring to a human agent..."
+                          />
+                          <p className="text-xs text-gray-500">
+                            Used when the AI needs to transfer the conversation to a human agent.
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="closing">Closing Message</Label>
+                          <Textarea
+                            id="closing"
+                            value={templates.closing}
+                            onChange={(e) => handleTemplateChange("closing", e.target.value)}
+                            className="min-h-[80px]"
+                            placeholder="Enter the message shown at the end of conversations..."
+                          />
+                          <p className="text-xs text-gray-500">
+                            Shown at the end of conversations. Make it friendly and leave the door open for future help.
+                          </p>
+                        </div>
+
+                        {/* Template Preview */}
+                        <div className="space-y-4 pt-4 border-t">
+                          <h3 className="text-sm font-medium">Template Preview</h3>
+                          <div className="space-y-3">
+                            <div className="p-3 bg-blue-50 rounded-lg border-l-4 border-blue-400">
+                              <p className="text-sm font-medium text-blue-800">Greeting</p>
+                              <p className="text-sm text-blue-700 mt-1">{templates.greeting}</p>
+                            </div>
+
+                            <div className="p-3 bg-yellow-50 rounded-lg border-l-4 border-yellow-400">
+                              <p className="text-sm font-medium text-yellow-800">Escalation</p>
+                              <p className="text-sm text-yellow-700 mt-1">{templates.escalation}</p>
+                            </div>
+
+                            <div className="p-3 bg-green-50 rounded-lg border-l-4 border-green-400">
+                              <p className="text-sm font-medium text-green-800">Closing</p>
+                              <p className="text-sm text-green-700 mt-1">{templates.closing}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  {/* Analytics Tab */}
+                  <TabsContent value="analytics" className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                      {/* Status Card */}
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="flex items-center space-x-2">
+                            <Activity className="h-4 w-4 text-green-500" />
+                            <span className="text-sm font-medium">Status</span>
+                          </div>
+                          <p className="text-2xl font-bold mt-2">
+                            {statusLoading ? (
+                              <Loader2 className="h-6 w-6 animate-spin" />
+                            ) : (
+                              agentStatus?.agentStatus || "Unknown"
+                            )}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {agentStatus?.activeSessions || 0} active sessions
+                          </p>
+                        </CardContent>
+                      </Card>
+
+                      {/* Conversations Card */}
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="flex items-center space-x-2">
+                            <MessageSquare className="h-4 w-4 text-blue-500" />
+                            <span className="text-sm font-medium">Conversations</span>
+                          </div>
+                          <p className="text-2xl font-bold mt-2">
+                            {analyticsLoading ? (
+                              <Loader2 className="h-6 w-6 animate-spin" />
+                            ) : (
+                              analytics?.totalConversations || 0
+                            )}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">Total conversations</p>
+                        </CardContent>
+                      </Card>
+
+                      {/* Response Time Card */}
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="flex items-center space-x-2">
+                            <Clock className="h-4 w-4 text-orange-500" />
+                            <span className="text-sm font-medium">Avg Response</span>
+                          </div>
+                          <p className="text-2xl font-bold mt-2">
+                            {analyticsLoading ? (
+                              <Loader2 className="h-6 w-6 animate-spin" />
+                            ) : (
+                              `${analytics?.averageResponseTime || 0}s`
+                            )}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">Average response time</p>
+                        </CardContent>
+                      </Card>
+
+                      {/* Satisfaction Card */}
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="flex items-center space-x-2">
+                            <TrendingUp className="h-4 w-4 text-purple-500" />
+                            <span className="text-sm font-medium">Satisfaction</span>
+                          </div>
+                          <p className="text-2xl font-bold mt-2">
+                            {analyticsLoading ? (
+                              <Loader2 className="h-6 w-6 animate-spin" />
+                            ) : (
+                              `${analytics?.customerSatisfaction || 0}%`
+                            )}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">Customer satisfaction</p>
+                        </CardContent>
+                      </Card>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="escalation">Escalation Message</Label>
-                      <Textarea
-                        id="escalation"
-                        defaultValue={currentAgent.response_templates.escalation}
-                        className="min-h-[80px]"
-                      />
-                      <p className="text-xs text-gray-500">Used when transferring to a human agent</p>
-                    </div>
+                    {/* Detailed Analytics */}
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-lg flex items-center">
+                          <BarChart3 className="mr-2 h-5 w-5" />
+                          Performance Metrics
+                        </CardTitle>
+                        <CardDescription>Detailed analytics for your AI agent</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {analyticsLoading ? (
+                          <div className="text-center py-8">
+                            <Loader2 className="h-8 w-8 animate-spin mx-auto text-gray-400" />
+                            <p className="mt-2 text-gray-600">Loading analytics...</p>
+                          </div>
+                        ) : analytics ? (
+                          <div className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div className="text-center p-4 bg-gray-50 rounded-lg">
+                                <p className="text-2xl font-bold text-green-600">{analytics.resolutionRate}%</p>
+                                <p className="text-sm text-gray-600">Resolution Rate</p>
+                              </div>
+                              <div className="text-center p-4 bg-gray-50 rounded-lg">
+                                <p className="text-2xl font-bold text-blue-600">{analytics.escalationRate}%</p>
+                                <p className="text-sm text-gray-600">Escalation Rate</p>
+                              </div>
+                              <div className="text-center p-4 bg-gray-50 rounded-lg">
+                                <p className="text-2xl font-bold text-purple-600">{analytics.knowledgeBaseUsage}%</p>
+                                <p className="text-sm text-gray-600">Knowledge Base Usage</p>
+                              </div>
+                            </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="closing">Closing Message</Label>
-                      <Textarea
-                        id="closing"
-                        defaultValue={currentAgent.response_templates.closing}
-                        className="min-h-[80px]"
-                      />
-                      <p className="text-xs text-gray-500">Shown at the end of conversations</p>
-                    </div>
+                            {analytics.topQuestions && analytics.topQuestions.length > 0 && (
+                              <div>
+                                <h4 className="font-medium mb-3">Top Questions</h4>
+                                <div className="space-y-2">
+                                  {analytics.topQuestions.slice(0, 5).map((item, index) => (
+                                    <div
+                                      key={index}
+                                      className="flex justify-between items-center p-2 bg-gray-50 rounded"
+                                    >
+                                      <span className="text-sm">{item.question}</span>
+                                      <Badge variant="outline">{item.count}</Badge>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8">
+                            <BarChart3 className="h-12 w-12 mx-auto text-gray-300 mb-3" />
+                            <h3 className="font-medium text-gray-700 mb-1">No Analytics Data</h3>
+                            <p className="text-sm text-gray-500">
+                              Analytics data will appear once your agent starts handling conversations.
+                            </p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                </Tabs>
 
-                    <Button className="w-full">
-                      <Save className="mr-2 h-4 w-4" />
-                      Save Templates
+                {/* Save Button */}
+                {hasChanges && (
+                  <div className="flex justify-end mt-6">
+                    <Button onClick={handleSave} disabled={isLoading} size="lg">
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="mr-2 h-4 w-4" />
+                          Save Configuration
+                        </>
+                      )}
                     </Button>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="analytics" className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-gray-600">Status</p>
-                          <p className="text-2xl font-bold capitalize">{currentAgent.status}</p>
-                        </div>
-                        <TrendingUp className="h-8 w-8 text-gray-500" />
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-gray-600">Use Case</p>
-                          <p className="text-lg font-bold capitalize">{currentAgent.use_case.replace("-", " ")}</p>
-                        </div>
-                        <Target className="h-8 w-8 text-gray-500" />
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-gray-600">Language</p>
-                          <p className="text-2xl font-bold uppercase">{currentAgent.language}</p>
-                        </div>
-                        <Globe className="h-8 w-8 text-gray-500" />
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-gray-600">Created</p>
-                          <p className="text-lg font-bold">{formatDate(currentAgent.created_at)}</p>
-                        </div>
-                        <Clock className="h-8 w-8 text-gray-500" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg">Agent Capabilities</CardTitle>
-                    <CardDescription>What this agent can do</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex flex-wrap gap-2">
-                      {currentAgent.capabilities.map((capability, index) => (
-                        <Badge key={index} variant="secondary">
-                          {capability}
-                        </Badge>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           ) : (
             <div className="text-center py-16 px-4">
               <Bot className="h-16 w-16 mx-auto text-gray-300 mb-4" />
@@ -769,7 +1254,7 @@ export default function AIAgentsPage() {
         </div>
       </div>
 
-      {/* Modals */}
+      {/* Create Agent Modal */}
       <CreateAgentModal
         open={showCreateAgentModal}
         onOpenChange={setShowCreateAgentModal}
@@ -777,57 +1262,38 @@ export default function AIAgentsPage() {
       />
 
       {/* URL Dialog */}
-      <Dialog
-        open={showUrlDialog}
-        onOpenChange={(open) => {
-          setShowUrlDialog(open)
-          if (!open) clearMessages()
-        }}
-      >
-        <DialogContent className="sm:max-w-[425px]">
+      <Dialog open={showUrlDialog} onOpenChange={setShowUrlDialog}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center">
-              <Globe className="mr-2 h-5 w-5 text-gray-500" />
-              Add Website URL
-            </DialogTitle>
-            <DialogDescription>Enter a URL to add web content to your AI's knowledge base</DialogDescription>
+            <DialogTitle>Add Website URL</DialogTitle>
+            <DialogDescription>
+              Add a website URL to extract content from. This could be FAQ pages, documentation, or product pages.
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="url">Website URL</Label>
               <Input
                 id="url"
                 placeholder="https://example.com/faq"
                 value={urlInput}
-                onChange={(e) => {
-                  setUrlInput(e.target.value)
-                  setUrlError("")
-                }}
-                className={urlError ? "border-red-500" : ""}
+                onChange={(e) => setUrlInput(e.target.value)}
               />
-              {urlError && (
-                <div className="flex items-center space-x-2 text-red-600 text-sm">
-                  <AlertCircle className="h-4 w-4" />
-                  <span>{urlError}</span>
-                </div>
-              )}
+              {urlError && <p className="text-sm text-red-600">{urlError}</p>}
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowUrlDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleUrlSubmit} disabled={!urlInput.trim() || isValidatingUrl}>
+            <Button onClick={handleUrlSubmit} disabled={isValidatingUrl}>
               {isValidatingUrl ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Adding...
                 </>
               ) : (
-                <>
-                  <Check className="mr-2 h-4 w-4" />
-                  Add URL
-                </>
+                "Add URL"
               )}
             </Button>
           </DialogFooter>
@@ -835,27 +1301,20 @@ export default function AIAgentsPage() {
       </Dialog>
 
       {/* Text Dialog */}
-      <Dialog
-        open={showTextDialog}
-        onOpenChange={(open) => {
-          setShowTextDialog(open)
-          if (!open) clearMessages()
-        }}
-      >
-        <DialogContent className="sm:max-w-[525px]">
+      <Dialog open={showTextDialog} onOpenChange={setShowTextDialog}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center">
-              <MessageSquare className="mr-2 h-5 w-5 text-gray-500" />
-              Add Text Content
-            </DialogTitle>
-            <DialogDescription>Add custom text content to your AI's knowledge base</DialogDescription>
+            <DialogTitle>Add Text Content</DialogTitle>
+            <DialogDescription>
+              Add custom text content like company information, policies, or specific instructions for your AI agent.
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="textTitle">Title</Label>
               <Input
                 id="textTitle"
-                placeholder="e.g., Company Policies, Product Information"
+                placeholder="e.g., Company Policies"
                 value={textTitle}
                 onChange={(e) => setTextTitle(e.target.value)}
               />
@@ -864,10 +1323,10 @@ export default function AIAgentsPage() {
               <Label htmlFor="textContent">Content</Label>
               <Textarea
                 id="textContent"
-                placeholder="Enter the text content you want to add to the knowledge base..."
+                placeholder="Enter your text content here..."
+                className="min-h-[200px]"
                 value={textContent}
                 onChange={(e) => setTextContent(e.target.value)}
-                className="min-h-[120px]"
               />
             </div>
           </div>
@@ -875,47 +1334,26 @@ export default function AIAgentsPage() {
             <Button variant="outline" onClick={() => setShowTextDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleTextSubmit} disabled={!textTitle.trim() || !textContent.trim()}>
-              <Check className="mr-2 h-4 w-4" />
-              Add Content
-            </Button>
+            <Button onClick={handleTextSubmit}>Add Text</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center">
-              <Trash2 className="mr-2 h-5 w-5 text-gray-500" />
-              Confirm Deletion
-            </DialogTitle>
-            <DialogDescription>Are you sure you want to delete this item from your knowledge base?</DialogDescription>
+            <DialogTitle>Delete Knowledge Item</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this knowledge item? This action cannot be undone.
+            </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <p className="text-sm text-gray-700">
-              This action cannot be undone. This will permanently remove the item from your AI agent's knowledge base.
-            </p>
-            {itemToDelete && (
-              <div className="mt-4 p-3 bg-gray-50 rounded-md">
-                <p className="text-sm font-medium">{knowledgeItems.find((item) => item.id === itemToDelete)?.title}</p>
-              </div>
-            )}
-          </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowDeleteDialog(false)
-                setItemToDelete(null)
-              }}
-            >
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
               Cancel
             </Button>
             <Button variant="destructive" onClick={() => itemToDelete && handleDeleteKnowledgeItem(itemToDelete)}>
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete Item
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>

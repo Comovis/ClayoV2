@@ -27,7 +27,7 @@ import AIAgentsPage from "./MainPages/AgentConfigTraining/AgentConfig"
 
 
 // Google Analytics Configuration
-const GA_TRACKING_ID = "G-16JECJB6TS"
+const GA_TRACKING_ID = "G-TY55DN5JKN"
 
 // Initialize Google Analytics with debug logging
 const initializeGoogleAnalytics = () => {

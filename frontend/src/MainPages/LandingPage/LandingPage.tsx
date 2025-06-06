@@ -16,7 +16,8 @@ export default function LandingPage() {
       <Features />
       <InteractiveDemo />
       <HowItWorks />
-      
+      <PricingSection />
+      <Testimonials />
     
    
       <CallToAction />
