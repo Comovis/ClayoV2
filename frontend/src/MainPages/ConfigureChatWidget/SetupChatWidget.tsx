@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -33,57 +33,16 @@ import {
   Zap,
   CheckCircle,
   AlertCircle,
+  Loader2,
+  ExternalLink,
 } from "lucide-react"
 import { useUser } from "../../Auth/Contexts/UserContext"
+import { useWidgetConfig, type WidgetConfig } from "../../Hooks/useWidgetConfig"
 
-interface WidgetConfig {
-  // Appearance
-  primaryColor: string
-  secondaryColor: string
-  textColor: string
-  backgroundColor: string
-  borderRadius: number
-  fontSize: number
-  fontFamily: string
-  headerHeight: number
-
-  // Behavior
-  welcomeMessage: string
-  placeholderText: string
-  position: "bottom-right" | "bottom-left" | "top-right" | "top-left"
-  autoOpen: boolean
-  autoOpenDelay: number
-  showAvatar: boolean
-  showTypingIndicator: boolean
-  showOnlineStatus: boolean
-
-  // Branding
-  companyName: string
-  companyLogo: string
-  agentName: string
-  agentAvatar: string
-
-  // Features
-  enableFileUpload: boolean
-  enableEmojis: boolean
-  enableSoundNotifications: boolean
-  enableOfflineMessage: boolean
-  offlineMessage: string
-  showPoweredBy: boolean
-  enableRating: boolean
-
-  // Advanced
-  customCSS: string
-  allowedDomains: string[]
-  maxMessageLength: number
-  rateLimitMessages: number
-  rateLimitWindow: number
-  widgetWidth: number
-  widgetHeight: number
-}
-
-export default function ChatWidget() {
+export default function ChatWidgetConfig() {
   const { user, organization } = useUser()
+  const { getWidgetConfig, saveWidgetConfig, isLoading, error, success, clearMessages } = useWidgetConfig()
+
   const [activeTab, setActiveTab] = useState("appearance")
   const [previewMessages, setPreviewMessages] = useState([
     {
@@ -101,8 +60,7 @@ export default function ChatWidget() {
   const [isMinimized, setIsMinimized] = useState(false)
   const [showRating, setShowRating] = useState(false)
   const [rating, setRating] = useState(0)
-  const [success, setSuccess] = useState("")
-  const [error, setError] = useState("")
+  const [embedCode, setEmbedCode] = useState("")
 
   const [config, setConfig] = useState<WidgetConfig>({
     // Appearance defaults
@@ -150,8 +108,37 @@ export default function ChatWidget() {
     widgetHeight: 600,
   })
 
+  // Load existing configuration on mount
+  useEffect(() => {
+    const loadConfig = async () => {
+      const result = await getWidgetConfig()
+      if (result) {
+        setConfig(result.config)
+        setEmbedCode(result.embedCode)
+
+        // Update welcome message in preview
+        if (result.config.welcomeMessage) {
+          setPreviewMessages([
+            {
+              id: 1,
+              sender: "bot",
+              content: result.config.welcomeMessage,
+              timestamp: new Date(),
+              avatar: "🤖",
+            },
+          ])
+        }
+      }
+    }
+
+    if (user) {
+      loadConfig()
+    }
+  }, [user, getWidgetConfig])
+
   const updateConfig = (key: keyof WidgetConfig, value: any) => {
     setConfig((prev) => ({ ...prev, [key]: value }))
+    clearMessages()
 
     // Update welcome message in real-time
     if (key === "welcomeMessage" && value.trim()) {
@@ -230,46 +217,20 @@ export default function ChatWidget() {
 
   const handleSave = async () => {
     setIsSaving(true)
-    setError("")
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      setLastSaved(new Date())
-      setSuccess("Widget configuration saved successfully!")
-      setTimeout(() => setSuccess(""), 3000)
-    } catch (error) {
-      console.error("Error saving widget config:", error)
-      setError("Failed to save widget configuration. Please try again.")
+      const result = await saveWidgetConfig(config)
+      if (result) {
+        setLastSaved(new Date())
+        setEmbedCode(result.embedCode)
+      }
     } finally {
       setIsSaving(false)
     }
   }
 
-  const generateEmbedCode = () => {
-    return `<!-- Clayo Chat Widget -->
-<script>
-  window.ClayoConfig = {
-    apiKey: "your-api-key-here",
-    primaryColor: "${config.primaryColor}",
-    secondaryColor: "${config.secondaryColor}",
-    position: "${config.position}",
-    welcomeMessage: "${config.welcomeMessage}",
-    companyName: "${config.companyName}",
-    agentName: "${config.agentName}",
-    showAvatar: ${config.showAvatar},
-    enableFileUpload: ${config.enableFileUpload},
-    enableEmojis: ${config.enableEmojis},
-    autoOpen: ${config.autoOpen},
-    autoOpenDelay: ${config.autoOpenDelay},
-  };
-</script>
-<script src="https://widget.clayo.co/embed.js" async></script>`
-  }
-
   const copyEmbedCode = () => {
-    navigator.clipboard.writeText(generateEmbedCode())
-    setSuccess("Embed code copied to clipboard!")
-    setTimeout(() => setSuccess(""), 3000)
+    navigator.clipboard.writeText(embedCode)
+    // You could add a toast notification here
   }
 
   const handleRating = (stars: number) => {
@@ -289,21 +250,21 @@ export default function ChatWidget() {
 
   return (
     <div className="max-w-7xl mx-auto p-6">
-      {/* Header - matching team page structure */}
+      {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Chat Widget</h1>
+          <h1 className="text-2xl font-bold">Chat Widget Configuration</h1>
           <p className="text-gray-500">Customize and deploy your AI chat widget</p>
         </div>
         <div className="flex items-center gap-3">
           <Button variant="outline" onClick={resetChat}>
             <RefreshCw className="mr-2 h-4 w-4" />
-            Reset Chat
+            Reset Preview
           </Button>
-          <Button onClick={handleSave} disabled={isSaving}>
+          <Button onClick={handleSave} disabled={isSaving || isLoading}>
             {isSaving ? (
               <>
-                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Saving...
               </>
             ) : (
@@ -332,7 +293,7 @@ export default function ChatWidget() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Chat Preview - Main Content */}
+        {/* Chat Preview */}
         <div className="lg:col-span-2">
           <Card>
             <CardHeader className="pb-2">
@@ -369,7 +330,9 @@ export default function ChatWidget() {
                       style={{
                         backgroundColor: config.primaryColor,
                         color: config.backgroundColor,
-                        borderRadius: `${config.borderRadius}px ${config.borderRadius}px ${isMinimized ? config.borderRadius : 0}px ${isMinimized ? config.borderRadius : 0}px`,
+                        borderRadius: `${config.borderRadius}px ${config.borderRadius}px ${
+                          isMinimized ? config.borderRadius : 0
+                        }px ${isMinimized ? config.borderRadius : 0}px`,
                         height: `${config.headerHeight}px`,
                       }}
                       onClick={() => setIsMinimized(!isMinimized)}
@@ -446,7 +409,9 @@ export default function ChatWidget() {
                               className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"} mb-4`}
                             >
                               <div
-                                className={`flex items-end space-x-2 max-w-[80%] ${message.sender === "user" ? "flex-row-reverse space-x-reverse" : ""}`}
+                                className={`flex items-end space-x-2 max-w-[80%] ${
+                                  message.sender === "user" ? "flex-row-reverse space-x-reverse" : ""
+                                }`}
                               >
                                 {config.showAvatar && message.sender === "bot" && (
                                   <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm">
@@ -469,8 +434,12 @@ export default function ChatWidget() {
                                     color: message.sender === "user" ? config.backgroundColor : config.textColor,
                                     borderRadius:
                                       message.sender === "user"
-                                        ? `${config.borderRadius}px ${config.borderRadius * 0.3}px ${config.borderRadius}px ${config.borderRadius}px`
-                                        : `${config.borderRadius * 0.3}px ${config.borderRadius}px ${config.borderRadius}px ${config.borderRadius}px`,
+                                        ? `${config.borderRadius}px ${config.borderRadius * 0.3}px ${
+                                            config.borderRadius
+                                          }px ${config.borderRadius}px`
+                                        : `${config.borderRadius * 0.3}px ${config.borderRadius}px ${
+                                            config.borderRadius
+                                          }px ${config.borderRadius}px`,
                                   }}
                                 >
                                   <p className="text-sm leading-relaxed">{message.content}</p>
@@ -499,7 +468,9 @@ export default function ChatWidget() {
                                   style={{
                                     backgroundColor: config.secondaryColor,
                                     color: config.textColor,
-                                    borderRadius: `${config.borderRadius * 0.3}px ${config.borderRadius}px ${config.borderRadius}px ${config.borderRadius}px`,
+                                    borderRadius: `${config.borderRadius * 0.3}px ${config.borderRadius}px ${
+                                      config.borderRadius
+                                    }px ${config.borderRadius}px`,
                                   }}
                                 >
                                   <div className="flex space-x-1">
@@ -526,7 +497,9 @@ export default function ChatWidget() {
                                 style={{
                                   backgroundColor: config.secondaryColor,
                                   color: config.textColor,
-                                  borderRadius: `${config.borderRadius * 0.3}px ${config.borderRadius}px ${config.borderRadius}px ${config.borderRadius}px`,
+                                  borderRadius: `${config.borderRadius * 0.3}px ${config.borderRadius}px ${
+                                    config.borderRadius
+                                  }px ${config.borderRadius}px`,
                                 }}
                               >
                                 <p className="text-sm mb-2">How was your experience?</p>
@@ -538,7 +511,9 @@ export default function ChatWidget() {
                                       className="hover:scale-110 transition-transform"
                                     >
                                       <Star
-                                        className={`h-4 w-4 ${star <= rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}`}
+                                        className={`h-4 w-4 ${
+                                          star <= rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
+                                        }`}
                                       />
                                     </button>
                                   ))}
@@ -616,7 +591,7 @@ export default function ChatWidget() {
           </Card>
         </div>
 
-        {/* Configuration Panel - Expanded Sidebar */}
+        {/* Configuration Panel */}
         <div className="lg:col-span-1">
           <Card>
             <CardHeader className="pb-2">
@@ -962,13 +937,45 @@ export default function ChatWidget() {
                     <div className="mt-2 space-y-3">
                       <div className="bg-gray-50 p-3 rounded-lg border max-h-40 overflow-y-auto">
                         <code className="text-xs text-gray-800 whitespace-pre-wrap break-all">
-                          {generateEmbedCode()}
+                          {embedCode || "Save configuration to generate embed code"}
                         </code>
                       </div>
-                      <Button onClick={copyEmbedCode} className="w-full" variant="outline" size="sm">
+                      <Button
+                        onClick={copyEmbedCode}
+                        className="w-full"
+                        variant="outline"
+                        size="sm"
+                        disabled={!embedCode}
+                      >
                         <Copy className="mr-2 h-4 w-4" />
                         Copy Code
                       </Button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm font-medium">Deployment Instructions</Label>
+                    <div className="mt-2 space-y-3 text-sm text-gray-600">
+                      <div className="p-3 bg-blue-50 rounded-lg">
+                        <h4 className="font-medium text-blue-800 mb-2">How to Deploy:</h4>
+                        <ol className="list-decimal list-inside space-y-1 text-blue-700">
+                          <li>Copy the installation code above</li>
+                          <li>Paste it before the closing &lt;/body&gt; tag on your website</li>
+                          <li>The widget will automatically appear on your site</li>
+                          <li>Test the widget to ensure it's working correctly</li>
+                        </ol>
+                      </div>
+
+                      <div className="p-3 bg-green-50 rounded-lg">
+                        <h4 className="font-medium text-green-800 mb-2">Widget Features:</h4>
+                        <ul className="list-disc list-inside space-y-1 text-green-700">
+                          <li>Real-time AI responses</li>
+                          <li>Conversation history</li>
+                          <li>File upload support</li>
+                          <li>Mobile responsive design</li>
+                          <li>Customizable appearance</li>
+                        </ul>
+                      </div>
                     </div>
                   </div>
 
@@ -992,6 +999,15 @@ export default function ChatWidget() {
                         <span className="font-medium">2m 30s</span>
                       </div>
                     </div>
+                  </div>
+
+                  <div className="pt-4 border-t">
+                    <Button className="w-full" variant="outline" asChild>
+                      <a href="/conversations" target="_blank" rel="noreferrer">
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        View Live Conversations
+                      </a>
+                    </Button>
                   </div>
                 </TabsContent>
               </Tabs>
