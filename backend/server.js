@@ -51,6 +51,12 @@ const {
   createSession
 } = require("./AppFeatures/AgentTrainingCreation/ChatService")
 
+const {
+  handleGetWidgetConfig,
+  handleSaveWidgetConfig,
+  handleGetPublicWidgetConfig,
+} = require("./AppFeatures/WidgetConfig/WidgetConfigService")
+
 const { createAgent, getAgents, updateAgent } = require("./AppFeatures/AgentTrainingCreation/AgentService")
 
 const { handleGetAgentStatus } = require("./AppFeatures/AgentTrainingCreation/AgentStatusHandler")
@@ -1310,91 +1316,48 @@ app.get("/api/agents/:agentId/status", authenticateUser, async (req, res) => {
 })
 
 
-// ===== DEBUGGING AND MONITORING ENDPOINTS =====
+// ===== WIDGET CONFIGURATION ENDPOINTS =====
 
-// Get processing status with detailed info
-app.get("/api/knowledge/status/:id/detailed", authenticateUser, async (req, res) => {
+// Get widget configuration
+app.get("/api/widget/config", authenticateUser, async (req, res) => {
   try {
-    const { id } = req.params
-
-    const { data: item, error } = await supabaseAdmin.from("knowledge_base").select("*").eq("id", id).single()
-
-    if (error) throw error
-
-    res.json({
-      success: true,
-      item,
-      processingDetails: {
-        status: item.processing_status,
-        extractionMethod: item.metadata?.extractionMethod,
-        textLength: item.content?.length || 0,
-        hasContent: !!item.content,
-        errorDetails: item.metadata?.error,
-      },
-    })
+    await handleGetWidgetConfig(req, res)
   } catch (error) {
-    console.error("Error getting detailed status:", error)
+    console.error("Error fetching widget config:", error)
     res.status(500).json({
       success: false,
-      error: "Failed to get detailed processing status",
+      error: "Failed to fetch widget configuration",
     })
   }
 })
 
-// Test agent configuration endpoint
-app.post("/api/agents/:agentId/test-config", authenticateUser, async (req, res) => {
+// Save widget configuration
+app.post("/api/widget/config", authenticateUser, async (req, res) => {
   try {
-    const { agentId } = req.params
-    const { testMessage } = req.body
-    const organizationId = req.user.organization_id
-
-    const result = await testAgentConfiguration(agentId, organizationId, testMessage || "Hello, can you help me?")
-
-    if (!result.success) {
-      return res.status(500).json({
-        success: false,
-        error: result.error,
-      })
-    }
-
-    res.json({
-      success: true,
-      testResult: result.testResult,
-    })
+    await handleSaveWidgetConfig(req, res)
   } catch (error) {
-    console.error("Error testing agent config:", error)
+    console.error("Error saving widget config:", error)
     res.status(500).json({
       success: false,
-      error: "Failed to test agent configuration",
+      error: "Failed to save widget configuration",
     })
   }
 })
 
-// Health check for AI services
-app.get("/api/health/ai-services", async (req, res) => {
+// Get public widget configuration (for embed)
+app.get("/api/widget/config/public/:organizationId", async (req, res) => {
   try {
-    const healthCheck = {
-      timestamp: new Date().toISOString(),
-      services: {
-        chatService: "operational",
-        agentConfig: "operational",
-        documentProcessor: "operational",
-        knowledgeBase: "operational",
-      },
-      version: "enhanced-v1.0",
-    }
-
-    res.json({
-      success: true,
-      health: healthCheck,
-    })
+    await handleGetPublicWidgetConfig(req, res)
   } catch (error) {
+    console.error("Error fetching public widget config:", error)
     res.status(500).json({
       success: false,
-      error: "Health check failed",
+      error: "Failed to fetch widget configuration",
     })
   }
 })
+
+
 
 
 // Start server

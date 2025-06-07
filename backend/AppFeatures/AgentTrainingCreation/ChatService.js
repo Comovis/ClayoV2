@@ -1,5 +1,5 @@
 const { streamText } = require("ai")
-const { getOpenAIModel } = require("../ModelConnection") // Using YOUR AI SDK connection
+const { getOpenAIModel } = require("../ModelConnection")
 const { getAllKnowledgeForOrganization } = require("./FileKnowledgeService")
 const { supabaseAdmin } = require("../../SupabaseClient")
 const { v4: uuidv4 } = require("uuid")
@@ -7,7 +7,7 @@ const { v4: uuidv4 } = require("uuid")
 // ===== CORE SERVICE FUNCTIONS =====
 
 /**
- * Enhanced chat message processing with full agent configuration support
+ * Enhanced chat message processing with FIXED streaming
  * @param {Object} params - Message parameters
  * @returns {Promise<Object>} - Chat result
  */
@@ -15,74 +15,85 @@ async function processMessage({ message, sessionId, agentId, organizationId, onC
   try {
     console.log(`Processing message for agent ${agentId} in organization ${organizationId}`)
 
-    // Step 1: Get conversation history
+    // Steps 1-8 remain the same...
     const previousMessages = await getSessionMessages(sessionId)
-
-    // Step 2: Get ALL knowledge base content (your proven approach)
     const knowledgeResult = await getAllKnowledgeForOrganization(organizationId, agentId)
 
     if (!knowledgeResult.success) {
       throw new Error("Failed to retrieve knowledge base")
     }
 
-    console.log(`Using ${knowledgeResult.itemCount} knowledge items as context`)
-
-    // Step 3: Get FULL agent configuration (ENHANCED)
     const agentConfig = await getAgentWithSettings(agentId, organizationId)
-
     if (!agentConfig) {
       throw new Error("Agent configuration not found")
     }
 
-    // Step 4: Build enhanced system prompt with FULL configuration
     const systemPrompt = buildEnhancedSystemPrompt(agentConfig, knowledgeResult.combinedContent)
-
-    // Step 5: Get model parameters from agent settings (ENHANCED)
     const modelParams = getModelParameters(agentConfig)
-
-    // Step 6: Prepare messages for AI (your proven pattern)
     const messages = [...previousMessages, { role: "user", content: message }]
+    const model = getOpenAIModel(modelParams.model)
 
-    // Step 7: Stream response using YOUR AI SDK connection with agent settings
-    const model = getOpenAIModel(modelParams.model) // Using agent's preferred model
+    // Save user message first
+    await saveMessage(sessionId, message, "customer", organizationId)
+    console.log("✅ User message saved")
 
-    console.log(
-      `Using model: ${modelParams.model}, temperature: ${modelParams.temperature}, maxTokens: ${modelParams.maxTokens}`,
-    )
+    console.log("🤖 Starting AI text generation with FIXED streaming...")
 
-    const result = await streamText({
-      model,
-      system: systemPrompt, // Use system parameter instead of adding to messages
-      messages,
-      maxTokens: modelParams.maxTokens,
-      temperature: modelParams.temperature,
-      onChunk: ({ chunk }) => {
-        if (chunk.type === "text-delta") {
-          onChunk(chunk.text)
-        }
-      },
-    })
+    let fullResponse = ""
+    let chunkCount = 0
 
-    // Step 8: Save messages to database
-    await saveMessage(sessionId, message, "user", organizationId)
-    const fullResponse = await result.text
-    await saveMessage(sessionId, fullResponse, "assistant", organizationId)
-
-    // Step 9: Update session activity
-    await updateSessionActivity(sessionId)
-
-    return {
-      response: fullResponse,
-      sessionId,
-      knowledgeItemsUsed: knowledgeResult.itemCount,
-      agentConfig: {
-        personality: agentConfig.personality,
-        model: modelParams.model,
+    try {
+      // FIXED: Use the correct AI SDK streaming pattern
+      const result = await streamText({
+        model,
+        system: systemPrompt,
+        messages,
+        maxTokens: modelParams.maxTokens,
         temperature: modelParams.temperature,
-      },
+      })
+
+      console.log("🚀 streamText result created, starting to read stream...")
+
+      // FIXED: Read the stream properly
+      for await (const chunk of result.textStream) {
+        chunkCount++
+        console.log(`📦 Chunk ${chunkCount}:`, chunk.substring(0, 50) + "...")
+
+        // Send chunk to client
+        onChunk(chunk)
+        fullResponse += chunk
+      }
+
+      console.log("🎯 Stream reading completed")
+      console.log("📊 Total chunks received:", chunkCount)
+      console.log("🤖 Full response length:", fullResponse.length)
+      console.log("🤖 Full response preview:", fullResponse.substring(0, 100) + "...")
+
+      // Save AI response
+      await saveMessage(sessionId, fullResponse, "ai", organizationId)
+      console.log("✅ AI message saved")
+
+      // Update session activity
+      await updateSessionActivity(sessionId)
+
+      return {
+        response: fullResponse,
+        sessionId,
+        knowledgeItemsUsed: knowledgeResult.itemCount,
+        agentConfig: {
+          personality: agentConfig.personality,
+          model: modelParams.model,
+          temperature: modelParams.temperature,
+        },
+      }
+    } catch (aiError) {
+      console.error("❌ AI generation error:", aiError)
+      console.error("❌ AI error stack:", aiError.stack)
+      throw aiError
     }
   } catch (error) {
-    console.error("Chat processing error:", error)
+    console.error("❌ Chat processing error:", error)
+    console.error("❌ Error stack:", error.stack)
     throw error
   }
 }
@@ -160,7 +171,7 @@ async function getAgentWithSettings(agentId, organizationId) {
       .from("ai_agents")
       .select("*")
       .eq("id", agentId)
-      .eq("organization_id", organizationId) // Security check
+      .eq("organization_id", organizationId)
       .single()
 
     if (error) throw error
@@ -189,7 +200,6 @@ async function getAgentWithSettings(agentId, organizationId) {
 function getModelParameters(agent) {
   const settings = agent.settings || {}
 
-  // Map personality to temperature if not explicitly set
   const temperatureMap = {
     friendly: 0.7,
     professional: 0.3,
@@ -197,7 +207,6 @@ function getModelParameters(agent) {
     enthusiastic: 0.8,
   }
 
-  // Map response length to max tokens if not explicitly set
   const maxTokensMap = {
     short: 150,
     medium: 300,
@@ -215,7 +224,7 @@ function getModelParameters(agent) {
 }
 
 /**
- * Gets messages for a session (unchanged - your proven approach)
+ * Gets messages for a session - FIXED ENUM MAPPING
  * @param {string} sessionId - Session ID
  * @returns {Promise<Array>} - Messages
  */
@@ -223,15 +232,15 @@ async function getSessionMessages(sessionId) {
   try {
     const { data, error } = await supabaseAdmin
       .from("messages")
-      .select("content, message_type")
+      .select("content, type")
       .eq("session_id", sessionId)
       .order("created_at", { ascending: true })
-      .limit(10) // Keep last 10 messages for context
+      .limit(10)
 
     if (error) throw error
 
     return data.map((msg) => ({
-      role: msg.message_type === "user" ? "user" : "assistant",
+      role: msg.type === "customer" ? "user" : "assistant",
       content: msg.content,
     }))
   } catch (error) {
@@ -241,10 +250,10 @@ async function getSessionMessages(sessionId) {
 }
 
 /**
- * Enhanced message saving with organization tracking
+ * Enhanced message saving with organization tracking - FIXED ENUM VALUES
  * @param {string} sessionId - Session ID
  * @param {string} content - Message content
- * @param {string} messageType - Message type (user/assistant)
+ * @param {string} messageType - Message type (customer/ai/agent/system)
  * @param {string} organizationId - Organization ID
  * @returns {Promise<void>}
  */
@@ -254,12 +263,13 @@ async function saveMessage(sessionId, content, messageType, organizationId) {
       id: uuidv4(),
       session_id: sessionId,
       content,
-      message_type: messageType,
-      organization_id: organizationId, // Track organization
+      type: messageType,
+      organization_id: organizationId,
       created_at: new Date().toISOString(),
     })
 
     if (error) throw error
+    console.log(`✅ Message saved successfully as type: ${messageType}`)
   } catch (error) {
     console.error("Save message error:", error)
   }
@@ -284,7 +294,7 @@ async function updateSessionActivity(sessionId) {
 }
 
 /**
- * Creates a new conversation session (unchanged - your proven approach)
+ * Creates a new conversation session
  * @param {Object} params - Session parameters
  * @returns {Promise<Object>} - Session result
  */
@@ -314,69 +324,11 @@ async function createSession({ agentId, customerId, organizationId }) {
 // ===== HTTP REQUEST HANDLERS =====
 
 /**
- * Handle authenticated chat message requests
- */
-async function handleChatMessage(req, res) {
-  try {
-    const { message, sessionId, agentId } = req.body
-    const organizationId = req.user.organization_id
-
-    if (!message || !sessionId || !agentId) {
-      return res.status(400).json({
-        success: false,
-        error: "Missing required fields: message, sessionId, agentId",
-      })
-    }
-
-    if (!organizationId) {
-      return res.status(400).json({
-        success: false,
-        error: "Organization ID not found",
-      })
-    }
-
-    // Set up streaming response
-    res.writeHead(200, {
-      "Content-Type": "text/plain",
-      "Transfer-Encoding": "chunked",
-    })
-
-    let fullResponse = ""
-
-    const result = await processMessage({
-      message,
-      sessionId,
-      agentId,
-      organizationId,
-      onChunk: (chunk) => {
-        fullResponse += chunk
-        res.write(chunk)
-      },
-    })
-
-    res.end()
-
-    console.log("Chat message processed successfully:", {
-      sessionId,
-      agentId,
-      knowledgeItemsUsed: result.knowledgeItemsUsed,
-    })
-  } catch (error) {
-    console.error("Handle chat message error:", error)
-    if (!res.headersSent) {
-      res.status(500).json({
-        success: false,
-        error: "Failed to process chat message",
-      })
-    }
-  }
-}
-
-/**
  * Handle public chat message requests (no authentication)
  */
 async function handlePublicChatMessage(req, res) {
   try {
+    console.log("🌐 Handling public chat message request...")
     const { message, sessionId, agentId, organizationId } = req.body
 
     if (!message || !sessionId || !agentId || !organizationId) {
@@ -401,10 +353,81 @@ async function handlePublicChatMessage(req, res) {
       })
     }
 
-    // Set up streaming response
+    // FIXED: Set up proper streaming response headers
     res.writeHead(200, {
-      "Content-Type": "text/plain",
-      "Transfer-Encoding": "chunked",
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "Content-Type",
+    })
+
+    let fullResponse = ""
+    let chunksSent = 0
+
+    const result = await processMessage({
+      message,
+      sessionId,
+      agentId,
+      organizationId,
+      onChunk: (chunk) => {
+        chunksSent++
+        console.log(`📤 Sending chunk ${chunksSent} to client:`, chunk.substring(0, 50) + "...")
+        fullResponse += chunk
+
+        // FIXED: Send as Server-Sent Events format
+        res.write(`data: ${JSON.stringify({ type: "chunk", content: chunk })}\n\n`)
+      },
+    })
+
+    // Send completion signal
+    res.write(`data: ${JSON.stringify({ type: "complete" })}\n\n`)
+    res.end()
+
+    console.log("✅ Public chat message processed successfully:", {
+      sessionId,
+      agentId,
+      knowledgeItemsUsed: result.knowledgeItemsUsed,
+      responseLength: fullResponse.length,
+      chunksSent,
+    })
+  } catch (error) {
+    console.error("❌ Handle public chat message error:", error)
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        error: "Failed to process public chat message",
+      })
+    }
+  }
+}
+
+/**
+ * Handle authenticated chat message requests
+ */
+async function handleChatMessage(req, res) {
+  try {
+    const { message, sessionId, agentId } = req.body
+    const organizationId = req.user.organization_id
+
+    if (!message || !sessionId || !agentId) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields: message, sessionId, agentId",
+      })
+    }
+
+    if (!organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: "Organization ID not found",
+      })
+    }
+
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
     })
 
     let fullResponse = ""
@@ -416,23 +439,24 @@ async function handlePublicChatMessage(req, res) {
       organizationId,
       onChunk: (chunk) => {
         fullResponse += chunk
-        res.write(chunk)
+        res.write(`data: ${JSON.stringify({ type: "chunk", content: chunk })}\n\n`)
       },
     })
 
+    res.write(`data: ${JSON.stringify({ type: "complete" })}\n\n`)
     res.end()
 
-    console.log("Public chat message processed successfully:", {
+    console.log("Chat message processed successfully:", {
       sessionId,
       agentId,
       knowledgeItemsUsed: result.knowledgeItemsUsed,
     })
   } catch (error) {
-    console.error("Handle public chat message error:", error)
+    console.error("Handle chat message error:", error)
     if (!res.headersSent) {
       res.status(500).json({
         success: false,
-        error: "Failed to process public chat message",
+        error: "Failed to process chat message",
       })
     }
   }

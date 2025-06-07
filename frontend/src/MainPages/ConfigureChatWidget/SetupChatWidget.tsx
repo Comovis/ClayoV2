@@ -39,6 +39,60 @@ import {
 import { useUser } from "../../Auth/Contexts/UserContext"
 import { useWidgetConfig, type WidgetConfig } from "../../Hooks/useWidgetConfig"
 
+// Define size presets
+const SIZE_PRESETS = {
+  normal: { width: 380, height: 600, label: "Normal" },
+  medium: { width: 420, height: 650, label: "Medium" },
+  large: { width: 480, height: 720, label: "Large" },
+}
+
+// Modern default configuration
+const getModernDefaults = (organizationName?: string): WidgetConfig => ({
+  // Appearance defaults - MODERN LOOK
+  primaryColor: "#3B82F6", // Modern blue
+  secondaryColor: "#EFF6FF", // Light blue
+  textColor: "#374151", // Softer gray
+  backgroundColor: "#ffffff",
+  borderRadius: 20, // More rounded
+  fontSize: 15, // Slightly larger
+  fontFamily: "Inter, system-ui, sans-serif",
+  headerHeight: 64, // Taller header
+
+  // Behavior defaults
+  welcomeMessage: "👋 Hi there! I'm here to help you with any questions you might have. How can I assist you today?",
+  placeholderText: "Type your message...",
+  position: "bottom-right",
+  autoOpen: false,
+  autoOpenDelay: 3000,
+  showAvatar: true,
+  showTypingIndicator: true,
+  showOnlineStatus: true,
+
+  // Branding defaults
+  companyName: organizationName || "Your Company",
+  companyLogo: "",
+  agentName: "AI Assistant",
+  agentAvatar: "",
+
+  // Features defaults
+  enableFileUpload: true,
+  enableEmojis: true,
+  enableSoundNotifications: false,
+  enableOfflineMessage: true,
+  offlineMessage: "We're currently offline. Leave a message and we'll get back to you!",
+  showPoweredBy: true,
+  enableRating: true,
+
+  // Advanced defaults - MEDIUM SIZE BY DEFAULT
+  customCSS: "",
+  allowedDomains: [],
+  maxMessageLength: 1000,
+  rateLimitMessages: 10,
+  rateLimitWindow: 60,
+  widgetWidth: SIZE_PRESETS.medium.width,
+  widgetHeight: SIZE_PRESETS.medium.height,
+})
+
 export default function ChatWidgetConfig() {
   const { user, organization } = useUser()
   const { getWidgetConfig, saveWidgetConfig, isLoading, error, success, clearMessages } = useWidgetConfig()
@@ -48,7 +102,7 @@ export default function ChatWidgetConfig() {
     {
       id: 1,
       sender: "bot",
-      content: "Hello! How can I help you today?",
+      content: "👋 Hi there! I'm here to help you with any questions you might have. How can I assist you today?",
       timestamp: new Date(),
       avatar: "🤖",
     },
@@ -61,80 +115,93 @@ export default function ChatWidgetConfig() {
   const [showRating, setShowRating] = useState(false)
   const [rating, setRating] = useState(0)
   const [embedCode, setEmbedCode] = useState("")
+  const [selectedSize, setSelectedSize] = useState<keyof typeof SIZE_PRESETS>("medium")
 
-  const [config, setConfig] = useState<WidgetConfig>({
-    // Appearance defaults
-    primaryColor: "#000000",
-    secondaryColor: "#f8fafc",
-    textColor: "#1f2937",
-    backgroundColor: "#ffffff",
-    borderRadius: 16,
-    fontSize: 14,
-    fontFamily: "Inter, system-ui, sans-serif",
-    headerHeight: 60,
-
-    // Behavior defaults
-    welcomeMessage: "Hello! How can I help you today?",
-    placeholderText: "Type your message...",
-    position: "bottom-right",
-    autoOpen: false,
-    autoOpenDelay: 3000,
-    showAvatar: true,
-    showTypingIndicator: true,
-    showOnlineStatus: true,
-
-    // Branding defaults
-    companyName: organization?.name || "Your Company",
-    companyLogo: "",
-    agentName: "AI Assistant",
-    agentAvatar: "",
-
-    // Features defaults
-    enableFileUpload: true,
-    enableEmojis: true,
-    enableSoundNotifications: false,
-    enableOfflineMessage: true,
-    offlineMessage: "We're currently offline. Leave a message and we'll get back to you!",
-    showPoweredBy: true,
-    enableRating: true,
-
-    // Advanced defaults
-    customCSS: "",
-    allowedDomains: [],
-    maxMessageLength: 1000,
-    rateLimitMessages: 10,
-    rateLimitWindow: 60,
-    widgetWidth: 380,
-    widgetHeight: 600,
-  })
+  // Initialize with modern defaults
+  const [config, setConfig] = useState<WidgetConfig>(() => getModernDefaults())
 
   // Load existing configuration on mount
   useEffect(() => {
     const loadConfig = async () => {
       const result = await getWidgetConfig()
-      if (result) {
-        setConfig(result.config)
+      const modernDefaults = getModernDefaults(organization?.name)
+
+      if (result && result.config) {
+        // Check if this is an old config (missing modern styling)
+        const isOldConfig = !result.config.primaryColor || result.config.primaryColor === "#000000"
+
+        if (isOldConfig) {
+          // For old configs, use modern defaults but keep user's custom settings
+          const mergedConfig = {
+            ...modernDefaults,
+            // Only keep non-styling user preferences
+            companyName: result.config.companyName || modernDefaults.companyName,
+            agentName: result.config.agentName || modernDefaults.agentName,
+            companyLogo: result.config.companyLogo || modernDefaults.companyLogo,
+            welcomeMessage: result.config.welcomeMessage || modernDefaults.welcomeMessage,
+            placeholderText: result.config.placeholderText || modernDefaults.placeholderText,
+            position: result.config.position || modernDefaults.position,
+            autoOpen: result.config.autoOpen ?? modernDefaults.autoOpen,
+            showAvatar: result.config.showAvatar ?? modernDefaults.showAvatar,
+            showTypingIndicator: result.config.showTypingIndicator ?? modernDefaults.showTypingIndicator,
+            showOnlineStatus: result.config.showOnlineStatus ?? modernDefaults.showOnlineStatus,
+            enableFileUpload: result.config.enableFileUpload ?? modernDefaults.enableFileUpload,
+            enableEmojis: result.config.enableEmojis ?? modernDefaults.enableEmojis,
+            enableSoundNotifications: result.config.enableSoundNotifications ?? modernDefaults.enableSoundNotifications,
+            enableRating: result.config.enableRating ?? modernDefaults.enableRating,
+            showPoweredBy: result.config.showPoweredBy ?? modernDefaults.showPoweredBy,
+            maxMessageLength: result.config.maxMessageLength || modernDefaults.maxMessageLength,
+          }
+          setConfig(mergedConfig)
+        } else {
+          // For newer configs, merge with modern defaults to add any missing fields
+          const mergedConfig = { ...modernDefaults, ...result.config }
+          setConfig(mergedConfig)
+        }
+
         setEmbedCode(result.embedCode)
 
-        // Update welcome message in preview
-        if (result.config.welcomeMessage) {
-          setPreviewMessages([
-            {
-              id: 1,
-              sender: "bot",
-              content: result.config.welcomeMessage,
-              timestamp: new Date(),
-              avatar: "🤖",
-            },
-          ])
+        // Determine current size preset
+        const configToCheck = isOldConfig ? modernDefaults : result.config
+        const currentSize = Object.entries(SIZE_PRESETS).find(
+          ([_, preset]) => preset.width === configToCheck.widgetWidth && preset.height === configToCheck.widgetHeight,
+        )
+        if (currentSize) {
+          setSelectedSize(currentSize[0] as keyof typeof SIZE_PRESETS)
         }
+
+        // Update welcome message in preview
+        const finalWelcomeMessage = isOldConfig
+          ? modernDefaults.welcomeMessage
+          : result.config.welcomeMessage || modernDefaults.welcomeMessage
+        setPreviewMessages([
+          {
+            id: 1,
+            sender: "bot",
+            content: finalWelcomeMessage,
+            timestamp: new Date(),
+            avatar: "🤖",
+          },
+        ])
+      } else {
+        // No saved config, use modern defaults
+        setConfig(modernDefaults)
+        setPreviewMessages([
+          {
+            id: 1,
+            sender: "bot",
+            content: modernDefaults.welcomeMessage,
+            timestamp: new Date(),
+            avatar: "🤖",
+          },
+        ])
       }
     }
 
     if (user) {
       loadConfig()
     }
-  }, [user, getWidgetConfig])
+  }, [user, getWidgetConfig]) // Removed organization?.name from dependencies to prevent re-loading
 
   const updateConfig = (key: keyof WidgetConfig, value: any) => {
     setConfig((prev) => ({ ...prev, [key]: value }))
@@ -153,6 +220,28 @@ export default function ChatWidgetConfig() {
         ...prev.slice(1),
       ])
     }
+
+    // Force re-render for style changes
+    if (
+      [
+        "primaryColor",
+        "secondaryColor",
+        "textColor",
+        "backgroundColor",
+        "borderRadius",
+        "fontSize",
+        "fontFamily",
+      ].includes(key)
+    ) {
+      setLastSaved(null)
+    }
+  }
+
+  const handleSizeChange = (size: keyof typeof SIZE_PRESETS) => {
+    setSelectedSize(size)
+    const preset = SIZE_PRESETS[size]
+    updateConfig("widgetWidth", preset.width)
+    updateConfig("widgetHeight", preset.height)
   }
 
   const sendPreviewMessage = () => {
@@ -230,7 +319,6 @@ export default function ChatWidgetConfig() {
 
   const copyEmbedCode = () => {
     navigator.clipboard.writeText(embedCode)
-    // You could add a toast notification here
   }
 
   const handleRating = (stars: number) => {
@@ -293,9 +381,9 @@ export default function ChatWidgetConfig() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Chat Preview */}
+        {/* Chat Preview - STICKY */}
         <div className="lg:col-span-2">
-          <Card>
+          <Card className="sticky top-6">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg">Live Preview</CardTitle>
               <CardDescription>
@@ -310,7 +398,7 @@ export default function ChatWidgetConfig() {
                 <div className="relative">
                   {/* Position indicator */}
                   <div className="absolute -top-8 left-0 text-sm text-gray-600 font-medium">
-                    Preview: {config.position.replace("-", " ")}
+                    Preview: {config.position.replace("-", " ")} • {SIZE_PRESETS[selectedSize].label}
                   </div>
 
                   {/* Chat Widget */}
@@ -544,6 +632,7 @@ export default function ChatWidgetConfig() {
                               style={{
                                 fontSize: `${config.fontSize}px`,
                                 borderRadius: `${config.borderRadius * 0.7}px`,
+                                color: config.textColor,
                               }}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") {
@@ -626,6 +715,28 @@ export default function ChatWidgetConfig() {
                 </TabsList>
 
                 <TabsContent value="appearance" className="space-y-6 mt-4">
+                  {/* SIZE PRESETS */}
+                  <div>
+                    <Label className="text-sm font-medium">Widget Size</Label>
+                    <Select value={selectedSize} onValueChange={handleSizeChange}>
+                      <SelectTrigger className="mt-2">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="normal">
+                          Normal ({SIZE_PRESETS.normal.width}×{SIZE_PRESETS.normal.height})
+                        </SelectItem>
+                        <SelectItem value="medium">
+                          Medium ({SIZE_PRESETS.medium.width}×{SIZE_PRESETS.medium.height})
+                        </SelectItem>
+                        <SelectItem value="large">
+                          Large ({SIZE_PRESETS.large.width}×{SIZE_PRESETS.large.height})
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-gray-500 mt-1">Choose a preset size for your chat widget</p>
+                  </div>
+
                   <div>
                     <Label className="text-sm font-medium">Welcome Message</Label>
                     <Textarea
@@ -682,6 +793,44 @@ export default function ChatWidgetConfig() {
                           <Input
                             value={config.secondaryColor}
                             onChange={(e) => updateConfig("secondaryColor", e.target.value)}
+                            className="flex-1 text-xs"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="textColor" className="text-xs text-gray-600">
+                          Text Color
+                        </Label>
+                        <div className="flex items-center space-x-2 mt-1">
+                          <Input
+                            id="textColor"
+                            type="color"
+                            value={config.textColor}
+                            onChange={(e) => updateConfig("textColor", e.target.value)}
+                            className="w-12 h-8 p-1 border rounded"
+                          />
+                          <Input
+                            value={config.textColor}
+                            onChange={(e) => updateConfig("textColor", e.target.value)}
+                            className="flex-1 text-xs"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="backgroundColor" className="text-xs text-gray-600">
+                          Background Color
+                        </Label>
+                        <div className="flex items-center space-x-2 mt-1">
+                          <Input
+                            id="backgroundColor"
+                            type="color"
+                            value={config.backgroundColor}
+                            onChange={(e) => updateConfig("backgroundColor", e.target.value)}
+                            className="w-12 h-8 p-1 border rounded"
+                          />
+                          <Input
+                            value={config.backgroundColor}
+                            onChange={(e) => updateConfig("backgroundColor", e.target.value)}
                             className="flex-1 text-xs"
                           />
                         </div>

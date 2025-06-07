@@ -24,7 +24,7 @@ import OnboardingPage from "./Auth/Onboarding/OnboardingPage"
 import LandingPage from "./MainPages/LandingPage/LandingPage"
 import ChatWidgetConfig from "./MainPages/ConfigureChatWidget/SetupChatWidget"
 import AIAgentsPage from "./MainPages/AgentConfigTraining/AgentConfig" 
-
+import TestWidgetPage from './Tests/WidgetTest'
 
 // Google Analytics Configuration
 const GA_TRACKING_ID = "G-TY55DN5JKN"
@@ -272,6 +272,7 @@ function AppContent() {
       "/analytics",
       "/pricing",
       "/team",
+      "/tests"
     ],
     [],
   )
@@ -334,6 +335,7 @@ function AppContent() {
 
               <Route path="/accept-invite" element={<InvitationAccept />} />
               <Route path="/confirm-email" element={<EmailVerificationPage />} />
+              <Route path="/tests" element={<TestWidgetPage />} />
 
               <Route
                 path="/onboarding"
