@@ -53,6 +53,7 @@ async function processMessage({ message, sessionId, agentId, organizationId, onC
         topP: 0.9,
         frequencyPenalty: 0,
         presencePenalty: 0,
+        user: `agent_${agentId}`, // ADD THIS LINE for cache optimization
       })
 
       console.log("🚀 streamText result created, starting to read stream...")
@@ -140,7 +141,7 @@ async function processMessage({ message, sessionId, agentId, organizationId, onC
 }
 
 /**
- * Enhanced system prompt builder with full agent configuration
+ * Enhanced system prompt builder with full agent configuration - OPTIMIZED FOR CACHING
  * @param {Object} agent - Full agent configuration
  * @param {string} knowledgeContent - Combined knowledge content
  * @returns {string} - Enhanced system prompt
@@ -149,7 +150,39 @@ function buildEnhancedSystemPrompt(agent, knowledgeContent) {
   const settings = agent.settings || {}
   const templates = agent.response_templates || {}
 
-  let systemPrompt = `You are ${agent.name}, an AI assistant with the following characteristics:\n\n`
+  // CACHE OPTIMIZATION: Put static content first, dynamic content last
+  let systemPrompt = ""
+
+  // 1. KNOWLEDGE BASE FIRST (most static - gets cached)
+  if (knowledgeContent) {
+    const maxKnowledgeLength = 8000 // Limit knowledge base size
+    const truncatedKnowledge =
+      knowledgeContent.length > maxKnowledgeLength
+        ? knowledgeContent.substring(0, maxKnowledgeLength) + "\n\n[Knowledge base truncated for length...]"
+        : knowledgeContent
+
+    systemPrompt += `KNOWLEDGE BASE:\nUse the following information to answer questions accurately:\n\n${truncatedKnowledge}\n\n`
+  }
+
+  // 2. STATIC BEHAVIOR GUIDELINES (gets cached)
+  systemPrompt += `BEHAVIOR GUIDELINES:\n`
+  systemPrompt += `- Always stay in character based on your personality\n`
+  systemPrompt += `- Use the knowledge base to provide accurate information\n`
+  systemPrompt += `- If you don't know something, admit it honestly\n`
+  systemPrompt += `- Use the appropriate response template when needed\n`
+  systemPrompt += `- Always reference the knowledge base when providing information\n`
+  systemPrompt += `- If information isn't in the knowledge base, say "I don't have that information in my knowledge base"\n`
+  systemPrompt += `- IMPORTANT: Provide complete but concise responses within the allocated token limit\n`
+  systemPrompt += `- IMPORTANT: Prioritize completing your main point over adding extra details\n\n`
+
+  // 3. RESPONSE TEMPLATES (semi-static - gets cached)
+  systemPrompt += `RESPONSE TEMPLATES:\n`
+  systemPrompt += `- Greeting: "${templates.greeting || "Hello! How can I help you today?"}"\n`
+  systemPrompt += `- Escalation: "${templates.escalation || "I'll connect you with a human agent who can better assist you."}"\n`
+  systemPrompt += `- Closing: "${templates.closing || "Is there anything else I can help you with?"}"\n\n`
+
+  // 4. DYNAMIC AGENT SETTINGS LAST (doesn't get cached - changes frequently)
+  systemPrompt += `You are ${agent.name}, an AI assistant with the following characteristics:\n\n`
 
   // Personality and behavior
   systemPrompt += `PERSONALITY: ${agent.personality || "friendly"}\n`
@@ -175,35 +208,6 @@ function buildEnhancedSystemPrompt(agent, knowledgeContent) {
   if (settings.customInstructions) {
     systemPrompt += `SPECIAL INSTRUCTIONS: ${settings.customInstructions}\n\n`
   }
-
-  // Response templates
-  systemPrompt += `RESPONSE TEMPLATES:\n`
-  systemPrompt += `- Greeting: "${templates.greeting || "Hello! How can I help you today?"}"\n`
-  systemPrompt += `- Escalation: "${templates.escalation || "I'll connect you with a human agent who can better assist you."}"\n`
-  systemPrompt += `- Closing: "${templates.closing || "Is there anything else I can help you with?"}"\n\n`
-
-  // FIXED: Truncate knowledge base if too long to prevent context overflow
-  if (knowledgeContent) {
-    const maxKnowledgeLength = 8000 // Limit knowledge base size
-    const truncatedKnowledge =
-      knowledgeContent.length > maxKnowledgeLength
-        ? knowledgeContent.substring(0, maxKnowledgeLength) + "\n\n[Knowledge base truncated for length...]"
-        : knowledgeContent
-
-    systemPrompt += `KNOWLEDGE BASE:\nUse the following information to answer questions accurately:\n\n${truncatedKnowledge}\n\n`
-  }
-
-  // FIXED: Add guidelines for staying within token limits
-  systemPrompt += `BEHAVIOR GUIDELINES:\n`
-  systemPrompt += `- Always stay in character based on your personality (${agent.personality})\n`
-  systemPrompt += `- Use the knowledge base to provide accurate information\n`
-  systemPrompt += `- If you don't know something, admit it honestly\n`
-  systemPrompt += `- Use the appropriate response template when needed\n`
-  systemPrompt += `- Match the specified formality level and response length\n`
-  systemPrompt += `- Always reference the knowledge base when providing information\n`
-  systemPrompt += `- If information isn't in the knowledge base, say "I don't have that information in my knowledge base"\n`
-  systemPrompt += `- IMPORTANT: Provide complete but concise responses within the allocated token limit\n`
-  systemPrompt += `- IMPORTANT: Prioritize completing your main point over adding extra details\n`
 
   return systemPrompt
 }
