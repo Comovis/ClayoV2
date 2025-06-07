@@ -174,6 +174,58 @@ const upload = multer({
 // ===== BASIC MIDDLEWARE =====
 app.use(express.json({ limit: "10mb" }))
 
+
+
+// ===== GITHUB - WEBHOOK =====
+// Add GitHub webhook endpoint
+app.post('/github-webhook', express.json(), (req, res) => {
+  const secret = process.env.GITHUB_WEBHOOK_SECRET;
+  if (!secret) {
+    console.error('Webhook secret not set in environment variables');
+    return res.status(500).send('Server configuration error');
+  }
+
+  const signature = `sha256=${crypto.createHmac('sha256', secret).update(JSON.stringify(req.body)).digest('hex')}`;
+  const githubSignature = req.headers['x-hub-signature-256'];
+
+  if (!githubSignature || signature !== githubSignature) {
+    console.error('Unauthorized: Signature mismatch');
+    return res.status(401).send('Unauthorized');
+  }
+
+  console.log(`🚢 Received push event for ref: ${req.body.ref}`);
+
+  if (req.body.ref === 'refs/heads/master') {
+    console.log('⚓ Starting Clayo deployment...');
+    
+    // Respond to GitHub IMMEDIATELY
+    res.status(200).send('Deployment initiated successfully');
+    
+    // Run deployment in background with setTimeout to ensure response is sent first
+    setTimeout(() => {
+      exec(
+        'cd /var/www/Clayo/backend && git pull origin master && npm install --production && pm2 reload Clayo',
+        (error, stdout, stderr) => {
+          if (error) {
+            console.error(`🚨 Deployment error: ${error.message}`);
+            console.error(`stderr: ${stderr}`);
+          } else {
+            console.log(`✅ Deployment completed successfully`);
+            console.log(`stdout: ${stdout}`);
+            if (stderr) console.log(`stderr: ${stderr}`);
+          }
+        }
+      );
+    }, 100); // Small delay to ensure response is sent
+    
+  } else {
+    res.status(200).send('Push event to non-master branch, no action taken');
+  }
+});
+
+
+
+
 // ===== KNOWLEDGE BASE ENDPOINTS =====
 
 // Upload document to knowledge base
@@ -737,7 +789,7 @@ app.post("/api/public/chat/session", async (req, res) => {
     })
   }
 })
-
+ 
 // ===== YOUR EXISTING ENDPOINTS =====
 
 app.post("/api/send-confirmation-email", authLimiter, async (req, res) => {
