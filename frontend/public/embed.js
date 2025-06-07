@@ -7,8 +7,74 @@
       }
     }
   
+    // Simple markdown parser for chat messages
+    function parseMarkdown(text) {
+      return (
+        text
+          // Bold text: **text** or __text__
+          .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+          .replace(/__(.*?)__/g, "<strong>$1</strong>")
+  
+          // Italic text: *text* or _text_
+          .replace(/\*(.*?)\*/g, "<em>$1</em>")
+          .replace(/_(.*?)_/g, "<em>$1</em>")
+  
+          // FIXED: Links: [text](url) - corrected regex pattern
+          .replace(
+            /\[([^\]]+)\]$$([^)]+)$$/g,
+            '<a href="$2" target="_blank" rel="noopener noreferrer" style="color: #3B82F6; text-decoration: underline; cursor: pointer;">$1</a>',
+          )
+  
+          // Code blocks: \`\`\`code\`\`\`
+          .replace(
+            /```([\s\S]*?)```/g,
+            '<pre style="background: #f3f4f6; padding: 8px; border-radius: 4px; overflow-x: auto; font-family: monospace; margin: 8px 0;"><code>$1</code></pre>',
+          )
+  
+          // Inline code: `code`
+          .replace(
+            /`([^`]+)`/g,
+            '<code style="background: #f3f4f6; padding: 2px 4px; border-radius: 3px; font-family: monospace;">$1</code>',
+          )
+  
+          // Line breaks: Convert \n to <br>
+          .replace(/\n/g, "<br>")
+  
+          // Lists: - item or * item
+          .replace(/^[\s]*[-*]\s+(.+)$/gm, '<li style="margin-left: 20px;">$1</li>')
+  
+          // Wrap consecutive <li> elements in <ul>
+          .replace(/(<li[^>]*>.*?<\/li>)(\s*<li[^>]*>.*?<\/li>)*/g, '<ul style="margin: 8px 0; padding-left: 0;">$&</ul>')
+      )
+    }
+  
+    // Enhanced message adding with markdown support
+    function addMessage(content, sender, config) {
+      const messages = document.getElementById("clayo-widget-messages")
+      const messageDiv = document.createElement("div")
+      messageDiv.className = `clayo-message clayo-message-${sender}`
+  
+      const contentDiv = document.createElement("div")
+      contentDiv.className = "clayo-message-content"
+  
+      // Parse markdown for bot messages, plain text for user messages
+      if (sender === "bot") {
+        contentDiv.innerHTML = parseMarkdown(content)
+      } else {
+        contentDiv.textContent = content
+      }
+  
+      messageDiv.appendChild(contentDiv)
+      messages.appendChild(messageDiv)
+  
+      // Scroll to bottom
+      messages.scrollTop = messages.scrollHeight
+  
+      return contentDiv
+    }
+  
     function initClayoWidget() {
-      console.log("🚀 Initializing Clayo Widget...")
+      console.log("🚀 Initializing Clayo Widget with Markdown Support...")
   
       // Check if widget already exists and remove it
       const existingWidget = document.getElementById("clayo-chat-widget")
@@ -65,7 +131,7 @@
         widgetContainer.id = "clayo-chat-widget"
         widgetContainer.innerHTML = createWidgetHTML(finalConfig)
   
-        // Add styles
+        // Add enhanced styles with markdown support
         const styles = createWidgetStyles(finalConfig)
         const styleSheet = document.createElement("style")
         styleSheet.setAttribute("data-clayo-widget", "true")
@@ -152,7 +218,7 @@
           
           <div id="clayo-widget-messages" class="clayo-widget-messages">
             <div class="clayo-message clayo-message-bot">
-              <div class="clayo-message-content">${config.welcomeMessage}</div>
+              <div class="clayo-message-content">${parseMarkdown(config.welcomeMessage)}</div>
             </div>
           </div>
           
@@ -319,6 +385,7 @@
           padding: 12px 16px;
           border-radius: ${config.borderRadius * 0.7}px;
           line-height: 1.4;
+          word-wrap: break-word;
         }
         
         .clayo-message-bot .clayo-message-content {
@@ -331,6 +398,56 @@
           background: ${config.primaryColor};
           color: white;
           border-bottom-right-radius: 4px;
+        }
+        
+        /* Enhanced markdown styles */
+        .clayo-message-content a {
+          color: #3B82F6 !important;
+          text-decoration: underline !important;
+          cursor: pointer !important;
+          pointer-events: auto !important;
+        }
+  
+        .clayo-message-content a:hover {
+          color: #2563EB !important;
+          text-decoration: underline !important;
+        }
+        
+        .clayo-message-content strong {
+          font-weight: 600;
+        }
+        
+        .clayo-message-content em {
+          font-style: italic;
+        }
+        
+        .clayo-message-content code {
+          background: rgba(0,0,0,0.1);
+          padding: 2px 4px;
+          border-radius: 3px;
+          font-family: 'Courier New', monospace;
+          font-size: 0.9em;
+        }
+        
+        .clayo-message-content pre {
+          background: rgba(0,0,0,0.05);
+          padding: 8px;
+          border-radius: 4px;
+          overflow-x: auto;
+          font-family: 'Courier New', monospace;
+          margin: 8px 0;
+          white-space: pre-wrap;
+        }
+        
+        .clayo-message-content ul {
+          margin: 8px 0;
+          padding-left: 0;
+        }
+        
+        .clayo-message-content li {
+          margin-left: 20px;
+          list-style-type: disc;
+          margin-bottom: 4px;
         }
         
         .clayo-widget-input-area {
@@ -483,7 +600,7 @@
           return
         }
   
-        addMessage(message, "user")
+        addMessage(message, "user", config)
         input.value = ""
   
         sendMessageToAPI(message, window.sessionId, config)
@@ -623,17 +740,18 @@
   
                 if (data.type === "chunk") {
                   if (!messageElement) {
-                    messageElement = addMessage("", "bot")
+                    messageElement = addMessage("", "bot", config)
                   }
                   botMessage += data.content
-                  messageElement.textContent = botMessage
+                  // Update with markdown parsing
+                  messageElement.innerHTML = parseMarkdown(botMessage)
                 } else if (data.type === "complete") {
                   console.log("✅ Message complete")
                   break
                 } else if (data.type === "error") {
                   console.error("❌ Chat error:", data.error)
                   if (!messageElement) {
-                    addMessage("Sorry, I encountered an error. Please try again.", "bot")
+                    addMessage("Sorry, I encountered an error. Please try again.", "bot", config)
                   }
                 }
               } catch (e) {
@@ -644,25 +762,8 @@
         }
       } catch (error) {
         console.error("❌ Error sending message:", error)
-        addMessage("Sorry, I encountered an error. Please try again.", "bot")
+        addMessage("Sorry, I encountered an error. Please try again.", "bot", config)
       }
-    }
-  
-    function addMessage(content, sender) {
-      const messages = document.getElementById("clayo-widget-messages")
-      const messageDiv = document.createElement("div")
-      messageDiv.className = `clayo-message clayo-message-${sender}`
-  
-      const contentDiv = document.createElement("div")
-      contentDiv.className = "clayo-message-content"
-      contentDiv.textContent = content
-  
-      messageDiv.appendChild(contentDiv)
-      messages.appendChild(messageDiv)
-  
-      messages.scrollTop = messages.scrollHeight
-  
-      return contentDiv
     }
   
     ready(initClayoWidget)

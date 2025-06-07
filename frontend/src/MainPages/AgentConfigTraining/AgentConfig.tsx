@@ -96,7 +96,7 @@ export default function UpdatedEnhancedAIAgentsPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [itemToDelete, setItemToDelete] = useState<string | null>(null)
 
-  // Form state for personality tab
+  // Form state for personality tab (removed maxTokens)
   const [formData, setFormData] = useState({
     name: "",
     personality: "friendly",
@@ -105,7 +105,6 @@ export default function UpdatedEnhancedAIAgentsPage() {
     formalityLevel: "balanced",
     customInstructions: "",
     temperature: 0.7,
-    maxTokens: 300,
     model: "gpt-4o-mini",
     capabilities: [],
   })
@@ -251,7 +250,7 @@ export default function UpdatedEnhancedAIAgentsPage() {
       getAgentAnalytics(selectedAgent)
       getAgentStatus(selectedAgent)
 
-      // Update form data with current agent
+      // Update form data with current agent (removed maxTokens)
       const currentAgent = agents.find((agent) => agent.id === selectedAgent)
       if (currentAgent) {
         setFormData({
@@ -262,7 +261,6 @@ export default function UpdatedEnhancedAIAgentsPage() {
           formalityLevel: currentAgent.settings?.formalityLevel || "balanced",
           customInstructions: currentAgent.settings?.customInstructions || "",
           temperature: currentAgent.settings?.temperature || 0.7,
-          maxTokens: currentAgent.settings?.maxTokens || 300,
           model: currentAgent.settings?.model || "gpt-4o-mini",
           capabilities: currentAgent.capabilities || [],
         })
@@ -281,7 +279,7 @@ export default function UpdatedEnhancedAIAgentsPage() {
     }
   }, [selectedAgent, fetchKnowledgeItems, userLoading, agents, getAgentSessions, getAgentAnalytics, getAgentStatus])
 
-  // Track changes
+  // Track changes (removed maxTokens from comparison)
   useEffect(() => {
     const currentAgent = agents.find((agent) => agent.id === selectedAgent)
     if (!currentAgent) return
@@ -295,7 +293,6 @@ export default function UpdatedEnhancedAIAgentsPage() {
         key === "responseLength" ||
         key === "formalityLevel" ||
         key === "temperature" ||
-        key === "maxTokens" ||
         key === "model"
       ) {
         return formData[key] !== (currentAgent.settings?.[key] || "")
@@ -421,8 +418,8 @@ export default function UpdatedEnhancedAIAgentsPage() {
         formalityLevel: formData.formalityLevel,
         customInstructions: formData.customInstructions,
         temperature: formData.temperature,
-        maxTokens: formData.maxTokens,
         model: formData.model,
+        // maxTokens is now fixed at 300 and not configurable
       },
     }
 
@@ -965,22 +962,7 @@ export default function UpdatedEnhancedAIAgentsPage() {
                             </div>
                           </div>
 
-                          <div className="space-y-2">
-                            <Label>Max Response Length (Tokens: {formData.maxTokens})</Label>
-                            <input
-                              type="range"
-                              min="50"
-                              max="1000"
-                              step="50"
-                              value={formData.maxTokens}
-                              onChange={(e) => handleInputChange("maxTokens", Number.parseInt(e.target.value))}
-                              className="w-full"
-                            />
-                            <div className="flex justify-between text-xs text-gray-500">
-                              <span>Short</span>
-                              <span>Long</span>
-                            </div>
-                          </div>
+                       
 
                           <Alert className="border-blue-200 bg-blue-50">
                             <Sparkles className="h-4 w-4 text-blue-600" />

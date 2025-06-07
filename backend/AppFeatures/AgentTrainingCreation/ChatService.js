@@ -43,31 +43,72 @@ async function processMessage({ message, sessionId, agentId, organizationId, onC
     let chunkCount = 0
 
     try {
-      // FIXED: Use the correct AI SDK streaming pattern
+      // FIXED: Use the configured token limits as-is, don't force minimums
       const result = await streamText({
         model,
         system: systemPrompt,
         messages,
-        maxTokens: modelParams.maxTokens,
+        maxTokens: modelParams.maxTokens, // Use exactly what's configured
         temperature: modelParams.temperature,
+        topP: 0.9,
+        frequencyPenalty: 0,
+        presencePenalty: 0,
       })
 
       console.log("🚀 streamText result created, starting to read stream...")
 
-      // FIXED: Read the stream properly
-      for await (const chunk of result.textStream) {
-        chunkCount++
-        console.log(`📦 Chunk ${chunkCount}:`, chunk.substring(0, 50) + "...")
+      // FIXED: Proper stream reading with error handling
+      try {
+        for await (const chunk of result.textStream) {
+          chunkCount++
+          console.log(`📦 Chunk ${chunkCount}:`, chunk.substring(0, 50) + "...")
 
-        // Send chunk to client
-        onChunk(chunk)
-        fullResponse += chunk
+          // Ensure chunk is valid before processing
+          if (chunk && typeof chunk === "string") {
+            // Send chunk to client immediately
+            try {
+              onChunk(chunk)
+              fullResponse += chunk
+            } catch (chunkError) {
+              console.error("❌ Error sending chunk:", chunkError)
+              // Continue processing even if one chunk fails
+            }
+          }
+        }
+      } catch (streamError) {
+        console.error("❌ Stream reading error:", streamError)
+        // If streaming fails, try to get the full text
+        try {
+          const fallbackText = await result.text
+          if (fallbackText && fallbackText.length > fullResponse.length) {
+            const remainingText = fallbackText.substring(fullResponse.length)
+            onChunk(remainingText)
+            fullResponse = fallbackText
+          }
+        } catch (fallbackError) {
+          console.error("❌ Fallback text retrieval failed:", fallbackError)
+        }
       }
 
       console.log("🎯 Stream reading completed")
       console.log("📊 Total chunks received:", chunkCount)
       console.log("🤖 Full response length:", fullResponse.length)
       console.log("🤖 Full response preview:", fullResponse.substring(0, 100) + "...")
+
+      // FIXED: Ensure we have a complete response
+      if (!fullResponse || fullResponse.length === 0) {
+        console.warn("⚠️ Empty response detected, attempting fallback...")
+        try {
+          fullResponse = await result.text
+          if (fullResponse) {
+            onChunk(fullResponse)
+            console.log("✅ Fallback response retrieved:", fullResponse.length, "characters")
+          }
+        } catch (fallbackError) {
+          console.error("❌ Fallback failed:", fallbackError)
+          throw new Error("Failed to generate response")
+        }
+      }
 
       // Save AI response
       await saveMessage(sessionId, fullResponse, "ai", organizationId)
@@ -141,12 +182,18 @@ function buildEnhancedSystemPrompt(agent, knowledgeContent) {
   systemPrompt += `- Escalation: "${templates.escalation || "I'll connect you with a human agent who can better assist you."}"\n`
   systemPrompt += `- Closing: "${templates.closing || "Is there anything else I can help you with?"}"\n\n`
 
-  // Knowledge base (your proven approach)
+  // FIXED: Truncate knowledge base if too long to prevent context overflow
   if (knowledgeContent) {
-    systemPrompt += `KNOWLEDGE BASE:\nUse the following information to answer questions accurately:\n\n${knowledgeContent}\n\n`
+    const maxKnowledgeLength = 8000 // Limit knowledge base size
+    const truncatedKnowledge =
+      knowledgeContent.length > maxKnowledgeLength
+        ? knowledgeContent.substring(0, maxKnowledgeLength) + "\n\n[Knowledge base truncated for length...]"
+        : knowledgeContent
+
+    systemPrompt += `KNOWLEDGE BASE:\nUse the following information to answer questions accurately:\n\n${truncatedKnowledge}\n\n`
   }
 
-  // Behavior guidelines
+  // FIXED: Add guidelines for staying within token limits
   systemPrompt += `BEHAVIOR GUIDELINES:\n`
   systemPrompt += `- Always stay in character based on your personality (${agent.personality})\n`
   systemPrompt += `- Use the knowledge base to provide accurate information\n`
@@ -155,6 +202,8 @@ function buildEnhancedSystemPrompt(agent, knowledgeContent) {
   systemPrompt += `- Match the specified formality level and response length\n`
   systemPrompt += `- Always reference the knowledge base when providing information\n`
   systemPrompt += `- If information isn't in the knowledge base, say "I don't have that information in my knowledge base"\n`
+  systemPrompt += `- IMPORTANT: Provide complete but concise responses within the allocated token limit\n`
+  systemPrompt += `- IMPORTANT: Prioritize completing your main point over adding extra details\n`
 
   return systemPrompt
 }
@@ -257,21 +306,31 @@ async function getSessionMessages(sessionId) {
  * @param {string} organizationId - Organization ID
  * @returns {Promise<void>}
  */
-async function saveMessage(sessionId, content, messageType, organizationId) {
-  try {
-    const { error } = await supabaseAdmin.from("messages").insert({
-      id: uuidv4(),
-      session_id: sessionId,
-      content,
-      type: messageType,
-      organization_id: organizationId,
-      created_at: new Date().toISOString(),
-    })
+async function saveMessage(sessionId, content, messageType, organizationId, retries = 3) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const { error } = await supabaseAdmin.from("messages").insert({
+        id: uuidv4(),
+        session_id: sessionId,
+        content,
+        type: messageType,
+        organization_id: organizationId,
+        created_at: new Date().toISOString(),
+      })
 
-    if (error) throw error
-    console.log(`✅ Message saved successfully as type: ${messageType}`)
-  } catch (error) {
-    console.error("Save message error:", error)
+      if (error) throw error
+      console.log(`✅ Message saved successfully as type: ${messageType}`)
+      return
+    } catch (error) {
+      console.error(`❌ Save message error (attempt ${attempt}/${retries}):`, error)
+      if (attempt === retries) {
+        console.error("❌ Failed to save message after all retries")
+        // Don't throw error to prevent breaking the chat flow
+      } else {
+        // Wait before retry
+        await new Promise((resolve) => setTimeout(resolve, 1000 * attempt))
+      }
+    }
   }
 }
 
@@ -353,44 +412,71 @@ async function handlePublicChatMessage(req, res) {
       })
     }
 
-    // FIXED: Set up proper streaming response headers
+    // FIXED: Set up proper streaming response headers with keep-alive
     res.writeHead(200, {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Headers": "Content-Type",
+      "X-Accel-Buffering": "no", // Disable nginx buffering
     })
 
     let fullResponse = ""
     let chunksSent = 0
+    let isComplete = false
 
-    const result = await processMessage({
-      message,
-      sessionId,
-      agentId,
-      organizationId,
-      onChunk: (chunk) => {
-        chunksSent++
-        console.log(`📤 Sending chunk ${chunksSent} to client:`, chunk.substring(0, 50) + "...")
-        fullResponse += chunk
+    // Send keep-alive ping
+    const keepAlive = setInterval(() => {
+      if (!isComplete && !res.destroyed) {
+        res.write(`: keep-alive\n\n`)
+      }
+    }, 30000)
 
-        // FIXED: Send as Server-Sent Events format
-        res.write(`data: ${JSON.stringify({ type: "chunk", content: chunk })}\n\n`)
-      },
-    })
+    try {
+      const result = await processMessage({
+        message,
+        sessionId,
+        agentId,
+        organizationId,
+        onChunk: (chunk) => {
+          if (res.destroyed || isComplete) return
 
-    // Send completion signal
-    res.write(`data: ${JSON.stringify({ type: "complete" })}\n\n`)
-    res.end()
+          chunksSent++
+          console.log(`📤 Sending chunk ${chunksSent} to client:`, chunk.substring(0, 50) + "...")
+          fullResponse += chunk
 
-    console.log("✅ Public chat message processed successfully:", {
-      sessionId,
-      agentId,
-      knowledgeItemsUsed: result.knowledgeItemsUsed,
-      responseLength: fullResponse.length,
-      chunksSent,
-    })
+          // FIXED: Send as Server-Sent Events format with proper escaping
+          const escapedChunk = JSON.stringify({ type: "chunk", content: chunk })
+          res.write(`data: ${escapedChunk}\n\n`)
+        },
+      })
+
+      // Send completion signal
+      if (!res.destroyed && !isComplete) {
+        res.write(`data: ${JSON.stringify({ type: "complete" })}\n\n`)
+        isComplete = true
+      }
+
+      clearInterval(keepAlive)
+      res.end()
+
+      console.log("✅ Public chat message processed successfully:", {
+        sessionId,
+        agentId,
+        knowledgeItemsUsed: result.knowledgeItemsUsed,
+        responseLength: fullResponse.length,
+        chunksSent,
+      })
+    } catch (error) {
+      clearInterval(keepAlive)
+      console.error("❌ Error in message processing:", error)
+
+      if (!res.destroyed && !isComplete) {
+        res.write(`data: ${JSON.stringify({ type: "error", error: error.message })}\n\n`)
+        res.end()
+      }
+    }
   } catch (error) {
     console.error("❌ Handle public chat message error:", error)
     if (!res.headersSent) {

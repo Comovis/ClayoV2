@@ -45,7 +45,7 @@ export function EnhancedAgentConfigTabs({ agent, onAgentUpdate }: EnhancedAgentC
   const { analytics, getAgentAnalytics, isLoading: analyticsLoading } = useAgentAnalytics()
   const { agentStatus, getAgentStatus, isLoading: statusLoading } = useAgentStatus()
 
-  // Form state for personality tab
+  // Form state for personality tab (removed maxTokens)
   const [formData, setFormData] = useState({
     name: agent.name || "",
     personality: agent.personality || "friendly",
@@ -54,7 +54,6 @@ export function EnhancedAgentConfigTabs({ agent, onAgentUpdate }: EnhancedAgentC
     formalityLevel: agent.settings?.formalityLevel || "balanced",
     customInstructions: agent.settings?.customInstructions || "",
     temperature: agent.settings?.temperature || 0.7,
-    maxTokens: agent.settings?.maxTokens || 300,
     model: agent.settings?.model || "gpt-4o-mini",
     capabilities: agent.capabilities || [],
   })
@@ -84,7 +83,7 @@ export function EnhancedAgentConfigTabs({ agent, onAgentUpdate }: EnhancedAgentC
     }
   }, [agent.id, getAgentSessions, getAgentAnalytics, getAgentStatus])
 
-  // Track changes
+  // Track changes (removed maxTokens from comparison)
   useEffect(() => {
     const hasFormChanges = Object.keys(formData).some((key) => {
       if (key === "capabilities") {
@@ -95,7 +94,6 @@ export function EnhancedAgentConfigTabs({ agent, onAgentUpdate }: EnhancedAgentC
         key === "responseLength" ||
         key === "formalityLevel" ||
         key === "temperature" ||
-        key === "maxTokens" ||
         key === "model"
       ) {
         return formData[key] !== (agent.settings?.[key] || "")
@@ -137,8 +135,8 @@ export function EnhancedAgentConfigTabs({ agent, onAgentUpdate }: EnhancedAgentC
         formalityLevel: formData.formalityLevel,
         customInstructions: formData.customInstructions,
         temperature: formData.temperature,
-        maxTokens: formData.maxTokens,
         model: formData.model,
+        // maxTokens is now fixed at 300 and not configurable
       },
     }
 
@@ -352,22 +350,16 @@ export function EnhancedAgentConfigTabs({ agent, onAgentUpdate }: EnhancedAgentC
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Max Response Length (Tokens: {formData.maxTokens})</Label>
-                  <input
-                    type="range"
-                    min="50"
-                    max="1000"
-                    step="50"
-                    value={formData.maxTokens}
-                    onChange={(e) => handleInputChange("maxTokens", Number.parseInt(e.target.value))}
-                    className="w-full"
-                  />
-                  <div className="flex justify-between text-xs text-gray-500">
-                    <span>Short</span>
-                    <span>Long</span>
-                  </div>
-                </div>
+                {/* Response Length Info - Fixed at 300 tokens */}
+                <Alert className="border-blue-200 bg-blue-50">
+                  <Sparkles className="h-4 w-4 text-blue-600" />
+                  <AlertDescription className="text-blue-800">
+                    <p className="font-medium">Response Length</p>
+                    <p className="text-sm mt-1">
+                      All responses are optimized to fit within 300 tokens for consistent performance and speed.
+                    </p>
+                  </AlertDescription>
+                </Alert>
 
                 {/* Test Configuration */}
                 <div className="space-y-4 pt-4 border-t">
