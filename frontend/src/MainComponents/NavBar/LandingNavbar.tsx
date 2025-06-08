@@ -63,14 +63,14 @@ const LandingHeader = ({ user, logout }: LandingHeaderProps) => {
               onClick={() => handleScrollToSection("how-it-works")}
               className="text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors dark:text-slate-300 dark:hover:text-white"
             >
-              How Comovis Works
+              How Clayo Works
             </button>
 
             <button
               onClick={() => handleScrollToSection("call-to-action")}
               className="text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors dark:text-slate-300 dark:hover:text-white"
             >
-              Join Pilot Program
+              Pricing
             </button>
           </nav>
 

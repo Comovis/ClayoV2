@@ -305,14 +305,13 @@ export default function HeroSection() {
 
             {/* Problem-focused headline */}
             <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-4xl xl:text-5xl font-bold tracking-tight text-slate-900 mb-4 sm:mb-6 leading-tight break-words">
-              Boost Customer Satisfaction & Sales Without the Costs
+            Outdated chatbots sleep. Your customers don’t.
             </h1>
 
             {/* Clear value proposition */}
-            <p className="text-base sm:text-lg lg:text-xl text-slate-600 mb-6 sm:mb-8 leading-relaxed break-words">
+            <p className="text-base sm:text-lg lg:text-l text-slate-600 mb-6 sm:mb-8 leading-relaxed break-words">
               Our AI Customer Service and Sales Automation Platform trains on your company's documents, content, and
-              FAQs to provide 24/7 support, qualify leads, schedule appointments, and process orders across multiple
-              channels.
+              FAQs to provide 24/7 support, qualify leads, schedule appointments, while your competition’s "support" takes a coffee break.
             </p>
 
             {/* Professional CTAs */}
