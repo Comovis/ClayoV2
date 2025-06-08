@@ -4,7 +4,7 @@ const { supabaseAdmin } = require("../../SupabaseClient")
 
 // Company context and positioning
 const COMPANY_CONTEXT = `
-COMPANY: AI Customer Service and Sales Automation Platform
+COMPANY: AI Customer Service and Sales Automation Platform called Clayo with a website called Clayo.co
 MISSION: Boost Customer Satisfaction & Sales Without the Costs
 PRODUCT: AI that trains on company documents, content, and FAQs to provide 24/7 support, qualify leads, schedule appointments, and process orders across multiple channels.
 
@@ -376,6 +376,8 @@ WRITING STYLE:
 - Include specific examples and scenarios
 - Use data and statistics when relevant
 - Challenge conventional wisdom
+- DO NOT USE use em-dahses UNLESS NECCESARY
+- Use UK (English) grammar where you would use "s" instead of "z"
 
 CONTENT STRUCTURE:
 1. Attention-grabbing introduction with controversial hook
@@ -384,7 +386,10 @@ CONTENT STRUCTURE:
 4. Solution presentation (our AI platform benefits)
 5. Real-world examples and case studies
 6. Call-to-action (if requested)
-7. Try not to use em-dahses 
+7. DO NOT USE use em-dahses UNLESS NECCESARY
+8. We ar ein year 2025
+
+
 
 TONE EXAMPLES:
 - "While your competitors are sleeping, your customers are shopping"

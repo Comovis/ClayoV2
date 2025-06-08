@@ -249,7 +249,7 @@ export default function AdminBlogManagementPage() {
             <Lightbulb className="h-4 w-4 mr-2" />
             AI Topic Ideas
           </Button>
-          <Link to="/admin/blog/create">
+          <Link to="/admin/blog/new">
             <Button size="sm">
               <Plus className="h-4 w-4 mr-2" />
               Create New Article

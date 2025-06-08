@@ -202,6 +202,10 @@ export function useBlogService(): UseBlogServiceReturn {
     [authenticatedRequest],
   )
 
+
+
+
+
   const createPost = useCallback(
     async (data: CreateBlogPostBody, imageFile?: File) => {
       if (imageFile) {
@@ -230,6 +234,11 @@ export function useBlogService(): UseBlogServiceReturn {
     },
     [authenticatedRequest],
   )
+
+
+
+
+  
 
   const getAllPostsForAdmin = useCallback(async () => {
     return (await authenticatedRequest("/api/admin/blog/posts")) as BlogPost[] | null
@@ -263,6 +272,9 @@ export function useBlogService(): UseBlogServiceReturn {
     },
     [authenticatedRequest],
   )
+
+
+
 
   const deletePost = useCallback(
     async (id: string) => {

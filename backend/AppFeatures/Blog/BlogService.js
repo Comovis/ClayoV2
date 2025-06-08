@@ -33,9 +33,13 @@ async function isUserClayoAdmin(userId) {
  * @returns {Promise<string>} The public URL of the uploaded image.
  * @throws {Error} If upload fails or user is unauthorized.
  */
+
+
+// CORRECTED VERSION:
 async function uploadBlogImage(imageFile, fileName, userId) {
   try {
     console.log("=== UPLOAD BLOG IMAGE ===")
+    console.log("Original fileName:", fileName)
 
     if (!(await isUserClayoAdmin(userId))) {
       throw new Error("Unauthorized: Only Clayo Admins can upload blog images.")
@@ -44,34 +48,51 @@ async function uploadBlogImage(imageFile, fileName, userId) {
     // Generate unique filename to avoid conflicts
     const timestamp = Date.now()
     const fileExtension = fileName.split(".").pop()
-    const uniqueFileName = `${timestamp}-${fileName.replace(/[^a-zA-Z0-9.-]/g, "_")}`
-    const filePath = `${uniqueFileName}`
+    const cleanBaseName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_")
+    const uniqueFileName = `${timestamp}-${cleanBaseName}`
+    
+    console.log("Generated unique filename:", uniqueFileName)
 
     // Upload file to Supabase Storage
-    const { data, error } = await supabaseAdmin.storage.from("blog-images").upload(filePath, imageFile, {
-      cacheControl: "3600",
-      upsert: false,
-    })
+    const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+      .from("blog-images")
+      .upload(uniqueFileName, imageFile, {
+        cacheControl: "3600",
+        upsert: false,
+      })
 
-    if (error) {
-      console.error("Supabase Storage upload error:", error)
-      throw new Error(`Failed to upload image: ${error.message}`)
+    if (uploadError) {
+      console.error("Supabase Storage upload error:", uploadError)
+      throw new Error(`Failed to upload image: ${uploadError.message}`)
     }
 
-    // Get public URL for the uploaded image
-    const { data: publicUrlData } = supabaseAdmin.storage.from("blog-images").getPublicUrl(filePath)
+    console.log("Upload successful, data:", uploadData)
+    console.log("Uploaded file path:", uploadData.path) // This shows the actual path stored
+
+    // Get public URL using the SAME path that was uploaded
+    const { data: publicUrlData } = supabaseAdmin.storage
+      .from("blog-images")
+      .getPublicUrl(uploadData.path) // Use the path from upload response
+
+    console.log("Public URL generation result:", publicUrlData)
 
     if (!publicUrlData?.publicUrl) {
       throw new Error("Failed to get public URL for uploaded image")
     }
 
-    console.log("Image uploaded successfully:", publicUrlData.publicUrl)
+    console.log("Final public URL:", publicUrlData.publicUrl)
+    
+    // RETURN THE PUBLIC URL (this gets saved to featured_image_url in DB)
     return publicUrlData.publicUrl
   } catch (error) {
     console.error("Error in uploadBlogImage:", error.message)
     throw error
   }
 }
+
+
+
+
 
 /**
  * Deletes an image from Supabase Storage.
@@ -122,6 +143,11 @@ async function deleteBlogImage(imageUrl, userId) {
 async function createBlogPost(postData, userId, imageFile = null, imageFileName = null) {
   try {
     console.log("=== CREATE BLOG POST ===")
+    console.log("=== CREATE BLOG POST ===")
+    console.log("Raw postData:", postData) // Better logging
+    console.log("userId:", userId)
+    console.log("imageFile present:", !!imageFile)
+    console.log("imageFileName:", imageFileName)
 
     if (!(await isUserClayoAdmin(userId))) {
       throw new Error("Unauthorized: Only Clayo Admins can create blog posts.")

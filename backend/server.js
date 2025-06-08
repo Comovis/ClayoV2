@@ -8,6 +8,8 @@ const crypto = require("crypto")
 const { exec } = require("child_process")
 const { supabaseAdmin } = require("./SupabaseClient")
 
+
+
 // Import AI Customer Support service functions
 const {
   uploadDocument,
@@ -111,6 +113,11 @@ app.use(
 
 //Live
 const port = process.env.PORT || 2222
+
+
+
+
+
 
 // ===== SECURITY MIDDLEWARE =====
 
@@ -1429,7 +1436,6 @@ app.get("/api/widget/config/public/:organizationId", async (req, res) => {
 // Blog API Endpoints
 // =====================================================================
 
-// --- Public Blog Endpoints (No Authentication Required) ---
 
 // GET /api/blog/posts - Get all published blog posts
 app.get("/api/blog/posts", async (req, res) => {
@@ -1438,7 +1444,6 @@ app.get("/api/blog/posts", async (req, res) => {
     return res.status(200).json(posts);
   } catch (error) {
     console.error("Error in GET /api/blog/posts:", error);
-    // Public facing errors should be generic for security
     return res.status(500).json({
       success: false,
       error: "Failed to fetch blog posts.",
@@ -1467,14 +1472,13 @@ app.get("/api/blog/posts/:slug", async (req, res) => {
   }
 });
 
-
 // --- Admin Blog Endpoints (Authentication & Clayo Admin Privileges Required) ---
 
 // GET /api/admin/blog/posts - Get all blog posts (including drafts) for admin view
 app.get("/api/admin/blog/posts", authenticateUser, async (req, res) => {
   try {
-    // req.user.id is expected to be populated by the authenticateUser middleware
-    const userId = req.user.id;
+    // Use the correct user ID field from your auth middleware
+    const userId = req.user.user_id || req.user.id;
     const posts = await getAllBlogPostsForAdmin(userId);
     return res.status(200).json(posts);
   } catch (error) {
@@ -1489,22 +1493,97 @@ app.get("/api/admin/blog/posts", authenticateUser, async (req, res) => {
   }
 });
 
-// POST /api/admin/blog/posts - Create a new blog post
-app.post("/api/admin/blog/posts", authenticateUser, async (req, res) => {
+// GET /api/admin/blog/posts/:id - Get a single blog post by ID for admin
+app.get("/api/admin/blog/posts/:id", authenticateUser, async (req, res) => {
   try {
-    const userId = req.user.id;
-    const newPost = await createBlogPost(req.body, userId);
-    return res.status(201).json(newPost); // 201 Created
+    const { id } = req.params;
+    const userId = req.user.user_id || req.user.id;
+    
+    // You'll need to add this function to your BlogService.js
+    const post = await getBlogPostById(id, userId);
+    return res.status(200).json(post);
   } catch (error) {
-    console.error("Error in POST /api/admin/blog/posts:", error);
+    console.error(`Error in GET /api/admin/blog/posts/${req.params.id}:`, error);
     if (error.message.includes("Unauthorized")) {
       return res.status(401).json({ success: false, error: error.message });
     }
-    if (
-      error.message.includes("required") ||
-      error.message.includes("slug already exists")
-    ) {
-      // For validation errors or conflict
+    if (error.message.includes("not found")) {
+      return res.status(404).json({ success: false, error: error.message });
+    }
+    return res.status(500).json({
+      success: false,
+      error: "Failed to fetch blog post.",
+    });
+  }
+});
+
+// POST /api/admin/blog/posts - Create a new blog post (with optional image upload)
+app.post("/api/admin/blog/posts", upload.single('image'), authenticateUser, async (req, res) => {
+  try {
+    console.log("=== BLOG POST CREATION REQUEST ===");
+    console.log("req.body:", req.body);
+    console.log("req.file:", req.file ? { ...req.file, buffer: '[Buffer]' } : null);
+    
+    const userId = req.user.user_id || req.user.id;
+    const organizationId = req.user.organization_id;
+    
+    console.log("userId:", userId);
+    console.log("organizationId:", organizationId);
+
+    // Handle both FormData and JSON requests
+    let postData;
+    
+    if (req.file) {
+      // FormData request - data comes from req.body fields
+      postData = {
+        title: req.body.title,
+        slug: req.body.slug,
+        excerpt: req.body.excerpt || null,
+        content: req.body.content,
+        category: req.body.category || null,
+        featuredImage: req.body.featuredImage || null,
+        status: req.body.status || 'draft',
+        seoTitle: req.body.seoTitle || null,
+        seoDescription: req.body.seoDescription || null,
+        seoKeywords: req.body.seoKeywords ? JSON.parse(req.body.seoKeywords) : [],
+        readTime: req.body.readTime ? parseInt(req.body.readTime) : null,
+        organizationId: organizationId
+      };
+    } else {
+      // JSON request - data comes from req.body directly
+      postData = {
+        ...req.body,
+        organizationId: organizationId
+      };
+    }
+
+    console.log("Processed postData:", postData);
+
+    // Validate required fields
+    if (!postData.title || !postData.slug || !postData.content) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields: title, slug, and content are required"
+      });
+    }
+
+    const newPost = await createBlogPost(
+      postData,
+      userId,
+      req.file ? req.file.buffer : null,
+      req.file ? req.file.originalname : null
+    );
+    
+    return res.status(201).json(newPost);
+  } catch (error) {
+    console.error("Error in POST /api/admin/blog/posts:", error);
+    
+    if (error.message.includes("Unauthorized")) {
+      return res.status(401).json({ success: false, error: error.message });
+    }
+    if (error.message.includes("required") || 
+        error.message.includes("slug already exists") ||
+        error.message.includes("Only image files are allowed")) {
       return res.status(400).json({ success: false, error: error.message });
     }
     return res.status(500).json({
@@ -1514,20 +1593,66 @@ app.post("/api/admin/blog/posts", authenticateUser, async (req, res) => {
   }
 });
 
-// PUT /api/admin/blog/posts/:id - Update an existing blog post
-app.put("/api/admin/blog/posts/:id", authenticateUser, async (req, res) => {
+// PUT /api/admin/blog/posts/:id - Update an existing blog post (with optional image upload)
+app.put("/api/admin/blog/posts/:id", upload.single('image'), authenticateUser, async (req, res) => {
   try {
+    console.log("=== BLOG POST UPDATE REQUEST ===");
+    console.log("req.body:", req.body);
+    console.log("req.file:", req.file ? { ...req.file, buffer: '[Buffer]' } : null);
+    
     const { id } = req.params;
-    const userId = req.user.id;
-    const updatedPost = await updateBlogPost(id, req.body, userId);
+    const userId = req.user.user_id || req.user.id;
+    
+    // Handle both FormData and JSON requests
+    let updateData;
+    
+    if (req.file) {
+      // FormData request
+      updateData = {
+        title: req.body.title,
+        slug: req.body.slug,
+        excerpt: req.body.excerpt,
+        content: req.body.content,
+        category: req.body.category,
+        featuredImage: req.body.featuredImage,
+        status: req.body.status,
+        seoTitle: req.body.seoTitle,
+        seoDescription: req.body.seoDescription,
+        seoKeywords: req.body.seoKeywords ? JSON.parse(req.body.seoKeywords) : undefined,
+        readTime: req.body.readTime ? parseInt(req.body.readTime) : undefined,
+      };
+      
+      // Remove undefined values
+      Object.keys(updateData).forEach(key => 
+        updateData[key] === undefined && delete updateData[key]
+      );
+    } else {
+      // JSON request
+      updateData = req.body;
+    }
+
+    console.log("Processed updateData:", updateData);
+
+    const updatedPost = await updateBlogPost(
+      id, 
+      updateData, 
+      userId,
+      req.file ? req.file.buffer : null,
+      req.file ? req.file.originalname : null
+    );
+    
     return res.status(200).json(updatedPost);
   } catch (error) {
     console.error(`Error in PUT /api/admin/blog/posts/${req.params.id}:`, error);
+    
     if (error.message.includes("Unauthorized")) {
       return res.status(401).json({ success: false, error: error.message });
     }
     if (error.message.includes("not found")) {
-        return res.status(404).json({ success: false, error: error.message });
+      return res.status(404).json({ success: false, error: error.message });
+    }
+    if (error.message.includes("Only image files are allowed")) {
+      return res.status(400).json({ success: false, error: error.message });
     }
     return res.status(500).json({
       success: false,
@@ -1540,16 +1665,16 @@ app.put("/api/admin/blog/posts/:id", authenticateUser, async (req, res) => {
 app.delete("/api/admin/blog/posts/:id", authenticateUser, async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
+    const userId = req.user.user_id || req.user.id;
     await deleteBlogPost(id, userId);
-    return res.status(204).send(); // 204 No Content for successful deletion
+    return res.status(204).send();
   } catch (error) {
     console.error(`Error in DELETE /api/admin/blog/posts/${req.params.id}:`, error);
     if (error.message.includes("Unauthorized")) {
       return res.status(401).json({ success: false, error: error.message });
     }
     if (error.message.includes("not found")) {
-        return res.status(404).json({ success: false, error: error.message });
+      return res.status(404).json({ success: false, error: error.message });
     }
     return res.status(500).json({
       success: false,
@@ -1557,6 +1682,7 @@ app.delete("/api/admin/blog/posts/:id", authenticateUser, async (req, res) => {
     });
   }
 });
+
 
 
 /**
