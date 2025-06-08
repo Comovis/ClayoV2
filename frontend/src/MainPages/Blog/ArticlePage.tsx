@@ -12,32 +12,44 @@ import ReactMarkdown from "react-markdown"
 
 import { useBlogService, type BlogPost } from "../../Hooks/useBlogService"
 
-const ArticleImage: React.FC<{ src: string | null; alt: string; className?: string }> = ({
+const ArticleImage: React.FC<{ src: string | null; alt: string; className?: string; isPlaceholder?: boolean }> = ({
   src,
   alt,
   className = "w-full h-full object-cover",
+  isPlaceholder = false,
 }) => {
   const [imageError, setImageError] = useState(false)
-  const [imageLoading, setImageLoading] = useState(true)
+  const [imageLoading, setImageLoading] = useState(!!src && !isPlaceholder)
 
   const handleImageLoad = () => {
+    console.log("Image loaded successfully:", src)
     setImageLoading(false)
   }
 
-  const handleImageError = () => {
+  const handleImageError = (e) => {
+    console.error("Image failed to load:", src, e)
     setImageError(true)
     setImageLoading(false)
   }
 
   // Reset states when src changes
   useEffect(() => {
-    setImageError(false)
-    setImageLoading(true)
-  }, [src])
+    if (src && !isPlaceholder) {
+      console.log("ArticleImage - New src:", src)
+      setImageError(false)
+      setImageLoading(true)
+    } else if (isPlaceholder) {
+      setImageError(false)
+      setImageLoading(false)
+    }
+  }, [src, isPlaceholder])
 
-  if (!src || imageError) {
+  // Don't show anything if no src provided and not a placeholder
+  if (!src && !isPlaceholder) {
     return (
-      <div className={`${className} bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center`}>
+      <div
+        className={`${className} bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center rounded-lg`}
+      >
         <div className="text-center text-gray-400">
           <ImageIcon className="h-16 w-16 mx-auto mb-3" />
           <p className="text-lg font-medium">No featured image</p>
@@ -47,10 +59,27 @@ const ArticleImage: React.FC<{ src: string | null; alt: string; className?: stri
     )
   }
 
+  // Show placeholder or error state
+  if (imageError || isPlaceholder || !src) {
+    return (
+      <div
+        className={`${className} bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center rounded-lg`}
+      >
+        <div className="text-center text-gray-400">
+          <ImageIcon className="h-12 w-12 mx-auto mb-2" />
+          <p className="text-sm font-medium">
+            {isPlaceholder ? "Sample Article" : imageError ? "Image unavailable" : "Loading..."}
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="relative">
+    <div className="relative rounded-lg overflow-hidden">
+      {/* Loading overlay - only show when actually loading */}
       {imageLoading && (
-        <div className={`${className} bg-gray-100 flex items-center justify-center absolute inset-0 z-10`}>
+        <div className="absolute inset-0 z-10 bg-gray-100 flex items-center justify-center rounded-lg">
           <div className="text-center text-gray-400">
             <div className="animate-pulse">
               <ImageIcon className="h-12 w-12 mx-auto mb-2" />
@@ -59,14 +88,19 @@ const ArticleImage: React.FC<{ src: string | null; alt: string; className?: stri
           </div>
         </div>
       )}
+      
+      {/* Main image - always render but may be hidden by loading overlay */}
       <img
-        src={src || "/placeholder.svg"}
+        src={src}
         alt={alt}
-        className={className}
+        className={`${className} rounded-lg transition-opacity duration-300 ${
+          imageLoading ? 'opacity-0' : 'opacity-100'
+        }`}
         onLoad={handleImageLoad}
         onError={handleImageError}
-        loading="eager" // Load immediately for featured images
+        loading="eager"
         crossOrigin="anonymous"
+        style={{ display: imageError ? 'none' : 'block' }}
       />
     </div>
   )
@@ -89,7 +123,10 @@ export default function ArticlePage() {
         clearMessages()
         setSubmitStatus({ type: null, message: null })
 
+        console.log("Fetching post for slug:", slug)
         const fetchedPost = await getBlogPostBySlug(slug)
+        console.log("Fetched post:", fetchedPost)
+
         if (fetchedPost) {
           setPost(fetchedPost)
         } else {
@@ -139,14 +176,14 @@ export default function ArticlePage() {
   // --- Render Loading State ---
   if (isLoading) {
     return (
-      <div className="flex min-h-screen flex-col">
-        <header className="flex items-center justify-between p-4 md:p-6 bg-white border-b">
+      <div className="flex min-h-screen flex-col bg-white">
+        <header className="flex items-center justify-between p-4 md:p-6 bg-white border-b shadow-sm">
           <Link to="/blog" className="flex items-center text-gray-700 hover:text-gray-900">
             <ArrowLeft className="h-5 w-5 mr-2" />
             Back to all articles
           </Link>
         </header>
-        <main className="flex-1 flex justify-center items-center">
+        <main className="flex-1 flex justify-center items-center bg-white">
           <div className="text-center">
             <div className="animate-pulse">
               <div className="w-16 h-16 bg-gray-200 rounded-full mx-auto mb-4"></div>
@@ -162,14 +199,14 @@ export default function ArticlePage() {
   // --- Render Error/Not Found State ---
   if (!post || submitStatus.type === "error") {
     return (
-      <div className="flex min-h-screen flex-col">
-        <header className="flex items-center justify-between p-4 md:p-6 bg-white border-b">
+      <div className="flex min-h-screen flex-col bg-white">
+        <header className="flex items-center justify-between p-4 md:p-6 bg-white border-b shadow-sm">
           <Link to="/blog" className="flex items-center text-gray-700 hover:text-gray-900">
             <ArrowLeft className="h-5 w-5 mr-2" />
             Back to all articles
           </Link>
         </header>
-        <main className="flex-1 flex justify-center items-center">
+        <main className="flex-1 flex justify-center items-center bg-white">
           <div className="text-center text-red-600 p-4">
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <ImageIcon className="h-8 w-8 text-red-600" />
@@ -188,8 +225,8 @@ export default function ArticlePage() {
 
   // --- Render Article Content ---
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="flex items-center justify-between p-4 md:p-6 bg-white border-b sticky top-0 z-50">
+    <div className="flex min-h-screen flex-col bg-white">
+      <header className="flex items-center justify-between p-4 md:p-6 bg-white border-b shadow-sm sticky top-0 z-50">
         <Link to="/blog" className="flex items-center text-gray-700 hover:text-gray-900 transition-colors">
           <ArrowLeft className="h-5 w-5 mr-2" />
           Back to all articles
@@ -206,17 +243,17 @@ export default function ArticlePage() {
         </div>
       </header>
 
-      <main className="flex-1">
+      <main className="flex-1 bg-white">
         <article className="container mx-auto px-4 py-8 md:py-12 max-w-4xl">
           {/* Featured Image Section */}
           {post.featured_image_url && (
             <div className="relative w-full h-80 md:h-96 mb-8 rounded-xl overflow-hidden shadow-lg">
-              <ArticleImage src={post.featured_image_url} alt={post.title} />
+              <ArticleImage src={post.featured_image_url} alt={post.title} className="w-full h-full object-cover" />
             </div>
           )}
 
           {/* Article Header */}
-          <div className="mb-8">
+          <div className="mb-8 bg-white">
             {post.category && (
               <Badge className={`${getCategoryColor(post.category)} mb-4 text-sm px-3 py-1`}>
                 {post.category.charAt(0).toUpperCase() + post.category.slice(1)}
@@ -248,19 +285,25 @@ export default function ArticlePage() {
           </div>
 
           {/* Article Content */}
-          <div className="prose prose-lg prose-gray max-w-none mb-12">
+          <div className="prose prose-lg prose-gray max-w-none mb-12 bg-white">
             <ReactMarkdown
               components={{
                 // Customize markdown rendering for better styling
-                h1: ({ children }) => <h1 className="text-3xl font-bold mt-8 mb-4 text-gray-900">{children}</h1>,
-                h2: ({ children }) => <h2 className="text-2xl font-semibold mt-6 mb-3 text-gray-900">{children}</h2>,
-                h3: ({ children }) => <h3 className="text-xl font-medium mt-4 mb-2 text-gray-900">{children}</h3>,
-                p: ({ children }) => <p className="mb-4 leading-relaxed text-gray-800">{children}</p>,
-                ul: ({ children }) => <ul className="mb-4 pl-6 space-y-2">{children}</ul>,
-                ol: ({ children }) => <ol className="mb-4 pl-6 space-y-2">{children}</ol>,
-                li: ({ children }) => <li className="text-gray-800">{children}</li>,
+                h1: ({ children }) => (
+                  <h1 className="text-3xl font-bold mt-8 mb-4 text-gray-900 leading-tight">{children}</h1>
+                ),
+                h2: ({ children }) => (
+                  <h2 className="text-2xl font-semibold mt-6 mb-3 text-gray-900 leading-tight">{children}</h2>
+                ),
+                h3: ({ children }) => (
+                  <h3 className="text-xl font-medium mt-4 mb-2 text-gray-900 leading-tight">{children}</h3>
+                ),
+                p: ({ children }) => <p className="mb-4 leading-relaxed text-gray-800 text-lg">{children}</p>,
+                ul: ({ children }) => <ul className="mb-4 pl-6 space-y-2 text-lg">{children}</ul>,
+                ol: ({ children }) => <ol className="mb-4 pl-6 space-y-2 text-lg">{children}</ol>,
+                li: ({ children }) => <li className="text-gray-800 leading-relaxed">{children}</li>,
                 blockquote: ({ children }) => (
-                  <blockquote className="border-l-4 border-blue-500 pl-4 py-2 my-4 bg-blue-50 italic text-gray-700">
+                  <blockquote className="border-l-4 border-blue-500 pl-6 py-4 my-6 bg-blue-50 italic text-gray-700 text-lg rounded-r-lg">
                     {children}
                   </blockquote>
                 ),
@@ -268,7 +311,17 @@ export default function ArticlePage() {
                   <code className="bg-gray-100 px-2 py-1 rounded text-sm font-mono text-gray-800">{children}</code>
                 ),
                 pre: ({ children }) => (
-                  <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto my-4">{children}</pre>
+                  <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto my-6 text-sm">
+                    {children}
+                  </pre>
+                ),
+                img: ({ src, alt }) => (
+                  <img
+                    src={src || "/placeholder.svg"}
+                    alt={alt}
+                    className="w-full h-auto rounded-lg shadow-md my-6"
+                    loading="lazy"
+                  />
                 ),
               }}
             >
@@ -278,7 +331,7 @@ export default function ArticlePage() {
 
           {/* Tags Section */}
           {post.seo_keywords && post.seo_keywords.length > 0 && (
-            <div className="border-t pt-8 mb-12">
+            <div className="border-t border-gray-200 pt-8 mb-12 bg-white">
               <h2 className="text-xl font-semibold text-gray-800 mb-4">Tags</h2>
               <div className="flex flex-wrap gap-2">
                 {post.seo_keywords.map((tag, index) => (
@@ -292,29 +345,30 @@ export default function ArticlePage() {
           )}
 
           {/* Related Articles Section */}
-          <section className="border-t pt-12">
+          <section className="border-t border-gray-200 pt-12 bg-white">
             <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">Related Articles</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {/* Placeholder related articles - these would be fetched dynamically */}
-              <Card className="group hover:shadow-lg transition-shadow duration-200 overflow-hidden">
+              <Card className="group hover:shadow-lg transition-shadow duration-200 overflow-hidden bg-white border border-gray-200">
                 <div className="relative">
                   <ArticleImage
-                    src="/placeholder.svg"
-                    alt="Future of Maritime Autonomy"
+                    src={null}
+                    alt="Future of AI Customer Service"
                     className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-200"
+                    isPlaceholder={true}
                   />
                   <div className="absolute top-4 left-4">
-                    <Badge className="bg-blue-100 text-blue-800">Compliance</Badge>
+                    <Badge className="bg-blue-100 text-blue-800">Technology</Badge>
                   </div>
                 </div>
                 <CardContent className="p-6">
                   <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-2 mb-2">
                     <Link to="#" className="hover:underline">
-                      Future of Maritime Autonomy
+                      Future of AI Customer Service
                     </Link>
                   </h3>
                   <p className="text-gray-600 text-sm line-clamp-2 mb-3">
-                    Exploring the advancements and challenges in autonomous shipping technologies.
+                    Exploring the advancements and challenges in AI-powered customer support.
                   </p>
                   <div className="flex items-center text-xs text-gray-500">
                     <Calendar className="h-3 w-3 mr-1" />
@@ -324,25 +378,26 @@ export default function ArticlePage() {
                 </CardContent>
               </Card>
 
-              <Card className="group hover:shadow-lg transition-shadow duration-200 overflow-hidden">
+              <Card className="group hover:shadow-lg transition-shadow duration-200 overflow-hidden bg-white border border-gray-200">
                 <div className="relative">
                   <ArticleImage
-                    src="/placeholder.svg"
-                    alt="AI in Port Operations"
+                    src={null}
+                    alt="Automation in Support"
                     className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-200"
+                    isPlaceholder={true}
                   />
                   <div className="absolute top-4 left-4">
-                    <Badge className="bg-green-100 text-green-800">Technology</Badge>
+                    <Badge className="bg-green-100 text-green-800">Automation</Badge>
                   </div>
                 </div>
                 <CardContent className="p-6">
                   <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-2 mb-2">
                     <Link to="#" className="hover:underline">
-                      AI in Port Operations
+                      Automation in Support
                     </Link>
                   </h3>
                   <p className="text-gray-600 text-sm line-clamp-2 mb-3">
-                    How artificial intelligence is revolutionizing efficiency and safety in ports.
+                    How automation is revolutionizing customer support efficiency.
                   </p>
                   <div className="flex items-center text-xs text-gray-500">
                     <Calendar className="h-3 w-3 mr-1" />
@@ -352,25 +407,26 @@ export default function ArticlePage() {
                 </CardContent>
               </Card>
 
-              <Card className="group hover:shadow-lg transition-shadow duration-200 overflow-hidden">
+              <Card className="group hover:shadow-lg transition-shadow duration-200 overflow-hidden bg-white border border-gray-200">
                 <div className="relative">
                   <ArticleImage
-                    src="/placeholder.svg"
-                    alt="Green Shipping Initiatives"
+                    src={null}
+                    alt="Customer Experience Trends"
                     className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-200"
+                    isPlaceholder={true}
                   />
                   <div className="absolute top-4 left-4">
-                    <Badge className="bg-purple-100 text-purple-800">Sustainability</Badge>
+                    <Badge className="bg-purple-100 text-purple-800">Trends</Badge>
                   </div>
                 </div>
                 <CardContent className="p-6">
                   <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-2 mb-2">
                     <Link to="#" className="hover:underline">
-                      Green Shipping Initiatives
+                      Customer Experience Trends
                     </Link>
                   </h3>
                   <p className="text-gray-600 text-sm line-clamp-2 mb-3">
-                    New strategies for reducing carbon footprint in the maritime industry.
+                    New strategies for improving customer experience and satisfaction.
                   </p>
                   <div className="flex items-center text-xs text-gray-500">
                     <Calendar className="h-3 w-3 mr-1" />

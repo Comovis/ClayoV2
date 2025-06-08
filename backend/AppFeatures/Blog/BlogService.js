@@ -34,7 +34,6 @@ async function isUserClayoAdmin(userId) {
  * @throws {Error} If upload fails or user is unauthorized.
  */
 
-
 // CORRECTED VERSION:
 async function uploadBlogImage(imageFile, fileName, userId) {
   try {
@@ -50,7 +49,7 @@ async function uploadBlogImage(imageFile, fileName, userId) {
     const fileExtension = fileName.split(".").pop()
     const cleanBaseName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_")
     const uniqueFileName = `${timestamp}-${cleanBaseName}`
-    
+
     console.log("Generated unique filename:", uniqueFileName)
 
     // Upload file to Supabase Storage
@@ -70,9 +69,7 @@ async function uploadBlogImage(imageFile, fileName, userId) {
     console.log("Uploaded file path:", uploadData.path) // This shows the actual path stored
 
     // Get public URL using the SAME path that was uploaded
-    const { data: publicUrlData } = supabaseAdmin.storage
-      .from("blog-images")
-      .getPublicUrl(uploadData.path) // Use the path from upload response
+    const { data: publicUrlData } = supabaseAdmin.storage.from("blog-images").getPublicUrl(uploadData.path) // Use the path from upload response
 
     console.log("Public URL generation result:", publicUrlData)
 
@@ -81,7 +78,7 @@ async function uploadBlogImage(imageFile, fileName, userId) {
     }
 
     console.log("Final public URL:", publicUrlData.publicUrl)
-    
+
     // RETURN THE PUBLIC URL (this gets saved to featured_image_url in DB)
     return publicUrlData.publicUrl
   } catch (error) {
@@ -89,10 +86,6 @@ async function uploadBlogImage(imageFile, fileName, userId) {
     throw error
   }
 }
-
-
-
-
 
 /**
  * Deletes an image from Supabase Storage.
@@ -126,6 +119,70 @@ async function deleteBlogImage(imageUrl, userId) {
     return true
   } catch (error) {
     console.error("Error in deleteBlogImage:", error.message)
+    throw error
+  }
+}
+
+/**
+ * Gets a single blog post by ID for admin view (includes drafts).
+ * Restricted to Clayo Admins.
+ * @param {string} id - The ID of the blog post to fetch.
+ * @param {string} userId - The ID of the user requesting the post.
+ * @returns {Promise<object>} The blog post record.
+ * @throws {Error} If unauthorized or post not found.
+ */
+async function getBlogPostById(id, userId) {
+  try {
+    console.log("=== GET BLOG POST BY ID ===")
+    console.log("Post ID:", id)
+    console.log("User ID:", userId)
+
+    if (!(await isUserClayoAdmin(userId))) {
+      throw new Error("Unauthorized: Only Clayo Admins can view blog posts by ID.")
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from("blog_posts")
+      .select(
+        `
+        id,
+        title,
+        slug,
+        content,
+        excerpt,
+        featured_image_url,
+        category,
+        seo_keywords,
+        status,
+        published_at,
+        seo_title,
+        seo_description,
+        read_time,
+        created_at,
+        updated_at,
+        organization_id,
+        author:users(id, full_name)
+        `,
+      )
+      .eq("id", id)
+      .single()
+
+    if (error) {
+      console.error("Supabase error fetching blog post by ID:", error)
+      if (error.code === "PGRST116") {
+        throw new Error("Blog post not found.")
+      }
+      throw new Error(`Failed to fetch blog post: ${error.message}`)
+    }
+
+    return {
+      ...data,
+      author_id: data.author?.id || null,
+      author_name: data.author?.full_name || "Clayo Team",
+      author: undefined,
+    }
+  } catch (error) {
+    console.error("Error in getBlogPostById:", error.message)
     throw error
   }
 }
@@ -523,6 +580,7 @@ module.exports = {
   deleteBlogPost,
   getPublishedBlogPosts,
   getBlogPostBySlug,
+  getBlogPostById,
   getAllBlogPostsForAdmin,
   uploadBlogImage,
   deleteBlogImage,

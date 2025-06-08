@@ -67,6 +67,7 @@ const {
   getAllBlogPostsForAdmin,
   updateBlogPost,
   deleteBlogPost,
+  getBlogPostById
 } = require("./AppFeatures/Blog/BlogService"); 
 
 
@@ -1592,6 +1593,35 @@ app.post("/api/admin/blog/posts", upload.single('image'), authenticateUser, asyn
     });
   }
 });
+
+
+
+// Clean endpoint for GET /api/admin/blog/posts/:id
+app.get("/api/admin/blog/posts/:id", authenticateUser, async (req, res) => {
+  try {
+    const { id } = req.params
+    const userId = req.user.user_id || req.user.id
+
+    const post = await getBlogPostById(id, userId)
+    return res.status(200).json(post)
+  } catch (error) {
+    console.error(`Error in GET /api/admin/blog/posts/${req.params.id}:`, error)
+
+    if (error.message.includes("Unauthorized")) {
+      return res.status(401).json({ success: false, error: error.message })
+    }
+    if (error.message.includes("not found")) {
+      return res.status(404).json({ success: false, error: error.message })
+    }
+    return res.status(500).json({
+      success: false,
+      error: "Failed to fetch blog post.",
+    })
+  }
+})
+
+
+
 
 // PUT /api/admin/blog/posts/:id - Update an existing blog post (with optional image upload)
 app.put("/api/admin/blog/posts/:id", upload.single('image'), authenticateUser, async (req, res) => {

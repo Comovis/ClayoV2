@@ -3,31 +3,12 @@
 import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { Link } from "react-router-dom"
-import {
-  Plus,
-  Search,
-  Edit,
-  Trash2,
-  Eye,
-  MoreHorizontal,
-  ImageIcon,
-  TrendingUp,
-  Loader2,
-  AlertCircle,
-  Lightbulb,
-} from "lucide-react"
+import { Plus, Search, Edit, Trash2, Eye, ImageIcon, TrendingUp, Loader2, AlertCircle, Lightbulb } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -320,106 +301,103 @@ export default function AdminBlogManagementPage() {
               <CardHeader>
                 <CardTitle>All Blog Articles</CardTitle>
               </CardHeader>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[60px]">Image</TableHead>
-                      <TableHead>Title</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Author</TableHead>
-                      <TableHead>Published At</TableHead>
-                      <TableHead>Read Time</TableHead>
-                      <TableHead className="w-[80px]">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {isLoading && (
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8">
-                          <div className="flex items-center justify-center space-x-2">
-                            <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
-                            <p>Loading blog posts...</p>
-                          </div>
-                        </TableCell>
+                        <TableHead className="w-[60px]">Image</TableHead>
+                        <TableHead>Title</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Author</TableHead>
+                        <TableHead>Published At</TableHead>
+                        <TableHead>Read Time</TableHead>
+                        <TableHead className="w-[120px]">Actions</TableHead>
                       </TableRow>
-                    )}
-                    {!isLoading && filteredPosts.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-gray-500">
-                          No blog posts found matching your criteria.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                    {filteredPosts.map((post) => (
-                      <TableRow key={post.id}>
-                        <TableCell>
-                          <ImageThumbnail src={post.featured_image_url || "/placeholder.svg"} alt={post.title} />
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          <Link to={`/admin/blog/edit/${post.id}`} className="hover:text-blue-600">
-                            {post.title}
-                          </Link>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={getCategoryColor(post.category)}>
-                            {post.category
-                              ? post.category.charAt(0).toUpperCase() + post.category.slice(1)
-                              : "Uncategorized"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={post.status === "published" ? "default" : "outline"}>
-                            {post.status.charAt(0).toUpperCase() + post.status.slice(1)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{post.author_name || "Clayo Team"}</TableCell>
-                        <TableCell>{formatDate(post.published_at)}</TableCell>
-                        <TableCell>{post.read_time || "N/A"} min</TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" className="h-8 w-8 p-0">
-                                <span className="sr-only">Open menu</span>
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              {/* Public View Link */}
-                              <Link to={`/blog/${post.slug}`} target="_blank">
-                                <DropdownMenuItem>
-                                  <Eye className="h-4 w-4 mr-2" />
-                                  View Public
-                                </DropdownMenuItem>
-                              </Link>
-                              {/* Edit Link */}
-                              <DropdownMenuItem asChild>
-                                <Link to={`/admin/blog/edit/${post.id}`}>
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Edit
+                    </TableHeader>
+                    <TableBody>
+                      {isLoading && (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center py-8">
+                            <div className="flex items-center justify-center space-x-2">
+                              <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
+                              <p>Loading blog posts...</p>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {!isLoading && filteredPosts.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                            No blog posts found matching your criteria.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {filteredPosts.map((post) => (
+                        <TableRow key={post.id} className="group">
+                          <TableCell className="p-4">
+                            <ImageThumbnail src={post.featured_image_url || "/placeholder.svg"} alt={post.title} />
+                          </TableCell>
+                          <TableCell className="font-medium p-4">
+                            <Link to={`/admin/blog/edit/${post.id}`} className="hover:text-blue-600">
+                              {post.title}
+                            </Link>
+                          </TableCell>
+                          <TableCell className="p-4">
+                            <Badge className={getCategoryColor(post.category)}>
+                              {post.category
+                                ? post.category.charAt(0).toUpperCase() + post.category.slice(1)
+                                : "Uncategorized"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="p-4">
+                            <Badge variant={post.status === "published" ? "default" : "outline"}>
+                              {post.status.charAt(0).toUpperCase() + post.status.slice(1)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="p-4">{post.author_name || "Clayo Team"}</TableCell>
+                          <TableCell className="p-4">{formatDate(post.published_at)}</TableCell>
+                          <TableCell className="p-4">{post.read_time || "N/A"} min</TableCell>
+                          <TableCell className="p-4">
+                            <div className="flex items-center gap-1">
+                              {/* View Public Button */}
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" asChild>
+                                <Link to={`/blog/${post.slug}`} target="_blank" title="View Public">
+                                  <Eye className="h-4 w-4" />
                                 </Link>
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              {/* Delete Action */}
-                              <DropdownMenuItem
-                                className="text-red-600"
-                                onClick={() => {
+                              </Button>
+
+                              {/* Edit Button */}
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" asChild>
+                                <Link to={`/admin/blog/edit/${post.id}`} title="Edit">
+                                  <Edit className="h-4 w-4" />
+                                </Link>
+                              </Button>
+
+                              {/* Delete Button */}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
                                   setPostToDelete(post.id)
                                   setDeleteDialogOpen(true)
                                 }}
+                                title="Delete"
                               >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
             </Card>
           </TabsContent>
 

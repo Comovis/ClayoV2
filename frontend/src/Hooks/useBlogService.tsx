@@ -134,6 +134,16 @@ export function useBlogService(): UseBlogServiceReturn {
           body: isFormData ? body : body ? JSON.stringify(body) : undefined,
         })
 
+        // For DELETE requests or empty responses, don't try to parse JSON
+        if (method === "DELETE" || response.headers.get("content-length") === "0") {
+          if (!response.ok) {
+            throw new Error(`Operation failed with status ${response.status}`)
+          }
+          setSuccess("Operation completed successfully!")
+          return { success: true }
+        }
+
+        // For non-empty responses, parse JSON as before
         const result = await response.json()
         console.log(`Response from ${url}:`, result)
 
@@ -202,10 +212,6 @@ export function useBlogService(): UseBlogServiceReturn {
     [authenticatedRequest],
   )
 
-
-
-
-
   const createPost = useCallback(
     async (data: CreateBlogPostBody, imageFile?: File) => {
       if (imageFile) {
@@ -234,11 +240,6 @@ export function useBlogService(): UseBlogServiceReturn {
     },
     [authenticatedRequest],
   )
-
-
-
-
-  
 
   const getAllPostsForAdmin = useCallback(async () => {
     return (await authenticatedRequest("/api/admin/blog/posts")) as BlogPost[] | null
@@ -273,13 +274,10 @@ export function useBlogService(): UseBlogServiceReturn {
     [authenticatedRequest],
   )
 
-
-
-
   const deletePost = useCallback(
     async (id: string) => {
       const result = await authenticatedRequest(`/api/admin/blog/posts/${id}`, "DELETE")
-      return result !== null
+      return result !== null && result.success === true
     },
     [authenticatedRequest],
   )

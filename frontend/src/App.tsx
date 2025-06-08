@@ -23,12 +23,13 @@ import TeamPage from "./MainPages/TeamManagement/TeamManagement"
 import OnboardingPage from "./Auth/Onboarding/OnboardingPage"
 import LandingPage from "./MainPages/LandingPage/LandingPage"
 import ChatWidgetConfig from "./MainPages/ConfigureChatWidget/SetupChatWidget"
-import AIAgentsPage from "./MainPages/AgentConfigTraining/AgentConfig" 
-import TestWidgetPage from './Tests/WidgetTest'
-import MainBlogPage from './MainPages/Blog/MainBlogPage'
-import AdminBlogMgt from './MainPages/Blog/AdminBlogManagement'
+import AIAgentsPage from "./MainPages/AgentConfigTraining/AgentConfig"
+import TestWidgetPage from "./Tests/WidgetTest"
+import MainBlogPage from "./MainPages/Blog/MainBlogPage"
+import AdminBlogMgt from "./MainPages/Blog/AdminBlogManagement"
 import EditBlogPostPage from "./MainPages/Blog/AdminEditArticle"
 import NewBlogPostPage from "./MainPages/Blog/AdminCreateNewArticle"
+import ArticlePage from "./MainPages/Blog/ArticlePage"
 
 // Google Analytics Configuration
 const GA_TRACKING_ID = "G-TY55DN5JKN"
@@ -54,7 +55,7 @@ const initializeGoogleAnalytics = () => {
 
   // Initialize gtag with debug logging
   window.dataLayer = window.dataLayer || []
-  function gtag(...args: any[]) {
+  function gtag(...args: any) {
     console.log("📊 GA Event:", args)
     window.dataLayer.push(args)
   }
@@ -174,6 +175,34 @@ const getPageMetadata = (pathname: string) => {
       title: "Join Customer Service Team | Clayo",
       description: "Accept your team invitation and start collaborating on AI-powered customer support.",
     },
+    // Blog pages
+    "/blog": {
+      title: "Blog | Clayo",
+      description: "Insights and updates on AI customer service and support automation.",
+    },
+    "/admin/blog/mgt": {
+      title: "Blog Management | Clayo",
+      description: "Manage your blog articles and content.",
+    },
+    "/admin/blog/new": {
+      title: "Create New Article | Clayo",
+      description: "Create a new blog article for your website.",
+    },
+  }
+
+  // Handle dynamic routes like blog edit
+  if (pathname.startsWith("/admin/blog/edit/")) {
+    return {
+      title: "Edit Article | Clayo",
+      description: "Edit your blog article content and settings.",
+    }
+  }
+
+  if (pathname.startsWith("/blog/")) {
+    return {
+      title: "Blog Article | Clayo",
+      description: "Read our latest insights on AI customer service.",
+    }
   }
 
   // Return specific page metadata or default
@@ -271,7 +300,7 @@ function AppContent() {
       "/onboarding",
       "/dashboard",
       "/conversations",
-      "/agent-config", // Make sure this is included
+      "/agent-config",
       "/widget-config",
       "/analytics",
       "/pricing",
@@ -279,15 +308,31 @@ function AppContent() {
       "/tests",
       "/blog",
       "/admin/blog/mgt",
-      "admin/blog/edit",
-      "/admin/blog/new"
-
+      "/admin/blog/edit/:id", // Updated to include dynamic parameter
+      "/admin/blog/new",
+      "/blog/:slug", // Added for viewing individual blog posts
     ],
     [],
   )
 
-  // Check if current path is a known path
-  const isKnownPath = knownPaths.includes(location.pathname)
+  // Check if current path matches any known path pattern
+  const isKnownPath = useMemo(() => {
+    // Exact matches
+    if (knownPaths.includes(location.pathname)) {
+      return true
+    }
+
+    // Check for dynamic routes
+    if (location.pathname.startsWith("/admin/blog/edit/")) {
+      return true
+    }
+
+    if (location.pathname.startsWith("/blog/") && location.pathname !== "/blog") {
+      return true
+    }
+
+    return false
+  }, [location.pathname, knownPaths])
 
   // If path is unknown, we should hide navbar, sidebar, and footer
   const isUnknownPath = !isKnownPath
@@ -312,7 +357,7 @@ function AppContent() {
               showSidePanel={showSidePanel}
               setShowSidePanel={setShowSidePanel}
               showRightPanel={showRightPanel}
-              setShowRightPanel={setShowRightPanel}
+              setShowRightPanel={showRightPanel}
               user={undefined}
               logout={undefined}
             />
@@ -345,10 +390,36 @@ function AppContent() {
               <Route path="/accept-invite" element={<InvitationAccept />} />
               <Route path="/confirm-email" element={<EmailVerificationPage />} />
               <Route path="/tests" element={<TestWidgetPage />} />
+
+              {/* Blog routes */}
               <Route path="/blog" element={<MainBlogPage />} />
-              <Route path="/admin/blog/mgt" element={<AdminBlogMgt />} />
-              <Route path="/admin/blog/edit" element={<EditBlogPostPage />} />
-              <Route path="/admin/blog/new" element={<NewBlogPostPage />} />
+              <Route path="/blog/:slug" element={<ArticlePage />} />
+
+              {/* Admin blog routes with proper protection */}
+              <Route
+                path="/admin/blog/mgt"
+                element={
+                  <ProtectedRoute>
+                    <AdminBlogMgt />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/blog/edit/:id"
+                element={
+                  <ProtectedRoute>
+                    <EditBlogPostPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/blog/new"
+                element={
+                  <ProtectedRoute>
+                    <NewBlogPostPage />
+                  </ProtectedRoute>
+                }
+              />
 
               <Route
                 path="/onboarding"
