@@ -50,12 +50,23 @@ interface UseBlogServiceReturn {
   error: string | null
   success: string | null
   getPublishedPosts: () => Promise<BlogPost[] | null>
-  getPublishedPostBySlug: (slug: string) => Promise<BlogPost | null>
-  createPost: (data: CreateBlogPostBody) => Promise<BlogPost | null>
+  getBlogPostBySlug: (slug: string) => Promise<BlogPost | null>
+  getBlogPostById: (id: string) => Promise<BlogPost | null>
+  createPost: (data: CreateBlogPostBody, imageFile?: File) => Promise<BlogPost | null>
   getAllPostsForAdmin: () => Promise<BlogPost[] | null>
-  updatePost: (id: string, data: UpdateBlogPostBody) => Promise<BlogPost | null>
+  updatePost: (id: string, data: UpdateBlogPostBody, imageFile?: File) => Promise<BlogPost | null>
   deletePost: (id: string) => Promise<boolean>
+  uploadImage: (imageFile: File) => Promise<string | null>
   clearMessages: () => void
+  generateAIBlogPost: (params: {
+    title: string
+    hook: string
+    targetKeywords?: string[]
+    tone?: string
+    wordCount?: number
+  }) => Promise<any>
+  generateTopicSuggestions: () => Promise<any>
+  checkTitleExists: (title: string) => Promise<any>
 }
 
 export function useBlogService(): UseBlogServiceReturn {
@@ -84,7 +95,7 @@ export function useBlogService(): UseBlogServiceReturn {
   }
 
   const authenticatedRequest = useCallback(
-    async (url: string, method: string = "GET", body?: object) => {
+    async (url: string, method = "GET", body?: object | FormData) => {
       if (userLoading) {
         setError("Please wait for user data to load")
         return null
@@ -100,16 +111,31 @@ export function useBlogService(): UseBlogServiceReturn {
 
       try {
         const token = await getAuthToken()
+
+        // Determine if we're sending FormData or JSON
+        const isFormData = body instanceof FormData
+        const headers: Record<string, string> = {
+          Authorization: `Bearer ${token}`,
+        }
+
+        // Only set Content-Type for JSON, let browser set it for FormData
+        if (!isFormData) {
+          headers["Content-Type"] = "application/json"
+        }
+
+        console.log(`Making ${method} request to ${url}`, {
+          headers: { ...headers, Authorization: "Bearer [REDACTED]" },
+          body: isFormData ? "[FormData]" : body,
+        })
+
         const response = await fetch(`${apiBaseUrl}${url}`, {
           method,
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: body ? JSON.stringify(body) : undefined,
+          headers,
+          body: isFormData ? body : body ? JSON.stringify(body) : undefined,
         })
 
         const result = await response.json()
+        console.log(`Response from ${url}:`, result)
 
         if (!response.ok) {
           throw new Error(result.error || `Operation failed with status ${response.status}`)
@@ -125,11 +151,11 @@ export function useBlogService(): UseBlogServiceReturn {
         setIsLoading(false)
       }
     },
-    [isAuthenticated, user, userLoading, clearMessages]
+    [isAuthenticated, user, userLoading, clearMessages],
   )
 
   const publicRequest = useCallback(
-    async (url: string, method: string = "GET") => {
+    async (url: string, method = "GET") => {
       clearMessages()
       setIsLoading(true)
       try {
@@ -155,22 +181,54 @@ export function useBlogService(): UseBlogServiceReturn {
         setIsLoading(false)
       }
     },
-    [clearMessages]
+    [clearMessages],
   )
 
   const getPublishedPosts = useCallback(async () => {
     return (await publicRequest("/api/blog/posts")) as BlogPost[] | null
   }, [publicRequest])
 
-  const getPublishedPostBySlug = useCallback(async (slug: string) => {
-    return (await publicRequest(`/api/blog/posts/${slug}`)) as BlogPost | null
-  }, [publicRequest])
+  const getBlogPostBySlug = useCallback(
+    async (slug: string) => {
+      return (await publicRequest(`/api/blog/posts/${slug}`)) as BlogPost | null
+    },
+    [publicRequest],
+  )
+
+  const getBlogPostById = useCallback(
+    async (id: string) => {
+      return (await authenticatedRequest(`/api/admin/blog/posts/${id}`)) as BlogPost | null
+    },
+    [authenticatedRequest],
+  )
 
   const createPost = useCallback(
-    async (data: CreateBlogPostBody) => {
-      return (await authenticatedRequest("/api/admin/blog/posts", "POST", data)) as BlogPost | null
+    async (data: CreateBlogPostBody, imageFile?: File) => {
+      if (imageFile) {
+        // Create FormData for multipart upload
+        const formData = new FormData()
+
+        // Add all the post data
+        Object.entries(data).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            if (Array.isArray(value)) {
+              formData.append(key, JSON.stringify(value))
+            } else {
+              formData.append(key, value.toString())
+            }
+          }
+        })
+
+        // Add the image file
+        formData.append("image", imageFile)
+
+        return (await authenticatedRequest("/api/admin/blog/posts", "POST", formData)) as BlogPost | null
+      } else {
+        // Regular JSON request when no image
+        return (await authenticatedRequest("/api/admin/blog/posts", "POST", data)) as BlogPost | null
+      }
     },
-    [authenticatedRequest]
+    [authenticatedRequest],
   )
 
   const getAllPostsForAdmin = useCallback(async () => {
@@ -178,10 +236,32 @@ export function useBlogService(): UseBlogServiceReturn {
   }, [authenticatedRequest])
 
   const updatePost = useCallback(
-    async (id: string, data: UpdateBlogPostBody) => {
-      return (await authenticatedRequest(`/api/admin/blog/posts/${id}`, "PUT", data)) as BlogPost | null
+    async (id: string, data: UpdateBlogPostBody, imageFile?: File) => {
+      if (imageFile) {
+        // Create FormData for multipart upload
+        const formData = new FormData()
+
+        // Add all the post data
+        Object.entries(data).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            if (Array.isArray(value)) {
+              formData.append(key, JSON.stringify(value))
+            } else {
+              formData.append(key, value.toString())
+            }
+          }
+        })
+
+        // Add the image file
+        formData.append("image", imageFile)
+
+        return (await authenticatedRequest(`/api/admin/blog/posts/${id}`, "PUT", formData)) as BlogPost | null
+      } else {
+        // Regular JSON request when no image
+        return (await authenticatedRequest(`/api/admin/blog/posts/${id}`, "PUT", data)) as BlogPost | null
+      }
     },
-    [authenticatedRequest]
+    [authenticatedRequest],
   )
 
   const deletePost = useCallback(
@@ -189,7 +269,45 @@ export function useBlogService(): UseBlogServiceReturn {
       const result = await authenticatedRequest(`/api/admin/blog/posts/${id}`, "DELETE")
       return result !== null
     },
-    [authenticatedRequest]
+    [authenticatedRequest],
+  )
+
+  const uploadImage = useCallback(
+    async (imageFile: File) => {
+      const formData = new FormData()
+      formData.append("image", imageFile)
+
+      const result = await authenticatedRequest("/api/admin/blog/upload-image", "POST", formData)
+      return result?.imageUrl || null
+    },
+    [authenticatedRequest],
+  )
+
+  const generateAIBlogPost = useCallback(
+    async (params: {
+      title: string
+      hook: string
+      targetKeywords?: string[]
+      tone?: string
+      wordCount?: number
+    }) => {
+      console.log("Calling generateAIBlogPost with params:", params)
+      const response = await authenticatedRequest("/api/ai/blog/generate", "POST", params)
+      console.log("Raw API response from generateAIBlogPost:", response)
+      return response
+    },
+    [authenticatedRequest],
+  )
+
+  const generateTopicSuggestions = useCallback(async () => {
+    return await authenticatedRequest("/api/ai/blog/topics", "POST", {})
+  }, [authenticatedRequest])
+
+  const checkTitleExists = useCallback(
+    async (title: string) => {
+      return await authenticatedRequest("/api/ai/blog/check-title", "POST", { title })
+    },
+    [authenticatedRequest],
   )
 
   return {
@@ -197,11 +315,16 @@ export function useBlogService(): UseBlogServiceReturn {
     error,
     success,
     getPublishedPosts,
-    getPublishedPostBySlug,
+    getBlogPostBySlug,
+    getBlogPostById,
     createPost,
     getAllPostsForAdmin,
     updatePost,
     deletePost,
+    uploadImage,
     clearMessages,
+    generateAIBlogPost,
+    generateTopicSuggestions,
+    checkTitleExists,
   }
 }

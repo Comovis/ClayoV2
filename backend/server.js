@@ -67,16 +67,20 @@ const {
   deleteBlogPost,
 } = require("./AppFeatures/Blog/BlogService"); 
 
+
+const {
+  generateBlogPost,
+  generateBlogTopicSuggestions,
+  generateSEOMetadata,
+  saveBlogPost,
+  BLOG_TOPICS_SUGGESTIONS
+} = require("./AppFeatures/Blog/AIBlogService");
+
 const { createAgent, getAgents, updateAgent } = require("./AppFeatures/AgentTrainingCreation/AgentService")
 
 const { handleGetAgentStatus } = require("./AppFeatures/AgentTrainingCreation/AgentStatusHandler")
 
-// Import your existing handlers
-const {
-  updateOrganizationOnboarding,
-  updateOnboardingStep,
-  getUserOnboardingStatus,
-} = require("./Auth/OnboardingService")
+
 
 
 
@@ -1554,6 +1558,164 @@ app.delete("/api/admin/blog/posts/:id", authenticateUser, async (req, res) => {
   }
 });
 
+
+/**
+ * Generate a blog post with AI
+ * POST /api/ai/blog/generate
+ */
+app.post("/api/ai/blog/generate", authenticateUser, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const result = await generateBlogPost({
+      ...req.body,
+      targetKeywords: req.body.targetKeywords || [],
+      tone: req.body.tone || "controversial",
+      wordCount: req.body.wordCount || 1500,
+      includeCallToAction: req.body.includeCallToAction !== false,
+      organizationId: req.user.organization_id,
+      userId: userId,
+    })
+    return res.status(200).json(result)
+  } catch (error) {
+    console.error("Error in POST /api/ai/blog/generate:", error)
+    if (error.message.includes("Unauthorized")) {
+      return res.status(401).json({ success: false, error: error.message })
+    }
+    return res.status(500).json({
+      success: false,
+      error: "Failed to generate blog post with AI.",
+    })
+  }
+})
+
+/**
+ * Generate blog topic suggestions with AI
+ * POST /api/ai/blog/topics
+ */
+app.post("/api/ai/blog/topics", authenticateUser, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const result = await generateBlogTopicSuggestions({
+      industry: req.body.industry,
+      currentTrends: req.body.currentTrends,
+      competitorAnalysis: req.body.competitorAnalysis,
+      organizationId: req.user.organization_id,
+      userId: userId,
+    })
+    return res.status(200).json(result)
+  } catch (error) {
+    console.error("Error in POST /api/ai/blog/topics:", error)
+    if (error.message.includes("Unauthorized")) {
+      return res.status(401).json({ success: false, error: error.message })
+    }
+    return res.status(500).json({
+      success: false,
+      error: "Failed to generate blog topic suggestions with AI.",
+    })
+  }
+})
+
+/**
+ * Generate SEO metadata for a blog post with AI
+ * POST /api/ai/blog/seo
+ */
+app.post("/api/ai/blog/seo", authenticateUser, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { title, content, targetKeywords } = req.body
+
+    const result = await generateSEOMetadata({
+      title,
+      content,
+      targetKeywords: targetKeywords || [],
+      userId: userId,
+    })
+
+    return res.status(200).json({
+      success: true,
+      seoData: result,
+    })
+  } catch (error) {
+    console.error("Error in POST /api/ai/blog/seo:", error)
+    if (error.message.includes("Unauthorized")) {
+      return res.status(401).json({ success: false, error: error.message })
+    }
+    return res.status(500).json({
+      success: false,
+      error: "Failed to generate SEO metadata with AI.",
+    })
+  }
+})
+
+/**
+ * Generate and save a blog post with AI in one step
+ * POST /api/ai/blog/generate-and-save
+ */
+app.post("/api/ai/blog/generate-and-save", authenticateUser, async (req, res) => {
+  try {
+    const userId = req.user.id
+
+    // First generate the blog post
+    const generationResult = await generateBlogPost({
+      ...req.body,
+      targetKeywords: req.body.targetKeywords || [],
+      tone: req.body.tone || "controversial",
+      wordCount: req.body.wordCount || 1500,
+      includeCallToAction: req.body.includeCallToAction !== false,
+      organizationId: req.user.organization_id,
+      userId: userId,
+    })
+
+    if (!generationResult.success) {
+      return res.status(500).json(generationResult)
+    }
+
+    // Then save it to the database
+    const saveResult = await saveBlogPost(generationResult.blog, req.user.organization_id, userId)
+
+    if (!saveResult.success) {
+      return res.status(500).json(saveResult)
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Blog post generated and saved successfully",
+      post: saveResult.post,
+    })
+  } catch (error) {
+    console.error("Error in POST /api/ai/blog/generate-and-save:", error)
+    if (error.message.includes("Unauthorized")) {
+      return res.status(401).json({ success: false, error: error.message })
+    }
+    return res.status(500).json({
+      success: false,
+      error: "Failed to generate and save blog post with AI.",
+    })
+  }
+})
+
+/**
+ * Check if a blog title already exists
+ * POST /api/ai/blog/check-title
+ */
+app.post("/api/ai/blog/check-title", authenticateUser, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { title } = req.body
+
+    const result = await checkTitleExists(title, userId)
+    return res.status(200).json(result)
+  } catch (error) {
+    console.error("Error in POST /api/ai/blog/check-title:", error)
+    if (error.message.includes("Unauthorized")) {
+      return res.status(401).json({ success: false, error: error.message })
+    }
+    return res.status(500).json({
+      success: false,
+      error: "Failed to check title existence.",
+    })
+  }
+})
 
 
 
