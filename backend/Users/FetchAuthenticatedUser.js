@@ -14,7 +14,7 @@ async function fetchUserData(userId) {
     // Fetch user data from users table
     const { data: userData, error: userError } = await supabaseAdmin
       .from("users")
-      .select("id, email, full_name, organization_id, role, onboarding_step, is_active, created_at, updated_at")
+      .select("id, email, full_name, organization_id, role, onboarding_step, is_active, is_clayo_admin, created_at, updated_at")
       .eq("id", userId)
       .single()
 

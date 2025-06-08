@@ -27,8 +27,7 @@ const UnauthorizedMessage: React.FC = () => {
         </CardHeader>
         <CardContent>
           <p className="text-gray-600 mb-6">
-            It looks like you're trying to access a protected area of Comovis. Please sign in to continue managing your
-            maritime compliance documents.
+            It looks like you're trying to access a protected area of Clayo. Please sign in to continue managing your account.
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
             {/* Sign In Button */}

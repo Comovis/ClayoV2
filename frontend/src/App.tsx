@@ -25,6 +25,10 @@ import LandingPage from "./MainPages/LandingPage/LandingPage"
 import ChatWidgetConfig from "./MainPages/ConfigureChatWidget/SetupChatWidget"
 import AIAgentsPage from "./MainPages/AgentConfigTraining/AgentConfig" 
 import TestWidgetPage from './Tests/WidgetTest'
+import MainBlogPage from './MainPages/Blog/MainBlogPage'
+import AdminBlogMgt from './MainPages/Blog/AdminBlogManagement'
+import EditBlogPostPage from "./MainPages/Blog/AdminEditArticle"
+import NewBlogPostPage from "./MainPages/Blog/AdminCreateNewArticle"
 
 // Google Analytics Configuration
 const GA_TRACKING_ID = "G-TY55DN5JKN"
@@ -272,7 +276,12 @@ function AppContent() {
       "/analytics",
       "/pricing",
       "/team",
-      "/tests"
+      "/tests",
+      "/blog",
+      "/admin/blog/mgt",
+      "admin/blog/edit",
+      "/admin/blog/new"
+
     ],
     [],
   )
@@ -336,6 +345,10 @@ function AppContent() {
               <Route path="/accept-invite" element={<InvitationAccept />} />
               <Route path="/confirm-email" element={<EmailVerificationPage />} />
               <Route path="/tests" element={<TestWidgetPage />} />
+              <Route path="/blog" element={<MainBlogPage />} />
+              <Route path="/admin/blog/mgt" element={<AdminBlogMgt />} />
+              <Route path="/admin/blog/edit" element={<EditBlogPostPage />} />
+              <Route path="/admin/blog/new" element={<NewBlogPostPage />} />
 
               <Route
                 path="/onboarding"

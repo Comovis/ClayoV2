@@ -999,14 +999,7 @@ export default function InteractiveDemoSection() {
         </Tabs>
 
         <div className="text-center mt-12">
-          <Button
-            size="lg"
-            className="bg-slate-800 hover:bg-slate-700 text-white"
-            onClick={() => setIsBookDemoOpen(true)}
-          >
-            Book a Personalized Demo
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
+       
         </div>
       </div>
     </section>

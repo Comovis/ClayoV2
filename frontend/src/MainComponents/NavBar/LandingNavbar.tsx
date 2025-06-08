@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button"
 import LogoBlack from "../../ReusableAssets/Logos/LogoBlack.svg"
 import { useState } from "react"
 import UserProfileDropdown from "./UserProfileDropdown"
-import BookDemoModal from "./BookDemoModal"
 
 interface UserType {
   id?: string
@@ -22,11 +21,14 @@ interface LandingHeaderProps {
 
 const LandingHeader = ({ user, logout }: LandingHeaderProps) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [demoModalOpen, setDemoModalOpen] = useState(false)
   const navigate = useNavigate()
 
   const handleLoginClick = () => {
     navigate("/login")
+  }
+
+  const handleSignUpClick = () => {
+    navigate("/signup")
   }
 
   // Function to handle smooth scrolling to section
@@ -84,8 +86,8 @@ const LandingHeader = ({ user, logout }: LandingHeaderProps) => {
                 >
                   Log In
                 </Button>
-                <Button className="bg-slate-800 hover:bg-slate-700 text-white" onClick={() => setDemoModalOpen(true)}>
-                  Book a Demo
+                <Button className="bg-slate-800 hover:bg-slate-700 text-white" onClick={handleSignUpClick}>
+                  Sign Up
                 </Button>
               </>
             )}
@@ -134,10 +136,10 @@ const LandingHeader = ({ user, logout }: LandingHeaderProps) => {
                     className="w-full bg-slate-800 hover:bg-slate-700"
                     onClick={() => {
                       setMobileMenuOpen(false)
-                      setDemoModalOpen(true)
+                      handleSignUpClick()
                     }}
                   >
-                    Book a Demo
+                    Sign Up
                   </Button>
                 </div>
               )}
@@ -145,9 +147,6 @@ const LandingHeader = ({ user, logout }: LandingHeaderProps) => {
           </div>
         )}
       </header>
-
-      {/* Book Demo Modal */}
-      <BookDemoModal isOpen={demoModalOpen} onClose={() => setDemoModalOpen(false)} />
     </>
   )
 }

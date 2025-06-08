@@ -18,6 +18,7 @@ interface User {
   role: string
   onboarding_step: string
   is_active: boolean
+  is_clayo_admin: boolean
   created_at: string
   updated_at: string
 }
@@ -162,8 +163,14 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Store user ID in localStorage for backup
         localStorage.setItem("userId", data.user.id)
 
+        // Ensure is_clayo_admin is properly set (default to false if undefined)
+        const userData = {
+          ...data.user,
+          is_clayo_admin: data.user.is_clayo_admin || false
+        }
+
         // Set the user and organization data
-        setUser(data.user)
+        setUser(userData)
         setOrganization(data.organization || null)
       } else {
         throw new Error("Failed to fetch user data")

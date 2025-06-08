@@ -57,6 +57,16 @@ const {
   handleGetPublicWidgetConfig,
 } = require("./AppFeatures/WidgetConfig/WidgetConfigService")
 
+// Import Blog Service functions
+const {
+  createBlogPost,
+  getPublishedBlogPosts,
+  getBlogPostBySlug,
+  getAllBlogPostsForAdmin,
+  updateBlogPost,
+  deleteBlogPost,
+} = require("./AppFeatures/Blog/BlogService"); 
+
 const { createAgent, getAgents, updateAgent } = require("./AppFeatures/AgentTrainingCreation/AgentService")
 
 const { handleGetAgentStatus } = require("./AppFeatures/AgentTrainingCreation/AgentStatusHandler")
@@ -1408,6 +1418,141 @@ app.get("/api/widget/config/public/:organizationId", async (req, res) => {
     })
   }
 })
+
+
+
+// =====================================================================
+// Blog API Endpoints
+// =====================================================================
+
+// --- Public Blog Endpoints (No Authentication Required) ---
+
+// GET /api/blog/posts - Get all published blog posts
+app.get("/api/blog/posts", async (req, res) => {
+  try {
+    const posts = await getPublishedBlogPosts();
+    return res.status(200).json(posts);
+  } catch (error) {
+    console.error("Error in GET /api/blog/posts:", error);
+    // Public facing errors should be generic for security
+    return res.status(500).json({
+      success: false,
+      error: "Failed to fetch blog posts.",
+    });
+  }
+});
+
+// GET /api/blog/posts/:slug - Get a single published blog post by slug
+app.get("/api/blog/posts/:slug", async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const post = await getBlogPostBySlug(slug);
+    return res.status(200).json(post);
+  } catch (error) {
+    console.error(`Error in GET /api/blog/posts/${req.params.slug}:`, error);
+    if (
+      error.message === "Blog post not found or not published." ||
+      error.message.includes("No rows found")
+    ) {
+      return res.status(404).json({ success: false, error: error.message });
+    }
+    return res.status(500).json({
+      success: false,
+      error: "Failed to fetch blog post.",
+    });
+  }
+});
+
+
+// --- Admin Blog Endpoints (Authentication & Clayo Admin Privileges Required) ---
+
+// GET /api/admin/blog/posts - Get all blog posts (including drafts) for admin view
+app.get("/api/admin/blog/posts", authenticateUser, async (req, res) => {
+  try {
+    // req.user.id is expected to be populated by the authenticateUser middleware
+    const userId = req.user.id;
+    const posts = await getAllBlogPostsForAdmin(userId);
+    return res.status(200).json(posts);
+  } catch (error) {
+    console.error("Error in GET /api/admin/blog/posts:", error);
+    if (error.message.includes("Unauthorized")) {
+      return res.status(401).json({ success: false, error: error.message });
+    }
+    return res.status(500).json({
+      success: false,
+      error: "Failed to fetch all blog posts for admin.",
+    });
+  }
+});
+
+// POST /api/admin/blog/posts - Create a new blog post
+app.post("/api/admin/blog/posts", authenticateUser, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const newPost = await createBlogPost(req.body, userId);
+    return res.status(201).json(newPost); // 201 Created
+  } catch (error) {
+    console.error("Error in POST /api/admin/blog/posts:", error);
+    if (error.message.includes("Unauthorized")) {
+      return res.status(401).json({ success: false, error: error.message });
+    }
+    if (
+      error.message.includes("required") ||
+      error.message.includes("slug already exists")
+    ) {
+      // For validation errors or conflict
+      return res.status(400).json({ success: false, error: error.message });
+    }
+    return res.status(500).json({
+      success: false,
+      error: "Failed to create blog post.",
+    });
+  }
+});
+
+// PUT /api/admin/blog/posts/:id - Update an existing blog post
+app.put("/api/admin/blog/posts/:id", authenticateUser, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const updatedPost = await updateBlogPost(id, req.body, userId);
+    return res.status(200).json(updatedPost);
+  } catch (error) {
+    console.error(`Error in PUT /api/admin/blog/posts/${req.params.id}:`, error);
+    if (error.message.includes("Unauthorized")) {
+      return res.status(401).json({ success: false, error: error.message });
+    }
+    if (error.message.includes("not found")) {
+        return res.status(404).json({ success: false, error: error.message });
+    }
+    return res.status(500).json({
+      success: false,
+      error: "Failed to update blog post.",
+    });
+  }
+});
+
+// DELETE /api/admin/blog/posts/:id - Delete a blog post
+app.delete("/api/admin/blog/posts/:id", authenticateUser, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    await deleteBlogPost(id, userId);
+    return res.status(204).send(); // 204 No Content for successful deletion
+  } catch (error) {
+    console.error(`Error in DELETE /api/admin/blog/posts/${req.params.id}:`, error);
+    if (error.message.includes("Unauthorized")) {
+      return res.status(401).json({ success: false, error: error.message });
+    }
+    if (error.message.includes("not found")) {
+        return res.status(404).json({ success: false, error: error.message });
+    }
+    return res.status(500).json({
+      success: false,
+      error: "Failed to delete blog post.",
+    });
+  }
+});
 
 
 

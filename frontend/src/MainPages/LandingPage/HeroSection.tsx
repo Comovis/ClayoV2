@@ -2,14 +2,15 @@
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { ArrowRight, Bot, Users, Zap, Shield, Send, Play, Pause, RotateCcw } from "lucide-react"
-import BookDemoModal from "./book-demo-modal"
 import { useState, useEffect, useRef } from "react"
 import { Card } from "@/components/ui/card"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { useNavigate } from "react-router-dom"
 
-export default function HeroSection({ isBookDemoOpen, setIsBookDemoOpen }) {
+export default function HeroSection() {
+  const navigate = useNavigate()
   // Chat Demo Logic - Enhanced with User Controls
   const [messages, setMessages] = useState([
     {
@@ -273,6 +274,10 @@ export default function HeroSection({ isBookDemoOpen, setIsBookDemoOpen }) {
     setIsPaused(false)
   }
 
+  const handleStartFreeTrial = () => {
+    navigate("/signup")
+  }
+
   return (
     <div className="relative overflow-hidden bg-gradient-to-b from-slate-50 to-white min-h-[90vh] flex items-center">
       {/* Background pattern */}
@@ -315,16 +320,9 @@ export default function HeroSection({ isBookDemoOpen, setIsBookDemoOpen }) {
               <Button
                 size="lg"
                 className="bg-slate-800 hover:bg-slate-700 text-white text-base px-6 w-full sm:w-auto flex-shrink-0"
-                onClick={() => setIsBookDemoOpen(true)}
+                onClick={handleStartFreeTrial}
               >
-                Book a Demo <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="text-slate-700 border-slate-300 hover:bg-slate-100 text-base w-full sm:w-auto"
-              >
-                Start Free Trial
+                Start Free Trial <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
 
@@ -528,8 +526,6 @@ export default function HeroSection({ isBookDemoOpen, setIsBookDemoOpen }) {
           </motion.div>
         </div>
       </div>
-
-      
     </div>
   )
 }
