@@ -118,14 +118,7 @@ const AppHeader: FC<AppHeaderProps> = ({
         )}
       </div>
 
-      {/* Center - Maritime Search Bar */}
-      <div className="flex-1 max-w-md mx-4">
-        <MaritimeSearchBar
-          onNavigate={handleSearchNavigate}
-          placeholder="Search vessels, documents, ports..."
-          className="w-full"
-        />
-      </div>
+   
 
       {/* Right side - Notifications and User Profile */}
       <div className="flex items-center space-x-2">
