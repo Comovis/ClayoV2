@@ -109,6 +109,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Set up auth state change listener
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("🔔 Auth state change:", event)
+
       if (event === "SIGNED_IN" && session) {
         setIsAuthenticated(true)
         await fetchUserDataFromAPI(session.access_token)
@@ -166,7 +168,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Ensure is_clayo_admin is properly set (default to false if undefined)
         const userData = {
           ...data.user,
-          is_clayo_admin: data.user.is_clayo_admin || false
+          is_clayo_admin: data.user.is_clayo_admin || false,
         }
 
         // Set the user and organization data
@@ -290,6 +292,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // User data functions
   const refreshUserData = async () => {
     try {
+      // Set authentication state when refreshing user data
+      setIsAuthenticated(true)
       await fetchUserData()
     } catch (error) {
       console.error("Error refreshing user data:", error)

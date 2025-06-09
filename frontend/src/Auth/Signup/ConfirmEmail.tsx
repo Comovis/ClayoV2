@@ -40,7 +40,7 @@ export default function EmailVerificationPage() {
           localStorage.removeItem("isInvitedUser")
           navigate("/dashboard")
         } else {
-          navigate("/onboarding")
+          navigate("/dashboard")
         }
       } else {
         // Fallback to localStorage if you stored it there during signup

@@ -53,14 +53,12 @@ const UserProfileDropdown: FC<UserProfileDropdownProps> = ({ user, onSignOut }) 
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="rounded-full">
-            <Avatar className="h-8 w-8">
-              <AvatarFallback>{initials}</AvatarFallback>
-            </Avatar>
-          </Button>
+        <DropdownMenuTrigger className="rounded-full p-0 border-0 bg-transparent hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+          <Avatar className="h-8 w-8 cursor-pointer">
+            <AvatarFallback className="bg-primary/10 text-primary font-medium">{initials}</AvatarFallback>
+          </Avatar>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuContent align="end" className="w-56 z-50" sideOffset={5}>
           <DropdownMenuLabel>
             <div className="flex flex-col space-y-1">
               <p className="text-sm font-medium leading-none">{user.full_name || "User"}</p>
@@ -69,50 +67,54 @@ const UserProfileDropdown: FC<UserProfileDropdownProps> = ({ user, onSignOut }) 
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => console.log("Profile clicked")}>
             <User className="mr-2 h-4 w-4" />
             <span>Profile</span>
           </DropdownMenuItem>
-          <DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => console.log("My Vessels clicked")}>
             <Ship className="mr-2 h-4 w-4" />
             <span>My Vessels</span>
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
+          <DropdownMenuItem onSelect={() => setSettingsOpen(true)}>
             <Settings className="mr-2 h-4 w-4" />
             <span>Settings</span>
           </DropdownMenuItem>
-          <DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => console.log("Pricing clicked")}>
             <CreditCard className="mr-2 h-4 w-4" />
             <span>Pricing</span>
           </DropdownMenuItem>
-          <DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => console.log("Support clicked")}>
             <LifeBuoy className="mr-2 h-4 w-4" />
             <span>Support</span>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuLabel>Preferences</DropdownMenuLabel>
-          <DropdownMenuItem>
+          <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center">
                 <span>Theme</span>
               </div>
               <div className="flex space-x-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <Laptop className="h-4 w-4" />
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => e.stopPropagation()}>
+                  <Laptop className="h-3 w-3" />
                 </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <Sun className="h-4 w-4" />
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => e.stopPropagation()}>
+                  <Sun className="h-3 w-3" />
                 </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <Moon className="h-4 w-4" />
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => e.stopPropagation()}>
+                  <Moon className="h-3 w-3" />
                 </Button>
               </div>
             </div>
           </DropdownMenuItem>
-          <DropdownMenuItem>
+          <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
             <div className="flex items-center justify-between w-full">
               <span>Language</span>
-              <select className="text-sm bg-transparent border-none outline-none">
+              <select
+                className="text-sm bg-transparent border-none outline-none"
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => console.log("Language changed:", e.target.value)}
+              >
                 <option value="en">English</option>
                 <option value="es">Spanish</option>
                 <option value="fr">French</option>
@@ -121,7 +123,7 @@ const UserProfileDropdown: FC<UserProfileDropdownProps> = ({ user, onSignOut }) 
             </div>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={onSignOut} disabled={isLoggingOut}>
+          <DropdownMenuItem onSelect={onSignOut} disabled={isLoggingOut}>
             <LogOut className="mr-2 h-4 w-4" />
             {isLoggingOut ? (
               <span className="flex items-center">

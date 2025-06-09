@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { Link, useParams } from "react-router-dom"
-import { ArrowLeft, Calendar, Clock, User, Share2, Bookmark, Tag, ImageIcon } from "lucide-react"
+import { ArrowLeft, Calendar, Clock, User, Share2, Bookmark, Tag, ImageIcon } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
@@ -91,7 +91,7 @@ const ArticleImage: React.FC<{ src: string | null; alt: string; className?: stri
       
       {/* Main image - always render but may be hidden by loading overlay */}
       <img
-        src={src}
+        src={src || "/placeholder.svg"}
         alt={alt}
         className={`${className} rounded-lg transition-opacity duration-300 ${
           imageLoading ? 'opacity-0' : 'opacity-100'
@@ -343,100 +343,6 @@ export default function ArticlePage() {
               </div>
             </div>
           )}
-
-          {/* Related Articles Section */}
-          <section className="border-t border-gray-200 pt-12 bg-white">
-            <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">Related Articles</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* Placeholder related articles - these would be fetched dynamically */}
-              <Card className="group hover:shadow-lg transition-shadow duration-200 overflow-hidden bg-white border border-gray-200">
-                <div className="relative">
-                  <ArticleImage
-                    src={null}
-                    alt="Future of AI Customer Service"
-                    className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-200"
-                    isPlaceholder={true}
-                  />
-                  <div className="absolute top-4 left-4">
-                    <Badge className="bg-blue-100 text-blue-800">Technology</Badge>
-                  </div>
-                </div>
-                <CardContent className="p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-2 mb-2">
-                    <Link to="#" className="hover:underline">
-                      Future of AI Customer Service
-                    </Link>
-                  </h3>
-                  <p className="text-gray-600 text-sm line-clamp-2 mb-3">
-                    Exploring the advancements and challenges in AI-powered customer support.
-                  </p>
-                  <div className="flex items-center text-xs text-gray-500">
-                    <Calendar className="h-3 w-3 mr-1" />
-                    Jan 10, 2024
-                    <Clock className="h-3 w-3 ml-3 mr-1" />7 min read
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="group hover:shadow-lg transition-shadow duration-200 overflow-hidden bg-white border border-gray-200">
-                <div className="relative">
-                  <ArticleImage
-                    src={null}
-                    alt="Automation in Support"
-                    className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-200"
-                    isPlaceholder={true}
-                  />
-                  <div className="absolute top-4 left-4">
-                    <Badge className="bg-green-100 text-green-800">Automation</Badge>
-                  </div>
-                </div>
-                <CardContent className="p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-2 mb-2">
-                    <Link to="#" className="hover:underline">
-                      Automation in Support
-                    </Link>
-                  </h3>
-                  <p className="text-gray-600 text-sm line-clamp-2 mb-3">
-                    How automation is revolutionizing customer support efficiency.
-                  </p>
-                  <div className="flex items-center text-xs text-gray-500">
-                    <Calendar className="h-3 w-3 mr-1" />
-                    Dec 28, 2023
-                    <Clock className="h-3 w-3 ml-3 mr-1" />9 min read
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="group hover:shadow-lg transition-shadow duration-200 overflow-hidden bg-white border border-gray-200">
-                <div className="relative">
-                  <ArticleImage
-                    src={null}
-                    alt="Customer Experience Trends"
-                    className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-200"
-                    isPlaceholder={true}
-                  />
-                  <div className="absolute top-4 left-4">
-                    <Badge className="bg-purple-100 text-purple-800">Trends</Badge>
-                  </div>
-                </div>
-                <CardContent className="p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-2 mb-2">
-                    <Link to="#" className="hover:underline">
-                      Customer Experience Trends
-                    </Link>
-                  </h3>
-                  <p className="text-gray-600 text-sm line-clamp-2 mb-3">
-                    New strategies for improving customer experience and satisfaction.
-                  </p>
-                  <div className="flex items-center text-xs text-gray-500">
-                    <Calendar className="h-3 w-3 mr-1" />
-                    Nov 05, 2023
-                    <Clock className="h-3 w-3 ml-3 mr-1" />6 min read
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </section>
         </article>
       </main>
     </div>

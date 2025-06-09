@@ -11,7 +11,6 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useUser } from "../../Auth/Contexts/UserContext"
-import SystemInitializationLoading from "./LoadingWelcomePage"
 
 // Simple image import for logo
 import LogoBlack from "../../ReusableAssets/Logos/LogoBlack.svg"
@@ -22,7 +21,6 @@ const apiBaseUrl =
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
-  const [showLoadingScreen, setShowLoadingScreen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -44,22 +42,10 @@ export default function LoginPage() {
     }
   }, [])
 
-  const handleLoadingComplete = async () => {
-    console.log("🚢 Loading complete, clearing loading flag and navigating...")
-
-    // Clear the loading flag
-    localStorage.removeItem("comovis_showing_loading")
-
-    // Refresh user data and navigate
-    await refreshUserData()
-    navigate("/dashboard")
-  }
-
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError(null)
     setIsLoading(true)
-    setShowLoadingScreen(false)
 
     console.log("🔐 Starting authentication process...")
 
@@ -74,15 +60,15 @@ export default function LoginPage() {
 
       console.log(`🔍 Attempting to sign in user: ${sanitizedEmail}`)
 
-      // Set loading flag BEFORE authentication
-      localStorage.setItem("comovis_showing_loading", "true")
+      // Set a flag to prevent UserContext from auto-redirecting
+      localStorage.setItem("login_in_progress", "true")
 
       // First, use the context's login function to authenticate with Supabase
       const loginResult = await login(sanitizedEmail, password)
 
       if (!loginResult.success) {
         console.log("❌ Supabase authentication failed")
-        localStorage.removeItem("comovis_showing_loading")
+        localStorage.removeItem("login_in_progress")
         throw new Error("Your email or password does not match our records")
       }
 
@@ -102,7 +88,7 @@ export default function LoginPage() {
 
       if (!response.ok) {
         console.log(`❌ API response not ok: ${response.status}`)
-        localStorage.removeItem("comovis_showing_loading")
+        localStorage.removeItem("login_in_progress")
         if (response.status === 401 || response.status === 403) {
           throw new Error("Your email or password does not match our records")
         } else {
@@ -115,13 +101,13 @@ export default function LoginPage() {
 
       // Handle rate limiting specifically
       if (data.type === "RATE_LIMIT_AUTH") {
-        localStorage.removeItem("comovis_showing_loading")
+        localStorage.removeItem("login_in_progress")
         throw new Error("Too many login attempts. Please wait 15 minutes before trying again.")
       }
 
       if (!data.success) {
         console.log("❌ API response indicates failure")
-        localStorage.removeItem("comovis_showing_loading")
+        localStorage.removeItem("login_in_progress")
         throw new Error("Your email or password does not match our records")
       }
 
@@ -140,13 +126,16 @@ export default function LoginPage() {
       localStorage.setItem("refreshToken", data.user.session.refresh_token)
       localStorage.setItem("tokenExpiry", data.user.session.expires_at)
 
-      // Show loading screen
-      console.log("🎬 Showing loading screen...")
-      setIsLoading(false)
-      setShowLoadingScreen(true)
+      // Clear the login flag and refresh user data
+      localStorage.removeItem("login_in_progress")
+      await refreshUserData()
+
+      // Navigate directly to dashboard - the welcome modal will handle onboarding
+      console.log("🎯 Navigating to dashboard...")
+      navigate("/dashboard")
     } catch (error) {
       console.error("❌ Login error:", error)
-      localStorage.removeItem("comovis_showing_loading")
+      localStorage.removeItem("login_in_progress")
 
       // Display user-friendly error message with rate limiting priority
       if (error.message.includes("Too many login attempts")) {
@@ -162,14 +151,7 @@ export default function LoginPage() {
         setError(error.message || "Failed to sign in. Please try again later.")
       }
       setIsLoading(false)
-      setShowLoadingScreen(false)
     }
-  }
-
-  // Show loading screen if authentication was successful
-  if (showLoadingScreen) {
-    console.log("🎬 Rendering loading screen")
-    return <SystemInitializationLoading onComplete={handleLoadingComplete} />
   }
 
   return (

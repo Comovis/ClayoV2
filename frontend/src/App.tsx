@@ -288,6 +288,8 @@ function AppContent() {
     location.pathname === "/email-confirmed" ||
     location.pathname === "/accept-invite"
 
+  const isBlogPage = location.pathname === "/blog" || location.pathname.startsWith("/blog/")
+
   // Define all known paths in the application
   const knownPaths = useMemo(
     () => [
@@ -344,11 +346,11 @@ function AppContent() {
 
       <div className="flex h-screen w-full max-w-full overflow-x-hidden">
         {/* Only show sidebar on known paths that are not landing pages or auth pages */}
-        {!isLandingPage && !isAuthPage && !isUnknownPath && !isShowingLoadingScreen && <Sidebar />}
+        {!isLandingPage && !isAuthPage && !isBlogPage && !isUnknownPath && !isShowingLoadingScreen && <Sidebar />}
 
         <div className="flex flex-col flex-1 min-w-0 max-w-full">
           {/* Conditionally render the appropriate header */}
-          {isShowingLoadingScreen ? null : isLandingPage ? (
+          {isShowingLoadingScreen ? null : isLandingPage || isBlogPage ? (
             <LandingHeader user={undefined} logout={undefined} />
           ) : isAuthPage || isUnknownPath ? null : (
             <AppHeader
@@ -357,7 +359,7 @@ function AppContent() {
               showSidePanel={showSidePanel}
               setShowSidePanel={setShowSidePanel}
               showRightPanel={showRightPanel}
-              setShowRightPanel={showRightPanel}
+              setShowRightPanel={setShowRightPanel}
               user={undefined}
               logout={undefined}
             />
