@@ -247,30 +247,29 @@ app.post('/github-webhook', express.json(), (req, res) => {
 
 
 
-
 // Sitemap endpoint (place this near the top of your routes, before protected routes)
 app.get("/sitemap.xml", async (req, res) => {
   try {
     res.header('Content-Type', 'application/xml');
-    const baseUrl = 'https://clayo.co';
+    const baseUrl = 'https://api.clayo.co';
 
     // Static pages from App.tsx
     const staticPages = [
-      { url: '/', lastmod: '2025-06-09T19:01:00Z', changefreq: 'weekly', priority: '1.0' },
-      { url: '/login', lastmod: '2025-06-09T19:01:00Z', changefreq: 'monthly', priority: '0.6' },
-      { url: '/signup', lastmod: '2025-06-09T19:01:00Z', changefreq: 'monthly', priority: '0.6' },
-      { url: '/accept-invite', lastmod: '2025-06-09T19:01:00Z', changefreq: 'monthly', priority: '0.5' },
-      { url: '/confirm-email', lastmod: '2025-06-09T19:01:00Z', changefreq: 'monthly', priority: '0.5' },
-      { url: '/onboarding', lastmod: '2025-06-09T19:01:00Z', changefreq: 'monthly', priority: '0.6' },
-      { url: '/dashboard', lastmod: '2025-06-09T19:01:00Z', changefreq: 'weekly', priority: '0.8' },
-      { url: '/conversations', lastmod: '2025-06-09T19:01:00Z', changefreq: 'daily', priority: '0.8' },
-      { url: '/agent-config', lastmod: '2025-06-09T19:01:00Z', changefreq: 'weekly', priority: '0.7' },
-      { url: '/widget-config', lastmod: '2025-06-09T19:01:00Z', changefreq: 'weekly', priority: '0.7' },
-      { url: '/analytics', lastmod: '2025-06-09T19:01:00Z', changefreq: 'weekly', priority: '0.7' },
-      { url: '/pricing', lastmod: '2025-06-09T19:01:00Z', changefreq: 'monthly', priority: '0.8' },
-      { url: '/team', lastmod: '2025-06-09T19:01:00Z', changefreq: 'weekly', priority: '0.7' },
-      { url: '/tests', lastmod: '2025-06-09T19:01:00Z', changefreq: 'monthly', priority: '0.5' },
-      { url: '/blog', lastmod: '2025-06-09T19:01:00Z', changefreq: 'weekly', priority: '0.9' },
+      { url: '/', lastmod: '2025-06-09T19:25:00Z', changefreq: 'weekly', priority: '1.0' },
+      { url: '/login', lastmod: '2025-06-09T19:25:00Z', changefreq: 'monthly', priority: '0.6' },
+      { url: '/signup', lastmod: '2025-06-09T19:25:00Z', changefreq: 'monthly', priority: '0.6' },
+      { url: '/accept-invite', lastmod: '2025-06-09T19:25:00Z', changefreq: 'monthly', priority: '0.5' },
+      { url: '/confirm-email', lastmod: '2025-06-09T19:25:00Z', changefreq: 'monthly', priority: '0.5' },
+      { url: '/onboarding', lastmod: '2025-06-09T19:25:00Z', changefreq: 'monthly', priority: '0.6' },
+      { url: '/dashboard', lastmod: '2025-06-09T19:25:00Z', changefreq: 'weekly', priority: '0.8' },
+      { url: '/conversations', lastmod: '2025-06-09T19:25:00Z', changefreq: 'daily', priority: '0.8' },
+      { url: '/agent-config', lastmod: '2025-06-09T19:25:00Z', changefreq: 'weekly', priority: '0.7' },
+      { url: '/widget-config', lastmod: '2025-06-09T19:25:00Z', changefreq: 'weekly', priority: '0.7' },
+      { url: '/analytics', lastmod: '2025-06-09T19:25:00Z', changefreq: 'weekly', priority: '0.7' },
+      { url: '/pricing', lastmod: '2025-06-09T19:25:00Z', changefreq: 'monthly', priority: '0.8' },
+      { url: '/team', lastmod: '2025-06-09T19:25:00Z', changefreq: 'weekly', priority: '0.7' },
+      { url: '/tests', lastmod: '2025-06-09T19:25:00Z', changefreq: 'monthly', priority: '0.5' },
+      { url: '/blog', lastmod: '2025-06-09T19:25:00Z', changefreq: 'weekly', priority: '0.9' },
     ];
 
     // Fetch published blog posts from Supabase
@@ -298,7 +297,7 @@ ${staticPages.map(page => `
 ${blogPosts.map(post => `
   <url>
     <loc>${baseUrl}/blog/${post.slug}</loc>
-    <lastmod>${post.updated_at ? new Date(post.updated_at).toISOString() : '2025-06-09T19:01:00Z'}</lastmod>
+    <lastmod>${post.updated_at ? new Date(post.updated_at).toISOString() : '2025-06-09T19:25:00Z'}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>`).join('')}
@@ -310,7 +309,6 @@ ${blogPosts.map(post => `
     res.status(500).send('Error generating sitemap');
   }
 });
-
 
 
 
