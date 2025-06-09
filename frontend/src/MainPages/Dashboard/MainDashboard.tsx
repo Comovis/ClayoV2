@@ -7,24 +7,28 @@ import { Badge } from "@/components/ui/badge"
 import {
   MessageSquare,
   Users,
-  TrendingUp,
   Clock,
   Bot,
   AlertCircle,
-  CheckCircle,
   ArrowUpRight,
   ArrowDownRight,
   MoreHorizontal,
   Plus,
   Filter,
+  Inbox,
+  BarChart3,
+  PlusCircle,
 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
 import { useUser } from "../../Auth/Contexts/UserContext"
 import { useNavigate } from "react-router-dom"
 import WelcomeModal from "./WelcomeModal"
+import { useAgents } from "../../Hooks/useAgents"
+import { useAgentAnalytics } from "../../Hooks/useAgentAnalytics"
+import { useAgentSessions, type Session } from "../../Hooks/useAgentSessions"
 
 interface DashboardStats {
   totalConversations: number
@@ -52,20 +56,12 @@ interface RecentConversation {
   priority: number
 }
 
-interface RecentLead {
-  id: string
-  title: string
-  customer: string
-  value: number
-  status: string
-  probability: number
-  source: string
-  createdAt: string
-}
-
 export default function NewDashboard() {
   const { isAuthenticated, isLoading, user, organization } = useUser()
   const navigate = useNavigate()
+  const { agents, fetchAgents, isLoading: agentsLoading } = useAgents()
+  const { getOrganizationAnalytics, isLoading: analyticsLoading } = useAgentAnalytics()
+  const { sessions, getAgentSessions, isLoading: sessionsLoading } = useAgentSessions()
 
   const [stats, setStats] = useState<DashboardStats>({
     totalConversations: 0,
@@ -77,13 +73,10 @@ export default function NewDashboard() {
     totalLeads: 0,
     qualifiedLeads: 0,
   })
-  const [recentConversations, setRecentConversations] = useState<RecentConversation[]>([])
-  const [recentLeads, setRecentLeads] = useState<RecentLead[]>([])
+  const [recentConversations, setRecentConversations] = useState<Session[]>([])
   const [isDashboardLoading, setIsDashboardLoading] = useState(true)
   const [timeRange, setTimeRange] = useState("7d")
   const [showWelcomeModal, setShowWelcomeModal] = useState(false)
-
-  console.log("NewDashboard rendering with auth state:", { isAuthenticated, isLoading, user, organization })
 
   useEffect(() => {
     if (isAuthenticated && user && organization) {
@@ -100,7 +93,7 @@ export default function NewDashboard() {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black mx-auto mb-4"></div>
           <p className="text-gray-600">Loading your dashboard...</p>
         </div>
       </div>
@@ -109,7 +102,6 @@ export default function NewDashboard() {
 
   // Handle authentication
   if (!isAuthenticated && !isLoading) {
-    console.log("NewDashboard: User not authenticated")
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
@@ -126,93 +118,48 @@ export default function NewDashboard() {
   const loadDashboardData = async () => {
     setIsDashboardLoading(true)
     try {
-      console.log("Loading dashboard data for organization:", organization?.name)
+      // Fetch agents
+      const agentsList = await fetchAgents()
 
-      // In a real app, these would be actual API calls using the user context
-      // For now, we'll use mock data but customize it based on the organization
-      const orgName = organization?.name || "Your Organization"
+      // If we have agents, get analytics and sessions for the first agent
+      if (agentsList && agentsList.length > 0) {
+        const firstAgentId = agentsList[0].id
 
-      setStats({
-        totalConversations: 1247,
-        activeConversations: 23,
-        resolvedToday: 45,
-        avgResponseTime: "2m 30s",
-        customerSatisfaction: 4.8,
-        aiResolutionRate: 78,
-        totalLeads: 156,
-        qualifiedLeads: 42,
-      })
+        // Get organization analytics
+        const analytics = await getOrganizationAnalytics()
+        if (analytics) {
+          setStats({
+            totalConversations: analytics.totalConversations || 0,
+            activeConversations: analytics.activeConversations || 0,
+            resolvedToday: analytics.resolvedToday || 0,
+            avgResponseTime: formatResponseTime(analytics.averageResponseTime || 0),
+            customerSatisfaction: analytics.customerSatisfaction || 0,
+            aiResolutionRate: analytics.resolutionRate || 0,
+            totalLeads: analytics.totalLeads || 0,
+            qualifiedLeads: analytics.qualifiedLeads || 0,
+          })
+        }
 
-      setRecentConversations([
-        {
-          id: "1",
-          customer: { name: "Sarah Johnson", email: "sarah@example.com" },
-          subject: "Billing question about subscription",
-          status: "active",
-          lastMessage: "I need help understanding my latest invoice...",
-          lastMessageAt: "2 minutes ago",
-          channel: "email",
-          priority: 2,
-        },
-        {
-          id: "2",
-          customer: { name: "Mike Chen", email: "mike@techcorp.com" },
-          subject: "Technical integration support",
-          status: "pending",
-          lastMessage: "The API is returning a 404 error when...",
-          lastMessageAt: "15 minutes ago",
-          channel: "chat",
-          priority: 3,
-        },
-        {
-          id: "3",
-          customer: { name: "Emma Davis", email: "emma@startup.io" },
-          subject: "Feature request discussion",
-          status: "resolved",
-          lastMessage: "Thank you for the detailed explanation!",
-          lastMessageAt: "1 hour ago",
-          channel: "email",
-          priority: 1,
-        },
-      ])
-
-      setRecentLeads([
-        {
-          id: "1",
-          title: "Enterprise Plan Upgrade",
-          customer: "TechCorp Inc.",
-          value: 25000,
-          status: "proposal",
-          probability: 75,
-          source: "website",
-          createdAt: "2 days ago",
-        },
-        {
-          id: "2",
-          title: "API Integration Project",
-          customer: "StartupXYZ",
-          value: 12000,
-          status: "negotiation",
-          probability: 60,
-          source: "referral",
-          createdAt: "5 days ago",
-        },
-        {
-          id: "3",
-          title: "Custom AI Training",
-          customer: "RetailCorp",
-          value: 8500,
-          status: "qualified",
-          probability: 40,
-          source: "demo",
-          createdAt: "1 week ago",
-        },
-      ])
+        // Get recent sessions/conversations
+        const recentSessions = await getAgentSessions(firstAgentId)
+        if (recentSessions) {
+          setRecentConversations(recentSessions)
+        }
+      }
     } catch (error) {
       console.error("Error loading dashboard data:", error)
     } finally {
       setIsDashboardLoading(false)
     }
+  }
+
+  const formatResponseTime = (seconds: number): string => {
+    if (seconds < 60) {
+      return `${seconds}s`
+    }
+    const minutes = Math.floor(seconds / 60)
+    const remainingSeconds = seconds % 60
+    return `${minutes}m ${remainingSeconds}s`
   }
 
   const handleWelcomeComplete = () => {
@@ -228,33 +175,20 @@ export default function NewDashboard() {
     switch (status) {
       case "active":
         return "bg-blue-100 text-blue-800"
-      case "pending":
+      case "escalated":
         return "bg-yellow-100 text-yellow-800"
-      case "resolved":
+      case "closed":
         return "bg-green-100 text-green-800"
       default:
         return "bg-gray-100 text-gray-800"
     }
   }
 
-  const getPriorityIcon = (priority: number) => {
-    if (priority >= 3) return <AlertCircle className="h-4 w-4 text-red-500" />
-    if (priority === 2) return <Clock className="h-4 w-4 text-yellow-500" />
-    return <CheckCircle className="h-4 w-4 text-green-500" />
-  }
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount)
-  }
-
   const handleNavigation = (path: string) => {
     navigate(path)
   }
+
+  const isDataEmpty = !agents || agents.length === 0
 
   return (
     <>
@@ -280,7 +214,10 @@ export default function NewDashboard() {
                 <SelectItem value="90d">Last 90 days</SelectItem>
               </SelectContent>
             </Select>
-            <Button onClick={() => handleNavigation("/conversations")}>
+            <Button
+              className="bg-black text-white hover:bg-gray-800"
+              onClick={() => handleNavigation("/conversations")}
+            >
               <Plus className="mr-2 h-4 w-4" />
               New Conversation
             </Button>
@@ -289,12 +226,12 @@ export default function NewDashboard() {
 
         {/* Organization Info */}
         {organization && (
-          <Card className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+          <Card className="mb-6 bg-white border border-gray-200">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <Bot className="h-6 w-6 text-blue-600" />
+                  <div className="w-12 h-12 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-center">
+                    <Bot className="h-6 w-6 text-gray-600" />
                   </div>
                   <div>
                     <CardTitle className="text-lg">{organization.name}</CardTitle>
@@ -310,71 +247,135 @@ export default function NewDashboard() {
           </Card>
         )}
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-700">Total Conversations</CardTitle>
-              <MessageSquare className="h-4 w-4 text-gray-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {isDashboardLoading ? "..." : stats.totalConversations.toLocaleString()}
+        {/* Empty State - No Agents */}
+        {isDataEmpty && !isDashboardLoading && (
+          <Card className="mb-6 border-dashed border-2 border-gray-200 bg-gray-50">
+            <CardContent className="p-10 flex flex-col items-center justify-center text-center">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                <Bot className="h-8 w-8 text-gray-400" />
               </div>
-              <p className="text-xs text-gray-600">
-                <span className="text-green-600 flex items-center">
-                  <ArrowUpRight className="h-3 w-3 mr-1" />
-                  +12% from last period
-                </span>
+              <h3 className="text-xl font-semibold mb-2">Set up your first AI agent</h3>
+              <p className="text-gray-500 mb-6 max-w-md">
+                Create an AI agent to start handling customer inquiries, qualifying leads, and providing 24/7 support.
               </p>
+              <Button
+                className="bg-black text-white hover:bg-gray-800"
+                onClick={() => handleNavigation("/agent-config")}
+              >
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Create Your First Agent
+              </Button>
             </CardContent>
           </Card>
+        )}
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-700">Active Now</CardTitle>
-              <Users className="h-4 w-4 text-gray-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{isDashboardLoading ? "..." : stats.activeConversations}</div>
-              <p className="text-xs text-gray-600">
-                <span className="text-blue-600">{stats.resolvedToday} resolved today</span>
-              </p>
-            </CardContent>
-          </Card>
+        {/* Stats Grid */}
+        {(!isDataEmpty || isDashboardLoading) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-700">Total Conversations</CardTitle>
+                <MessageSquare className="h-4 w-4 text-gray-500" />
+              </CardHeader>
+              <CardContent>
+                {isDashboardLoading ? (
+                  <div className="animate-pulse h-8 bg-gray-200 rounded mb-2"></div>
+                ) : (
+                  <>
+                    <div className="text-2xl font-bold">{stats.totalConversations.toLocaleString()}</div>
+                    {stats.totalConversations > 0 ? (
+                      <p className="text-xs text-gray-600">
+                        <span className="text-green-600 flex items-center">
+                          <ArrowUpRight className="h-3 w-3 mr-1" />
+                          Since {timeRange}
+                        </span>
+                      </p>
+                    ) : (
+                      <p className="text-xs text-gray-500">No conversations yet</p>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-700">Avg Response Time</CardTitle>
-              <Clock className="h-4 w-4 text-gray-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{isDashboardLoading ? "..." : stats.avgResponseTime}</div>
-              <p className="text-xs text-gray-600">
-                <span className="text-green-600 flex items-center">
-                  <ArrowDownRight className="h-3 w-3 mr-1" />
-                  -15% faster
-                </span>
-              </p>
-            </CardContent>
-          </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-700">Active Now</CardTitle>
+                <Users className="h-4 w-4 text-gray-500" />
+              </CardHeader>
+              <CardContent>
+                {isDashboardLoading ? (
+                  <div className="animate-pulse h-8 bg-gray-200 rounded mb-2"></div>
+                ) : (
+                  <>
+                    <div className="text-2xl font-bold">{stats.activeConversations}</div>
+                    {stats.resolvedToday > 0 ? (
+                      <p className="text-xs text-gray-600">
+                        <span className="text-blue-600">{stats.resolvedToday} resolved today</span>
+                      </p>
+                    ) : (
+                      <p className="text-xs text-gray-500">No active conversations</p>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-700">AI Resolution Rate</CardTitle>
-              <Bot className="h-4 w-4 text-gray-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{isDashboardLoading ? "..." : `${stats.aiResolutionRate}%`}</div>
-              <p className="text-xs text-gray-600">
-                <span className="text-green-600 flex items-center">
-                  <ArrowUpRight className="h-3 w-3 mr-1" />
-                  +5% improvement
-                </span>
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-700">Avg Response Time</CardTitle>
+                <Clock className="h-4 w-4 text-gray-500" />
+              </CardHeader>
+              <CardContent>
+                {isDashboardLoading ? (
+                  <div className="animate-pulse h-8 bg-gray-200 rounded mb-2"></div>
+                ) : (
+                  <>
+                    <div className="text-2xl font-bold">{stats.avgResponseTime}</div>
+                    {stats.avgResponseTime !== "0m" ? (
+                      <p className="text-xs text-gray-600">
+                        <span className="text-green-600 flex items-center">
+                          <ArrowDownRight className="h-3 w-3 mr-1" />
+                          Faster than average
+                        </span>
+                      </p>
+                    ) : (
+                      <p className="text-xs text-gray-500">No data available yet</p>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-700">AI Resolution Rate</CardTitle>
+                <Bot className="h-4 w-4 text-gray-500" />
+              </CardHeader>
+              <CardContent>
+                {isDashboardLoading ? (
+                  <div className="animate-pulse h-8 bg-gray-200 rounded mb-2"></div>
+                ) : (
+                  <>
+                    <div className="text-2xl font-bold">
+                      {stats.aiResolutionRate > 0 ? `${stats.aiResolutionRate}%` : "N/A"}
+                    </div>
+                    {stats.aiResolutionRate > 0 ? (
+                      <p className="text-xs text-gray-600">
+                        <span className="text-green-600 flex items-center">
+                          <ArrowUpRight className="h-3 w-3 mr-1" />
+                          Improving over time
+                        </span>
+                      </p>
+                    ) : (
+                      <p className="text-xs text-gray-500">No resolutions yet</p>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -400,11 +401,19 @@ export default function NewDashboard() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {isDashboardLoading ? (
-                  <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-                    <p className="text-gray-600">Loading conversations...</p>
+                  <div className="space-y-4">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="animate-pulse flex items-start space-x-4 p-4 border rounded-lg">
+                        <div className="rounded-full bg-gray-200 h-10 w-10"></div>
+                        <div className="flex-1">
+                          <div className="h-4 bg-gray-200 rounded w-1/4 mb-2"></div>
+                          <div className="h-3 bg-gray-200 rounded w-3/4 mb-2"></div>
+                          <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ) : (
+                ) : recentConversations.length > 0 ? (
                   recentConversations.map((conversation) => (
                     <div
                       key={conversation.id}
@@ -412,22 +421,14 @@ export default function NewDashboard() {
                       onClick={() => handleNavigation(`/conversations/${conversation.id}`)}
                     >
                       <Avatar className="h-10 w-10">
-                        <AvatarImage src={conversation.customer.avatar || "/placeholder.svg"} />
                         <AvatarFallback className="bg-gray-200 text-gray-700">
-                          {conversation.customer.name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
+                          {conversation.customer_id ? conversation.customer_id.substring(0, 2).toUpperCase() : "?"}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-2">
-                            <h4 className="font-medium truncate">{conversation.customer.name}</h4>
-                            <Badge variant="outline" className="text-xs">
-                              {conversation.channel}
-                            </Badge>
-                            {getPriorityIcon(conversation.priority)}
+                            <h4 className="font-medium truncate">{conversation.customer_id || "Anonymous User"}</h4>
                           </div>
                           <div className="flex items-center space-x-2">
                             <Badge className={getStatusColor(conversation.status)}>{conversation.status}</Badge>
@@ -445,12 +446,32 @@ export default function NewDashboard() {
                             </DropdownMenu>
                           </div>
                         </div>
-                        <p className="text-sm font-medium text-gray-900 mt-1">{conversation.subject}</p>
-                        <p className="text-sm text-gray-600 truncate">{conversation.lastMessage}</p>
-                        <p className="text-xs text-gray-500 mt-1">{conversation.lastMessageAt}</p>
+                        <p className="text-sm text-gray-600 truncate">
+                          {conversation.last_message || "No messages yet"}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {new Date(conversation.updated_at).toLocaleString()}
+                        </p>
                       </div>
                     </div>
                   ))
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-10 text-center">
+                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                      <Inbox className="h-8 w-8 text-gray-400" />
+                    </div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-1">No conversations yet</h3>
+                    <p className="text-gray-500 mb-4 max-w-sm">
+                      Start a conversation with your AI agent or set up your widget to collect customer inquiries.
+                    </p>
+                    <Button
+                      className="bg-black text-white hover:bg-gray-800"
+                      onClick={() => handleNavigation("/conversations/new")}
+                    >
+                      <MessageSquare className="mr-2 h-4 w-4" />
+                      Start a Test Conversation
+                    </Button>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -466,131 +487,56 @@ export default function NewDashboard() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {isDashboardLoading ? (
-                  <div className="text-center py-4">
-                    <div className="animate-pulse space-y-3">
-                      <div className="h-4 bg-gray-200 rounded"></div>
-                      <div className="h-2 bg-gray-200 rounded"></div>
-                      <div className="h-4 bg-gray-200 rounded"></div>
-                      <div className="h-2 bg-gray-200 rounded"></div>
-                    </div>
+                  <div className="animate-pulse space-y-3">
+                    <div className="h-4 bg-gray-200 rounded"></div>
+                    <div className="h-2 bg-gray-200 rounded"></div>
+                    <div className="h-4 bg-gray-200 rounded"></div>
+                    <div className="h-2 bg-gray-200 rounded"></div>
                   </div>
-                ) : (
+                ) : stats.customerSatisfaction > 0 || stats.aiResolutionRate > 0 ? (
                   <>
                     <div>
                       <div className="flex justify-between text-sm mb-2">
                         <span className="text-gray-700">Customer Satisfaction</span>
-                        <span className="font-medium">{stats.customerSatisfaction}/5.0</span>
+                        <span className="font-medium">
+                          {stats.customerSatisfaction > 0 ? `${stats.customerSatisfaction}/5.0` : "N/A"}
+                        </span>
                       </div>
-                      <Progress value={(stats.customerSatisfaction / 5) * 100} className="h-2" />
+                      <Progress
+                        value={stats.customerSatisfaction > 0 ? (stats.customerSatisfaction / 5) * 100 : 0}
+                        className="h-2"
+                      />
                     </div>
                     <div>
                       <div className="flex justify-between text-sm mb-2">
                         <span className="text-gray-700">AI Resolution Rate</span>
-                        <span className="font-medium">{stats.aiResolutionRate}%</span>
+                        <span className="font-medium">
+                          {stats.aiResolutionRate > 0 ? `${stats.aiResolutionRate}%` : "N/A"}
+                        </span>
                       </div>
                       <Progress value={stats.aiResolutionRate} className="h-2" />
                     </div>
                     <div>
                       <div className="flex justify-between text-sm mb-2">
                         <span className="text-gray-700">First Response Time</span>
-                        <span className="font-medium">Under 5min</span>
+                        <span className="font-medium">
+                          {stats.avgResponseTime !== "0m" ? stats.avgResponseTime : "N/A"}
+                        </span>
                       </div>
-                      <Progress value={85} className="h-2" />
+                      <Progress value={stats.avgResponseTime !== "0m" ? 85 : 0} className="h-2" />
                     </div>
                   </>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Recent Leads */}
-            <Card>
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-lg">Recent Leads</CardTitle>
-                    <CardDescription>Latest sales opportunities</CardDescription>
-                  </div>
-                  <Button variant="outline" size="sm" onClick={() => handleNavigation("/leads")}>
-                    View All
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {isDashboardLoading ? (
-                  <div className="text-center py-4">
-                    <div className="animate-pulse space-y-3">
-                      {[1, 2, 3].map((i) => (
-                        <div key={i} className="p-3 border rounded-lg">
-                          <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                          <div className="h-3 bg-gray-200 rounded mb-2"></div>
-                          <div className="h-3 bg-gray-200 rounded"></div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
                 ) : (
-                  recentLeads.map((lead) => (
-                    <div
-                      key={lead.id}
-                      className="p-3 border rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
-                      onClick={() => handleNavigation(`/leads/${lead.id}`)}
-                    >
-                      <div className="flex justify-between items-start mb-2">
-                        <h4 className="font-medium text-sm">{lead.title}</h4>
-                        <Badge variant="outline" className="text-xs">
-                          {lead.status}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-gray-600">{lead.customer}</p>
-                      <div className="flex justify-between items-center mt-2">
-                        <span className="font-medium text-green-600">{formatCurrency(lead.value)}</span>
-                        <span className="text-xs text-gray-500">{lead.probability}% likely</span>
-                      </div>
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                      <BarChart3 className="h-6 w-6 text-gray-400" />
                     </div>
-                  ))
+                    <h3 className="text-sm font-medium text-gray-900 mb-1">No performance data yet</h3>
+                    <p className="text-xs text-gray-500 mb-4">
+                      Performance metrics will appear once your AI agent starts handling conversations.
+                    </p>
+                  </div>
                 )}
-              </CardContent>
-            </Card>
-
-            {/* Quick Actions */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Quick Actions</CardTitle>
-                <CardDescription>Common tasks and shortcuts</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Button
-                  className="w-full justify-start"
-                  variant="outline"
-                  onClick={() => handleNavigation("/conversations/new")}
-                >
-                  <MessageSquare className="mr-2 h-4 w-4" />
-                  Start New Conversation
-                </Button>
-                <Button
-                  className="w-full justify-start"
-                  variant="outline"
-                  onClick={() => handleNavigation("/leads/new")}
-                >
-                  <Users className="mr-2 h-4 w-4" />
-                  Add New Lead
-                </Button>
-                <Button
-                  className="w-full justify-start"
-                  variant="outline"
-                  onClick={() => handleNavigation("/ai-training")}
-                >
-                  <Bot className="mr-2 h-4 w-4" />
-                  Train AI Assistant
-                </Button>
-                <Button
-                  className="w-full justify-start"
-                  variant="outline"
-                  onClick={() => handleNavigation("/analytics")}
-                >
-                  <TrendingUp className="mr-2 h-4 w-4" />
-                  View Analytics
-                </Button>
               </CardContent>
             </Card>
           </div>

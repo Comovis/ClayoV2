@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import type { FC } from "react"
-import { User, LogOut, Settings, Ship, LifeBuoy, CreditCard, Moon, Sun, Laptop } from "lucide-react"
+import { LogOut, Settings, CreditCard } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -67,60 +67,13 @@ const UserProfileDropdown: FC<UserProfileDropdownProps> = ({ user, onSignOut }) 
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => console.log("Profile clicked")}>
-            <User className="mr-2 h-4 w-4" />
-            <span>Profile</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => console.log("My Vessels clicked")}>
-            <Ship className="mr-2 h-4 w-4" />
-            <span>My Vessels</span>
-          </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setSettingsOpen(true)}>
             <Settings className="mr-2 h-4 w-4" />
-            <span>Settings</span>
+            <span>Profile & Settings</span>
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => console.log("Pricing clicked")}>
+          <DropdownMenuItem onSelect={() => (window.location.href = "/pricing")}>
             <CreditCard className="mr-2 h-4 w-4" />
             <span>Pricing</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => console.log("Support clicked")}>
-            <LifeBuoy className="mr-2 h-4 w-4" />
-            <span>Support</span>
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuLabel>Preferences</DropdownMenuLabel>
-          <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-            <div className="flex items-center justify-between w-full">
-              <div className="flex items-center">
-                <span>Theme</span>
-              </div>
-              <div className="flex space-x-1">
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => e.stopPropagation()}>
-                  <Laptop className="h-3 w-3" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => e.stopPropagation()}>
-                  <Sun className="h-3 w-3" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => e.stopPropagation()}>
-                  <Moon className="h-3 w-3" />
-                </Button>
-              </div>
-            </div>
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-            <div className="flex items-center justify-between w-full">
-              <span>Language</span>
-              <select
-                className="text-sm bg-transparent border-none outline-none"
-                onClick={(e) => e.stopPropagation()}
-                onChange={(e) => console.log("Language changed:", e.target.value)}
-              >
-                <option value="en">English</option>
-                <option value="es">Spanish</option>
-                <option value="fr">French</option>
-                <option value="de">German</option>
-              </select>
-            </div>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={onSignOut} disabled={isLoggingOut}>

@@ -31,6 +31,7 @@ import EditBlogPostPage from "./MainPages/Blog/AdminEditArticle"
 import NewBlogPostPage from "./MainPages/Blog/AdminCreateNewArticle"
 import ArticlePage from "./MainPages/Blog/ArticlePage"
 
+
 // Google Analytics Configuration
 const GA_TRACKING_ID = "G-TY55DN5JKN"
 
@@ -313,6 +314,7 @@ function AppContent() {
       "/admin/blog/edit/:id", // Updated to include dynamic parameter
       "/admin/blog/new",
       "/blog/:slug", // Added for viewing individual blog posts
+      "/pricing"
     ],
     [],
   )
@@ -392,6 +394,7 @@ function AppContent() {
               <Route path="/accept-invite" element={<InvitationAccept />} />
               <Route path="/confirm-email" element={<EmailVerificationPage />} />
               <Route path="/tests" element={<TestWidgetPage />} />
+              <Route path="/pricing" element={<PricingPage />} />
 
               {/* Blog routes */}
               <Route path="/blog" element={<MainBlogPage />} />
