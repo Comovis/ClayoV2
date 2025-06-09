@@ -500,25 +500,25 @@ export default function NewBlogPostPage() {
       return
     }
 
-    const postData: CreateBlogPostBody = {
-      title: formData.title,
-      slug: formData.slug,
-      excerpt: formData.excerpt || undefined,
-      content: formData.content,
-      category: formData.category || undefined,
-      featuredImage: formData.featuredImage || undefined,
-      status: formData.status,
-      seoTitle: formData.seoTitle || undefined,
-      seoDescription: formData.seoDescription || undefined,
-      seoKeywords: formData.seoKeywords
-        ? formData.seoKeywords
-            .split(",")
-            .map((k) => k.trim())
-            .filter((k) => k.length > 0)
-        : undefined,
-      readTime: formData.readTime > 0 ? formData.readTime : undefined,
-    }
-
+   const postData: CreateBlogPostBody = {
+  title: formData.title,
+  slug: formData.slug,
+  content: formData.content,
+  status: formData.status,
+  // Only include fields that have actual values - don't use undefined
+  ...(formData.excerpt && { excerpt: formData.excerpt }),
+  ...(formData.category && { category: formData.category }),
+  ...(formData.featuredImage && { featuredImage: formData.featuredImage }),
+  ...(formData.seoTitle && { seoTitle: formData.seoTitle }),
+  ...(formData.seoDescription && { seoDescription: formData.seoDescription }),
+  ...(formData.seoKeywords && formData.seoKeywords.trim() && {
+    seoKeywords: formData.seoKeywords
+      .split(",")
+      .map((k) => k.trim())
+      .filter((k) => k.length > 0)
+  }),
+  ...(formData.readTime > 0 && { readTime: formData.readTime }),
+}
     await createPost(postData, selectedImageFile || undefined)
   }
 
