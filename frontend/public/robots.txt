@@ -1,0 +1,25 @@
+User-agent: *
+Allow: /
+
+# Disallow admin and private areas
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /conversations
+Disallow: /agent-config
+Disallow: /widget-config
+Disallow: /analytics
+Disallow: /team
+Disallow: /onboarding
+Disallow: /confirm-email
+Disallow: /email-confirmed
+Disallow: /accept-invite
+Disallow: /tests
+Disallow: /api
+Disallow: /private
+Disallow: /.well-known
+
+# Sitemap location
+Sitemap: https://clayo.co/sitemap.xml
+
+# Crawl delay (optional - be nice to servers)
+Crawl-delay: 1

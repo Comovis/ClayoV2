@@ -6,18 +6,16 @@ const https = require('https');
 const http = require('http');
 const { supabaseAdmin } = require('./SupabaseClient');
 
-// Configuration - Update these for your website
+// Configuration - Updated to match your actual routes
 const config = {
   domain: 'https://clayo.co', // Your website domain
   outputDir: '../frontend/public', // Save to frontend public directory
   
-  // Static pages configuration
+  // Static pages configuration - Updated to match your actual App.tsx routes
   staticPages: [
     { url: '/', priority: '1.0', changefreq: 'weekly' },
     { url: '/pricing', priority: '0.9', changefreq: 'monthly' },
     { url: '/blog', priority: '0.9', changefreq: 'weekly' },
-    { url: '/about', priority: '0.8', changefreq: 'monthly' },
-    { url: '/contact', priority: '0.7', changefreq: 'monthly' },
     { url: '/login', priority: '0.3', changefreq: 'monthly' },
     { url: '/signup', priority: '0.3', changefreq: 'monthly' }
   ],
@@ -28,10 +26,20 @@ const config = {
     type: 'supabase'
   },
   
-  // Exclusions
+  // Exclusions - Updated to match your actual protected routes
   excludePatterns: [
     '/admin',
     '/dashboard',
+    '/conversations',
+    '/agent-config',
+    '/widget-config',
+    '/analytics',
+    '/team',
+    '/onboarding',
+    '/confirm-email',
+    '/email-confirmed',
+    '/accept-invite',
+    '/tests',
     '/api',
     '/private',
     '/.well-known'
@@ -180,12 +188,68 @@ Crawl-delay: 1`;
   async submitToSearchEngines() {
     const sitemapUrl = `${this.config.domain}/sitemap.xml`;
     
-    console.log('\n🔍 Search Engine Submission URLs:');
+    console.log('\n🔍 Automatically pinging search engines...');
+    
+    // Auto-ping Google
+    try {
+      const googlePingUrl = `https://www.google.com/ping?sitemap=${encodeURIComponent(sitemapUrl)}`;
+      console.log('📤 Pinging Google...');
+      
+      await this.makeHttpRequest(googlePingUrl);
+      console.log('✅ Google ping successful');
+    } catch (error) {
+      console.log('⚠️ Google ping failed:', error.message);
+    }
+    
+    // Auto-ping Bing
+    try {
+      const bingPingUrl = `https://www.bing.com/ping?sitemap=${encodeURIComponent(sitemapUrl)}`;
+      console.log('📤 Pinging Bing...');
+      
+      await this.makeHttpRequest(bingPingUrl);
+      console.log('✅ Bing ping successful');
+    } catch (error) {
+      console.log('⚠️ Bing ping failed:', error.message);
+    }
+    
+    console.log('\n🔍 Manual submission URLs (for better control):');
     console.log(`Google: https://www.google.com/ping?sitemap=${encodeURIComponent(sitemapUrl)}`);
     console.log(`Bing: https://www.bing.com/ping?sitemap=${encodeURIComponent(sitemapUrl)}`);
-    console.log('\n📝 Manual submission (recommended):');
+    console.log('\n📝 Advanced manual submission (recommended):');
     console.log('Google Search Console: https://search.google.com/search-console');
     console.log('Bing Webmaster Tools: https://www.bing.com/webmasters');
+  }
+
+  // Helper method to make HTTP requests
+  makeHttpRequest(url) {
+    return new Promise((resolve, reject) => {
+      const protocol = url.startsWith('https:') ? https : http;
+      
+      const request = protocol.get(url, (response) => {
+        let data = '';
+        
+        response.on('data', (chunk) => {
+          data += chunk;
+        });
+        
+        response.on('end', () => {
+          if (response.statusCode >= 200 && response.statusCode < 300) {
+            resolve(data);
+          } else {
+            reject(new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`));
+          }
+        });
+      });
+      
+      request.on('error', (error) => {
+        reject(error);
+      });
+      
+      request.setTimeout(10000, () => {
+        request.abort();
+        reject(new Error('Request timeout'));
+      });
+    });
   }
 
   // Main generation process

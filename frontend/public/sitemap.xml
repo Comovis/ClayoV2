@@ -2,112 +2,38 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://clayo.co/</loc>
-    <lastmod>2025-06-09</lastmod>
+    <lastmod>2025-06-09T20:03:29.881Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://clayo.co/login</loc>
-    <lastmod>2025-06-09</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://clayo.co/signup</loc>
-    <lastmod>2025-06-09</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://clayo.co/accept-invite</loc>
-    <lastmod>2025-06-09</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
-    <loc>https://clayo.co/confirm-email</loc>
-    <lastmod>2025-06-09</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
-    <loc>https://clayo.co/onboarding</loc>
-    <lastmod>2025-06-09</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://clayo.co/dashboard</loc>
-    <lastmod>2025-06-09</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://clayo.co/conversations</loc>
-    <lastmod>2025-06-09</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://clayo.co/agent-config</loc>
-    <lastmod>2025-06-09</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://clayo.co/widget-config</loc>
-    <lastmod>2025-06-09</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://clayo.co/analytics</loc>
-    <lastmod>2025-06-09</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
     <loc>https://clayo.co/pricing</loc>
-    <lastmod>2025-06-09</lastmod>
+    <lastmod>2025-06-09T20:03:29.882Z</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://clayo.co/team</loc>
-    <lastmod>2025-06-09</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://clayo.co/tests</loc>
-    <lastmod>2025-06-09</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
+    <priority>0.9</priority>
   </url>
   <url>
     <loc>https://clayo.co/blog</loc>
-    <lastmod>2025-06-09</lastmod>
+    <lastmod>2025-06-09T20:03:29.882Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://clayo.co/admin/blog/mgt</loc>
-    <lastmod>2025-06-09</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://clayo.co/admin/blog/new</loc>
-    <lastmod>2025-06-09</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <!-- Dynamic blog posts (example placeholder; replace with actual slugs from your database) -->
-  <!-- <url>
-    <loc>https://clayo.co/blog/sample-post</loc>
-    <lastmod>2025-06-09</lastmod>
+    <loc>https://clayo.co/blog/if-your-customer-service-isnt-247-youre-basically-openly-inviting-competitors-to-steal-your-clients</loc>
+    <lastmod>2025-06-08T18:35:19.402+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
-  </url> -->
-  <!-- Dynamic blog edit pages are not included as they are admin-only and typically not indexed -->
+  </url>
+  <url>
+    <loc>https://clayo.co/login</loc>
+    <lastmod>2025-06-09T20:03:29.882Z</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://clayo.co/signup</loc>
+    <lastmod>2025-06-09T20:03:29.882Z</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
 </urlset>
